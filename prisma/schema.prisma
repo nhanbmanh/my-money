@@ -1,0 +1,126 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("POSTGRES_PRISMA_URL")
+  directUrl = env("POSTGRES_URL_NON_POOLING")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  username      String    @unique
+  bod           DateTime?
+  gender        String?
+  emailVerified Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  otpCodes      OtpCode[]
+  sources             Source[]
+  categories          Category[]
+  secondaryCategories SecondaryCategory[]
+  cashFlows           CashFlow[]
+
+  @@map("users")
+}
+
+model OtpCode {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code      String
+  expiresAt DateTime
+  consumed  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("otp_codes")
+}
+
+model Source {
+  id         String     @id @default(uuid())
+  userId     String?
+  user       User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceName String
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  cashFlows  CashFlow[]
+
+  @@map("sources")
+}
+
+model Category {
+  id           String     @id @default(uuid())
+  userId       String?
+  user         User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryName String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  cashFlows    CashFlow[]
+
+  @@map("categories")
+}
+
+model SecondaryCategory {
+  id           String     @id @default(uuid())
+  userId       String?
+  user         User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryName String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  cashFlowSecondaryCategories CashFlowSecondaryCategory[]
+
+  @@map("secondary_categories")   // <-- đổi tên này
+}
+
+model CashFlow {
+  id                String    @id @default(uuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceId          String?
+  source            Source?   @relation(fields: [sourceId], references: [id])
+  primaryCategoryId String?
+  primaryCategory   Category? @relation(fields: [primaryCategoryId], references: [id])
+  title             String
+  datetime          DateTime  @default(now())
+  cashType          CashType  @default(Expense)
+  amountOfMoney     Float
+  description       String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  secondaryCategories CashFlowSecondaryCategory[]
+
+  @@index([userId, datetime])
+  @@index([userId, primaryCategoryId])
+  @@index([userId, sourceId])
+  @@map("cash_flows")
+}
+
+model CashFlowSecondaryCategory {
+  id                  String            @id @default(uuid())
+  cashFlowId          String
+  cashFlow            CashFlow          @relation(fields: [cashFlowId], references: [id], onDelete: Cascade)
+  secondaryCategoryId String
+  secondaryCategory   SecondaryCategory @relation(fields: [secondaryCategoryId], references: [id])
+
+  @@unique([cashFlowId, secondaryCategoryId])
+  @@map("cash_flow_secondary_categories")
+}
+
+enum CashType {
+  Income
+  Expense
+}
