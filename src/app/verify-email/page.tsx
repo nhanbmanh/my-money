@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -73,78 +73,86 @@ export default function VerifyEmailPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted px-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">Xác thực email</CardTitle>
-          <CardDescription>
-            Nhập mã 6 số đã gửi tới{" "}
-            <span className="font-medium text-foreground">{email}</span>
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleVerify} className="space-y-6">
-            <div className="flex flex-col items-center space-y-2">
-              <InputOTP
-                maxLength={6}
-                value={code}
-                onChange={(value) => {
-                  setCode(value);
-                  setError("");
-                }}
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-muted">
+          <Spinner />
+        </div>
+      }
+    >
+      <div className="flex min-h-screen items-center justify-center bg-muted px-4">
+        <Card className="w-full max-w-sm">
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-2xl font-bold">Xác thực email</CardTitle>
+            <CardDescription>
+              Nhập mã 6 số đã gửi tới{" "}
+              <span className="font-medium text-foreground">{email}</span>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleVerify} className="space-y-6">
+              <div className="flex flex-col items-center space-y-2">
+                <InputOTP
+                  maxLength={6}
+                  value={code}
+                  onChange={(value) => {
+                    setCode(value);
+                    setError("");
+                  }}
+                >
+                  <InputOTPGroup>
+                    <InputOTPSlot index={0} />
+                    <InputOTPSlot index={1} />
+                    <InputOTPSlot index={2} />
+                    <InputOTPSlot index={3} />
+                    <InputOTPSlot index={4} />
+                    <InputOTPSlot index={5} />
+                  </InputOTPGroup>
+                </InputOTP>
+              </div>
+
+              {error && (
+                <p className="text-center text-sm text-red-500">{error}</p>
+              )}
+              {info && (
+                <p className="text-center text-sm text-green-600">{info}</p>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={loading || code.length < 6}
               >
-                <InputOTPGroup>
-                  <InputOTPSlot index={0} />
-                  <InputOTPSlot index={1} />
-                  <InputOTPSlot index={2} />
-                  <InputOTPSlot index={3} />
-                  <InputOTPSlot index={4} />
-                  <InputOTPSlot index={5} />
-                </InputOTPGroup>
-              </InputOTP>
-            </div>
+                {loading ? (
+                  <>
+                    <Spinner className="mr-2" />
+                    Đang xác thực...
+                  </>
+                ) : (
+                  "Xác thực"
+                )}
+              </Button>
 
-            {error && (
-              <p className="text-center text-sm text-red-500">{error}</p>
-            )}
-            {info && (
-              <p className="text-center text-sm text-green-600">{info}</p>
-            )}
-
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={loading || code.length < 6}
-            >
-              {loading ? (
-                <>
-                  <Spinner className="mr-2" />
-                  Đang xác thực...
-                </>
-              ) : (
-                "Xác thực"
-              )}
-            </Button>
-
-            <Button
-              type="button"
-              variant="ghost"
-              className="w-full"
-              onClick={handleResend}
-              disabled={resending}
-            >
-              {resending ? (
-                <>
-                  <Spinner className="mr-2" />
-                  Đang gửi...
-                </>
-              ) : (
-                "Gửi lại mã"
-              )}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full"
+                onClick={handleResend}
+                disabled={resending}
+              >
+                {resending ? (
+                  <>
+                    <Spinner className="mr-2" />
+                    Đang gửi...
+                  </>
+                ) : (
+                  "Gửi lại mã"
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    </Suspense>
   );
 }
