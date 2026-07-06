@@ -51,7 +51,7 @@ export async function GET(req: Request) {
     }),
   };
 
-  const [items, total] = await Promise.all([
+  const [items, total, aggregate] = await Promise.all([
     prisma.cashFlow.findMany({
       where,
       skip,
@@ -64,13 +64,25 @@ export async function GET(req: Request) {
       },
     }),
     prisma.cashFlow.count({ where }),
+    prisma.cashFlow.groupBy({
+      by: ["cashType"],
+      where,
+      _sum: { amountOfMoney: true },
+    }),
   ]);
+
+  const totalIncome =
+    aggregate.find((a) => a.cashType === "Income")?._sum.amountOfMoney ?? 0;
+  const totalExpense =
+    aggregate.find((a) => a.cashType === "Expense")?._sum.amountOfMoney ?? 0;
 
   return NextResponse.json({
     items,
     total,
     page,
     totalPages: Math.ceil(total / limit),
+    totalIncome,
+    totalExpense,
   });
 }
 

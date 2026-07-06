@@ -75,6 +75,8 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [totalIncome, setTotalIncome] = useState(0);
+  const [totalExpense, setTotalExpense] = useState(0);
 
   // Filter options
   const [sources, setSources] = useState<Source[]>([]);
@@ -118,6 +120,8 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
     setItems(data.items || []);
     setTotal(data.total || 0);
     setTotalPages(data.totalPages || 1);
+    setTotalIncome(data.totalIncome || 0);
+    setTotalExpense(data.totalExpense || 0);
     setLoading(false);
   }, [
     page,
@@ -306,27 +310,37 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
       </div>
 
       {/* Result info */}
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <span>
-          Tổng: <strong className="text-foreground">{total}</strong> giao dịch
-        </span>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="gap-1"
-          onClick={() =>
-            setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"))
-          }
-        >
-          Ngày giao dịch
-          {sortOrder === "desc" ? (
-            <ChevronDown className="h-4 w-4" />
-          ) : sortOrder === "asc" ? (
-            <ChevronUp className="h-4 w-4" />
-          ) : (
-            <ChevronsUpDown className="h-4 w-4" />
-          )}
-        </Button>
+      <div className="flex justify-between text-sm text-muted-foreground">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 text-sm">
+          <span className="text-green-600">
+            Thu: <strong>+{totalIncome.toLocaleString("vi-VN")}đ</strong>
+          </span>
+          <span className="text-red-500">
+            Chi: <strong>-{totalExpense.toLocaleString("vi-VN")}đ</strong>
+          </span>
+        </div>
+        <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-4 text-sm">
+          <span>
+            Tổng: <strong className="text-foreground">{total}</strong> giao dịch
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1"
+            onClick={() =>
+              setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"))
+            }
+          >
+            Ngày giao dịch
+            {sortOrder === "desc" ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : sortOrder === "asc" ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronsUpDown className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Table */}

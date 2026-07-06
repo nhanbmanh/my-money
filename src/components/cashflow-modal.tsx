@@ -188,7 +188,7 @@ export function CashFlowModal({ open, onOpenChange, onSuccess }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto bg-sky-50 ring-1 ring-gray-300">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto bg-sky-50 ring-1 ring-gray-300">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">
             Khai báo thu chi
@@ -220,7 +220,7 @@ export function CashFlowModal({ open, onOpenChange, onSuccess }: Props) {
                 value={form.cashType}
                 onValueChange={(value) => setForm({ ...form, cashType: value })}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -230,7 +230,7 @@ export function CashFlowModal({ open, onOpenChange, onSuccess }: Props) {
               </Select>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 w-full">
               <Label htmlFor="amount">
                 Số tiền (VND) <span className="text-red-500">*</span>
               </Label>
@@ -294,7 +294,7 @@ export function CashFlowModal({ open, onOpenChange, onSuccess }: Props) {
               value={form.sourceId}
               onValueChange={(value) => setForm({ ...form, sourceId: value })}
             >
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -334,7 +334,7 @@ export function CashFlowModal({ open, onOpenChange, onSuccess }: Props) {
                 setForm({ ...form, primaryCategoryId: value })
               }
             >
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
