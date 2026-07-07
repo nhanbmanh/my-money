@@ -33,20 +33,42 @@ import { cn } from "@/lib/utils";
 type Category = { id: string; categoryName: string };
 type Source = { id: string; sourceName: string; sourceType: string };
 
+type CashFlowData = {
+  id: string;
+  title: string;
+  description: string | null;
+  datetime: string;
+  cashType: "Income" | "Expense";
+  amountOfMoney: number;
+  sourceId: string | null;
+  primaryCategoryId: string | null;
+  secondaryCategories: {
+    secondaryCategory: { id: string; categoryName: string };
+  }[];
+};
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  editData?: CashFlowData | null;
 }
 
-export function CashFlowModal({ open, onOpenChange, onSuccess }: Props) {
+export function CashFlowModal({
+  open,
+  onOpenChange,
+  onSuccess,
+  editData,
+}: Props) {
+  const isEdit = !!editData;
+
   const [form, setForm] = useState({
     title: "",
     description: "",
     cashType: "Expense",
     amountOfMoney: "",
-    sourceId: "default-cash",
-    primaryCategoryId: "default-uncategorized",
+    sourceId: "",
+    primaryCategoryId: "",
   });
 
   const [datetime, setDatetime] = useState<Date>(new Date());
@@ -72,7 +94,22 @@ export function CashFlowModal({ open, onOpenChange, onSuccess }: Props) {
     fetchSources();
     fetchCategories();
     fetchSecondaryCategories();
-  }, [open]);
+
+    if (editData) {
+      setForm({
+        title: editData.title,
+        description: editData.description || "",
+        cashType: editData.cashType,
+        amountOfMoney: String(editData.amountOfMoney),
+        sourceId: editData.sourceId || "",
+        primaryCategoryId: editData.primaryCategoryId || "",
+      });
+      setDatetime(new Date(editData.datetime));
+      setSecondaryCategoryIds(
+        editData.secondaryCategories.map((s) => s.secondaryCategory.id),
+      );
+    }
+  }, [open, editData]);
 
   const fetchSources = async () => {
     const res = await fetch("/api/source");
@@ -148,20 +185,26 @@ export function CashFlowModal({ open, onOpenChange, onSuccess }: Props) {
     setError("");
     setLoading(true);
 
-    const res = await fetch("/api/cashflow", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        items: [
-          {
-            ...form,
-            amountOfMoney: parseFloat(form.amountOfMoney),
-            datetime: datetime.toISOString(),
-            secondaryCategoryIds,
-          },
-        ],
-      }),
-    });
+    const payload = {
+      ...form,
+      amountOfMoney: parseFloat(form.amountOfMoney),
+      datetime: datetime.toISOString(),
+      secondaryCategoryIds,
+      sourceId: form.sourceId || undefined,
+      primaryCategoryId: form.primaryCategoryId || undefined,
+    };
+
+    const res = isEdit
+      ? await fetch(`/api/cashflow/${editData!.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+      : await fetch("/api/cashflow", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: [payload] }),
+        });
 
     const data = await res.json();
     setLoading(false);
@@ -177,8 +220,8 @@ export function CashFlowModal({ open, onOpenChange, onSuccess }: Props) {
       description: "",
       cashType: "Expense",
       amountOfMoney: "",
-      sourceId: "default-cash",
-      primaryCategoryId: "default-uncategorized",
+      sourceId: "",
+      primaryCategoryId: "",
     });
     setDatetime(new Date());
     setSecondaryCategoryIds([]);
@@ -191,7 +234,7 @@ export function CashFlowModal({ open, onOpenChange, onSuccess }: Props) {
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto bg-sky-50 ring-1 ring-gray-300">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">
-            Khai báo thu chi
+            {isEdit ? "Sửa giao dịch" : "Khai giao dịch mới"}
           </DialogTitle>
         </DialogHeader>
 
@@ -199,7 +242,7 @@ export function CashFlowModal({ open, onOpenChange, onSuccess }: Props) {
           {/* Title */}
           <div className="space-y-2">
             <Label htmlFor="title">
-              Tên chi tiêu <span className="text-red-500">*</span>
+              Tên giao dịch <span className="text-red-500">*</span>
             </Label>
             <Input
               id="title"
@@ -214,7 +257,7 @@ export function CashFlowModal({ open, onOpenChange, onSuccess }: Props) {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>
-                Loại <span className="text-red-500">*</span>
+                Loại giao dịch <span className="text-red-500">*</span>
               </Label>
               <Select
                 value={form.cashType}
@@ -307,7 +350,7 @@ export function CashFlowModal({ open, onOpenChange, onSuccess }: Props) {
             </Select>
             <div className="flex gap-2">
               <Input
-                placeholder="Thêm nguồn mới..."
+                placeholder="Thêm nguồn tiền mới..."
                 value={newSource}
                 onChange={(e) => setNewSource(e.target.value)}
                 onKeyDown={(e) =>
@@ -327,7 +370,7 @@ export function CashFlowModal({ open, onOpenChange, onSuccess }: Props) {
 
           {/* Primary Category */}
           <div className="space-y-2">
-            <Label>Nhãn chính</Label>
+            <Label>Nhãn phân loại chính</Label>
             <Select
               value={form.primaryCategoryId}
               onValueChange={(value) =>
@@ -367,7 +410,7 @@ export function CashFlowModal({ open, onOpenChange, onSuccess }: Props) {
 
           {/* Secondary Categories */}
           <div className="space-y-2">
-            <Label>Nhãn phụ</Label>
+            <Label>Nhãn phân loại phụ</Label>
             <div className="flex flex-wrap gap-2 min-h-8">
               {secondaryCategories.map((c) => (
                 <Badge
@@ -405,7 +448,7 @@ export function CashFlowModal({ open, onOpenChange, onSuccess }: Props) {
 
           {/* Description */}
           <div className="space-y-2">
-            <Label htmlFor="description">Mô tả</Label>
+            <Label htmlFor="description">Mô tả ngắn</Label>
             <Textarea
               id="description"
               value={form.description}
@@ -434,6 +477,8 @@ export function CashFlowModal({ open, onOpenChange, onSuccess }: Props) {
                   <Spinner className="mr-2" />
                   Đang lưu...
                 </>
+              ) : isEdit ? (
+                "Cập nhật"
               ) : (
                 "Lưu"
               )}

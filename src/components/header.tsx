@@ -23,7 +23,7 @@ export function Header({ onOpenModal }: HeaderProps) {
         <div className="hidden md:flex items-center gap-3">
           <Button onClick={onOpenModal} className="gap-2" size="sm">
             <PlusCircle className="h-4 w-4" />
-            Khai báo thu chi
+            Khai giao dịch
           </Button>
           <a
             href="/profile"
@@ -85,7 +85,7 @@ export function Header({ onOpenModal }: HeaderProps) {
             size="sm"
           >
             <PlusCircle className="h-4 w-4" />
-            Khai báo thu chi
+            Khai giao dịch
           </Button>
 
           <Button

@@ -129,9 +129,10 @@ export async function POST(req: Request) {
             datetime: item.datetime ? new Date(item.datetime) : new Date(),
             cashType: item.cashType,
             amountOfMoney: item.amountOfMoney,
-            sourceId: item.sourceId || "default-cash",
-            primaryCategoryId:
-              item.primaryCategoryId || "default-uncategorized",
+            sourceId: item.sourceId?.trim() ? item.sourceId : undefined,
+            primaryCategoryId: item.primaryCategoryId?.trim()
+              ? item.primaryCategoryId
+              : undefined,
             secondaryCategories: item.secondaryCategoryIds?.length
               ? {
                   create: item.secondaryCategoryIds.map(

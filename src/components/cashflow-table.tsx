@@ -9,10 +9,12 @@ import {
   ChevronsUpDown,
   Search,
   X,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -35,6 +37,23 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { CashFlowModal } from "@/components/cashflow-modal";
 import { cn } from "@/lib/utils";
 
 type Category = { id: string; categoryName: string };
@@ -49,6 +68,8 @@ type CashFlowItem = {
   source: Source | null;
   primaryCategory: Category | null;
   secondaryCategories: { secondaryCategory: Category }[];
+  sourceId: string | null;
+  primaryCategoryId: string | null;
 };
 
 const DEFAULT_DATE_FROM = startOfDay(subMonths(new Date(), 1));
@@ -65,8 +86,6 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
     [],
   );
   const [cashType, setCashType] = useState("all");
-
-  // Sort & Pagination
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
 
@@ -74,9 +93,9 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
   const [items, setItems] = useState<CashFlowItem[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(false);
   const [totalIncome, setTotalIncome] = useState(0);
   const [totalExpense, setTotalExpense] = useState(0);
+  const [loading, setLoading] = useState(false);
 
   // Filter options
   const [sources, setSources] = useState<Source[]>([]);
@@ -84,6 +103,18 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
   const [secondaryCategories, setSecondaryCategories] = useState<Category[]>(
     [],
   );
+
+  // Selection
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  // Edit modal
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editData, setEditData] = useState<CashFlowItem | null>(null);
+
+  // Delete confirm
+  const [deleteIds, setDeleteIds] = useState<string[]>([]);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetch("/api/source")
@@ -110,7 +141,6 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
       dateFrom: dateFrom.toISOString(),
       dateTo: dateTo.toISOString(),
     });
-
     secondaryCategoryIds.forEach((id) =>
       params.append("secondaryCategoryId", id),
     );
@@ -138,10 +168,9 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
   useEffect(() => {
     fetchData();
   }, [fetchData, refreshKey]);
-
-  // Reset về page 1 khi filter thay đổi
   useEffect(() => {
     setPage(1);
+    setSelectedIds([]);
   }, [
     search,
     sourceId,
@@ -169,6 +198,53 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
     setPage(1);
   };
 
+  // Checkbox handlers
+  const isAllSelected =
+    items.length > 0 && items.every((i) => selectedIds.includes(i.id));
+  const isIndeterminate = selectedIds.length > 0 && !isAllSelected;
+
+  const toggleAll = () => {
+    setSelectedIds(isAllSelected ? [] : items.map((i) => i.id));
+  };
+
+  const toggleOne = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
+    );
+  };
+
+  // Delete handlers
+  const handleDeleteConfirm = (ids: string[]) => {
+    setDeleteIds(ids);
+    setConfirmOpen(true);
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    const isBulk = deleteIds.length > 1;
+
+    if (isBulk) {
+      await fetch("/api/cashflow/bulk-delete", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: deleteIds }),
+      });
+    } else {
+      await fetch(`/api/cashflow/${deleteIds[0]}`, { method: "DELETE" });
+    }
+
+    setDeleting(false);
+    setConfirmOpen(false);
+    setSelectedIds([]);
+    fetchData();
+  };
+
+  // Edit handler
+  const handleEdit = (item: CashFlowItem) => {
+    setEditData(item);
+    setEditModalOpen(true);
+  };
+
   const formatMoney = (amount: number, type: "Income" | "Expense") => {
     const formatted = amount.toLocaleString("vi-VN") + "đ";
     return type === "Income" ? `+${formatted}` : `-${formatted}`;
@@ -191,19 +267,16 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
           </Button>
         </div>
 
-        {/* Row 1: Search + Date range */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               className="pl-9 bg-white"
-              placeholder="Tìm theo tên, mô tả..."
+              placeholder="Tìm theo tên giao dịch, mô tả..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-
-          {/* Date From */}
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -222,8 +295,6 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
               />
             </PopoverContent>
           </Popover>
-
-          {/* Date To */}
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -244,25 +315,23 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
           </Popover>
         </div>
 
-        {/* Row 2: CashType + Source + Category */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Select value={cashType} onValueChange={setCashType}>
             <SelectTrigger className="bg-white w-full">
               <SelectValue placeholder="Loại giao dịch" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Tất cả loại</SelectItem>
+              <SelectItem value="all">Tất cả loại giao dịch</SelectItem>
               <SelectItem value="Income">💰 Thu nhập</SelectItem>
               <SelectItem value="Expense">💸 Chi tiêu</SelectItem>
             </SelectContent>
           </Select>
-
           <Select value={sourceId} onValueChange={setSourceId}>
             <SelectTrigger className="bg-white w-full">
               <SelectValue placeholder="Nguồn tiền" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Tất cả nguồn</SelectItem>
+              <SelectItem value="all">Tất cả nguồn tiền</SelectItem>
               {sources.map((s) => (
                 <SelectItem key={s.id} value={s.id}>
                   {s.sourceName}
@@ -270,13 +339,12 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
               ))}
             </SelectContent>
           </Select>
-
           <Select value={categoryId} onValueChange={setCategoryId}>
             <SelectTrigger className="bg-white w-full">
               <SelectValue placeholder="Nhãn chính" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Tất cả nhãn</SelectItem>
+              <SelectItem value="all">Tất cả nhãn chính</SelectItem>
               {categories.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   {c.categoryName}
@@ -286,27 +354,37 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
           </Select>
         </div>
 
-        {/* Row 3: Secondary categories */}
         <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">Nhãn phụ</p>
-          <div className="flex flex-wrap gap-2">
-            {secondaryCategories.map((c) => (
-              <Badge
-                key={c.id}
-                variant={
-                  secondaryCategoryIds.includes(c.id) ? "default" : "outline"
-                }
-                className="cursor-pointer select-none"
-                onClick={() => toggleSecondaryCategory(c.id)}
-              >
-                {c.categoryName}
-              </Badge>
-            ))}
-            {secondaryCategories.length === 0 && (
+          <p className="text-xs text-muted-foreground">Nhãn phân loại phụ</p>
+          <div className="flex flex-wrap gap-2 min-h-9 px-3 py-2 rounded-md border border-input bg-white items-center">
+            {secondaryCategories.length === 0 ? (
               <p className="text-xs text-muted-foreground">Chưa có nhãn phụ</p>
+            ) : (
+              secondaryCategories.map((c) => (
+                <Badge
+                  key={c.id}
+                  variant={
+                    secondaryCategoryIds.includes(c.id) ? "default" : "outline"
+                  }
+                  className="cursor-pointer select-none"
+                  onClick={() => toggleSecondaryCategory(c.id)}
+                >
+                  {c.categoryName}
+                </Badge>
+              ))
             )}
           </div>
         </div>
+        <Button
+          variant="destructive"
+          size="sm"
+          className="gap-1 w-full sm:w-auto justify-center"
+          disabled={selectedIds.length == 0}
+          onClick={() => handleDeleteConfirm(selectedIds)}
+        >
+          <Trash2 className="h-4 w-4" />
+          Xóa giao dịch
+        </Button>
       </div>
 
       {/* Result info */}
@@ -348,6 +426,15 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
         <Table>
           <TableHeader className="bg-sky-100">
             <TableRow>
+              <TableHead className="w-10">
+                <Checkbox
+                  checked={isAllSelected}
+                  ref={(el) => {
+                    if (el) (el as any).indeterminate = isIndeterminate;
+                  }}
+                  onCheckedChange={toggleAll}
+                />
+              </TableHead>
               <TableHead>Tên</TableHead>
               <TableHead>Loại</TableHead>
               <TableHead>Số tiền</TableHead>
@@ -361,14 +448,14 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-12">
+                <TableCell colSpan={9} className="text-center py-12">
                   <Spinner className="mx-auto" />
                 </TableCell>
               </TableRow>
             ) : items.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={8}
+                  colSpan={9}
                   className="text-center py-12 text-muted-foreground"
                 >
                   Không có dữ liệu
@@ -376,55 +463,86 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
               </TableRow>
             ) : (
               items.map((item) => (
-                <TableRow key={item.id} className="bg-white hover:bg-sky-50">
-                  <TableCell className="font-medium">{item.title}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        item.cashType === "Income" ? "default" : "destructive"
-                      }
+                <ContextMenu key={item.id}>
+                  <ContextMenuTrigger asChild>
+                    <TableRow
+                      className={cn(
+                        "bg-white hover:bg-sky-50 cursor-context-menu",
+                        selectedIds.includes(item.id) &&
+                          "bg-sky-100 hover:bg-sky-100",
+                      )}
                     >
-                      {item.cashType === "Income" ? "💰 Thu" : "💸 Chi"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell
-                    className={cn(
-                      "font-semibold",
-                      item.cashType === "Income"
-                        ? "text-green-600"
-                        : "text-red-500",
-                    )}
-                  >
-                    {formatMoney(item.amountOfMoney, item.cashType)}
-                  </TableCell>
-                  <TableCell>{item.source?.sourceName ?? "—"}</TableCell>
-                  <TableCell>
-                    {item.primaryCategory?.categoryName ?? "—"}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {item.secondaryCategories.length > 0
-                        ? item.secondaryCategories.map(
-                            ({ secondaryCategory }) => (
-                              <Badge
-                                key={secondaryCategory.id}
-                                variant="outline"
-                                className="text-xs"
-                              >
-                                {secondaryCategory.categoryName}
-                              </Badge>
-                            ),
-                          )
-                        : "—"}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                    {format(new Date(item.datetime), "HH:mm dd/MM/yyyy")}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate">
-                    {item.description ?? "—"}
-                  </TableCell>
-                </TableRow>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedIds.includes(item.id)}
+                          onCheckedChange={() => toggleOne(item.id)}
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {item.title}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            item.cashType === "Income"
+                              ? "default"
+                              : "destructive"
+                          }
+                        >
+                          {item.cashType === "Income" ? "💰 Thu" : "💸 Chi"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell
+                        className={cn(
+                          "font-semibold",
+                          item.cashType === "Income"
+                            ? "text-green-600"
+                            : "text-red-500",
+                        )}
+                      >
+                        {formatMoney(item.amountOfMoney, item.cashType)}
+                      </TableCell>
+                      <TableCell>{item.source?.sourceName ?? "—"}</TableCell>
+                      <TableCell>
+                        {item.primaryCategory?.categoryName ?? "—"}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {item.secondaryCategories.length > 0
+                            ? item.secondaryCategories.map(
+                                ({ secondaryCategory }) => (
+                                  <Badge
+                                    key={secondaryCategory.id}
+                                    variant="outline"
+                                    className="text-xs"
+                                  >
+                                    {secondaryCategory.categoryName}
+                                  </Badge>
+                                ),
+                              )
+                            : "—"}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                        {format(new Date(item.datetime), "HH:mm dd/MM/yyyy")}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate">
+                        {item.description ?? "—"}
+                      </TableCell>
+                    </TableRow>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent>
+                    <ContextMenuItem onClick={() => handleEdit(item)}>
+                      ✏️ Sửa giao dịch
+                    </ContextMenuItem>
+                    <ContextMenuItem
+                      className="text-red-500 focus:text-red-500"
+                      onClick={() => handleDeleteConfirm([item.id])}
+                    >
+                      🗑️ Xóa giao dịch
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
               ))
             )}
           </TableBody>
@@ -483,6 +601,45 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
           </Button>
         </div>
       )}
+
+      {/* Edit Modal */}
+      <CashFlowModal
+        open={editModalOpen}
+        onOpenChange={setEditModalOpen}
+        onSuccess={fetchData}
+        editData={editData}
+      />
+
+      {/* Confirm Delete Dialog */}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Xác nhận xóa</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteIds.length > 1
+                ? `Bạn có chắc muốn xóa ${deleteIds.length} giao dịch đã chọn không? Hành động này không thể hoàn tác.`
+                : "Bạn có chắc muốn xóa giao dịch này không? Hành động này không thể hoàn tác."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              {deleting ? (
+                <>
+                  <Spinner className="mr-2" />
+                  Đang xóa...
+                </>
+              ) : (
+                "Xóa"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
