@@ -231,7 +231,7 @@ export function CashFlowModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto bg-sky-50 ring-1 ring-gray-300">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto bg-sky-50 ring-1 ring-gray-400">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">
             {isEdit ? "Sửa giao dịch" : "Khai giao dịch mới"}

@@ -253,7 +253,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
   return (
     <div className="space-y-4">
       {/* Filter Section */}
-      <div className="bg-sky-50 ring-1 ring-gray-300 rounded-xl p-4 space-y-4 shadow-md shadow-sky-100">
+      <div className="bg-sky-50 ring-1 ring-gray-400 rounded-xl p-4 space-y-4 shadow-md shadow-sky-100">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-sm">Bộ lọc</h3>
           <Button
@@ -422,9 +422,9 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
       </div>
 
       {/* Table */}
-      <div className="rounded-xl overflow-hidden ring-1 ring-gray-300 shadow-md shadow-sky-100">
+      <div className="rounded-xl overflow-hidden ring-1 ring-gray-400 shadow-md shadow-sky-100">
         <Table>
-          <TableHeader className="bg-sky-100">
+          <TableHeader className="bg-sky-200">
             <TableRow>
               <TableHead className="w-10">
                 <Checkbox
@@ -435,14 +435,14 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                   onCheckedChange={toggleAll}
                 />
               </TableHead>
-              <TableHead>Tên</TableHead>
-              <TableHead>Loại</TableHead>
-              <TableHead>Số tiền</TableHead>
-              <TableHead>Nguồn</TableHead>
-              <TableHead>Nhãn chính</TableHead>
-              <TableHead>Nhãn phụ</TableHead>
-              <TableHead>Thời gian</TableHead>
-              <TableHead>Mô tả</TableHead>
+              <TableHead className="font-bold">Tên</TableHead>
+              <TableHead className="font-bold">Loại</TableHead>
+              <TableHead className="font-bold">Số tiền</TableHead>
+              <TableHead className="font-bold">Nguồn</TableHead>
+              <TableHead className="font-bold">Nhãn chính</TableHead>
+              <TableHead className="font-bold">Nhãn phụ</TableHead>
+              <TableHead className="font-bold">Thời gian</TableHead>
+              <TableHead className="font-bold">Mô tả</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
