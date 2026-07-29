@@ -72,14 +72,6 @@ export function Header({ onOpenModal }: HeaderProps) {
       >
         <div className="max-w-7xl mx-auto flex flex-col gap-2">
           <a
-            href="/settings"
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground px-1 py-1 transition-colors"
-            onClick={() => setMenuOpen(false)}
-          >
-            <Settings className="h-4 w-4" />
-            Cài đặt
-          </a>
-          <a
             href="/profile"
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground px-1 py-1 transition-colors"
             onClick={() => setMenuOpen(false)}
@@ -88,6 +80,14 @@ export function Header({ onOpenModal }: HeaderProps) {
             <span>
               Xin chào, <strong>{session?.user?.name}</strong>
             </span>
+          </a>
+          <a
+            href="/settings"
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground px-1 py-1 transition-colors"
+            onClick={() => setMenuOpen(false)}
+          >
+            <Settings className="h-4 w-4" />
+            Cài đặt
           </a>
 
           <Button
