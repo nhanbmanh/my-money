@@ -53,6 +53,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { CashFlowChartModal } from "@/components/cashflow-chart-modal";
 import { CashFlowModal } from "@/components/cashflow-modal";
 import { cn, getSecondaryCategoryBadgeClass } from "@/lib/utils";
 
@@ -111,6 +112,9 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
   // Edit modal
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editData, setEditData] = useState<CashFlowItem | null>(null);
+
+  // Chart modal
+  const [chartOpen, setChartOpen] = useState(false);
 
   // Delete confirm
   const [deleteIds, setDeleteIds] = useState<string[]>([]);
@@ -267,6 +271,17 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
     return type === "Income" ? `+${formatted}` : `-${formatted}`;
   };
 
+  const chartFilters = {
+    search,
+    sourceId,
+    categoryId,
+    secondaryCategoryIds,
+    cashType,
+    dateFrom: dateFrom.toISOString(),
+    dateTo: dateTo.toISOString(),
+    sortOrder,
+  };
+
   return (
     <div className="space-y-4">
       {/* Filter Section */}
@@ -416,6 +431,13 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
       {/* Result info */}
       <div className="flex justify-between text-sm text-muted-foreground">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 text-sm">
+          <span
+            onClick={() =>
+              setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"))
+            }
+          >
+            SL: <strong className="text-foreground">{total}</strong> bản ghi
+          </span>
           <span className="text-green-600">
             Thu: <strong>+{totalIncome.toLocaleString("vi-VN")}đ</strong>
           </span>
@@ -424,9 +446,6 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
           </span>
         </div>
         <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-4 text-sm">
-          <span>
-            Tổng: <strong className="text-foreground">{total}</strong> giao dịch
-          </span>
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground">Hiển thị</span>
             <Select
@@ -450,21 +469,12 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
             </Select>
           </div>
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             className="gap-1"
-            onClick={() =>
-              setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"))
-            }
+            onClick={() => setChartOpen(true)}
           >
-            Ngày giao dịch
-            {sortOrder === "desc" ? (
-              <ChevronDown className="h-4 w-4" />
-            ) : sortOrder === "asc" ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronsUpDown className="h-4 w-4" />
-            )}
+            Xem biểu đồ
           </Button>
         </div>
       </div>
@@ -671,6 +681,12 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
         onOpenChange={setEditModalOpen}
         onSuccess={fetchData}
         editData={editData}
+      />
+
+      <CashFlowChartModal
+        open={chartOpen}
+        onOpenChange={setChartOpen}
+        filters={chartFilters}
       />
 
       {/* Confirm Delete Dialog */}
