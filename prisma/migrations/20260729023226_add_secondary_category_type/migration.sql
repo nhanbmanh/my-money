@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "secondary_categories" ADD COLUMN     "type" INTEGER NOT NULL DEFAULT 0;

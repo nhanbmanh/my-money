@@ -28,9 +28,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { cn } from "@/lib/utils";
+import { cn, getSecondaryCategoryBadgeClass } from "@/lib/utils";
 
-type Category = { id: string; categoryName: string };
+type Category = { id: string; categoryName: string; type?: number | null };
 type Source = { id: string; sourceName: string; sourceType: string };
 
 type CashFlowData = {
@@ -43,7 +43,11 @@ type CashFlowData = {
   sourceId: string | null;
   primaryCategoryId: string | null;
   secondaryCategories: {
-    secondaryCategory: { id: string; categoryName: string };
+    secondaryCategory: {
+      id: string;
+      categoryName: string;
+      type?: number | null;
+    };
   }[];
 };
 
@@ -85,6 +89,7 @@ export function CashFlowModal({
   const [newSource, setNewSource] = useState("");
   const [newCategory, setNewCategory] = useState("");
   const [newSecondaryCategory, setNewSecondaryCategory] = useState("");
+  const [newSecondaryCategoryType, setNewSecondaryCategoryType] = useState("0");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -112,21 +117,33 @@ export function CashFlowModal({
   }, [open, editData]);
 
   const fetchSources = async () => {
-    const res = await fetch("/api/source");
-    const data = await res.json();
-    setSources(data);
+    try {
+      const res = await fetch("/api/source");
+      const text = await res.text();
+      setSources(text ? JSON.parse(text) : []);
+    } catch {
+      setSources([]);
+    }
   };
 
   const fetchCategories = async () => {
-    const res = await fetch("/api/category");
-    const data = await res.json();
-    setCategories(data);
+    try {
+      const res = await fetch("/api/category");
+      const text = await res.text();
+      setCategories(text ? JSON.parse(text) : []);
+    } catch {
+      setCategories([]);
+    }
   };
 
   const fetchSecondaryCategories = async () => {
-    const res = await fetch("/api/secondary-category");
-    const data = await res.json();
-    setSecondaryCategories(data);
+    try {
+      const res = await fetch("/api/secondary-category");
+      const text = await res.text();
+      setSecondaryCategories(text ? JSON.parse(text) : []);
+    } catch {
+      setSecondaryCategories([]);
+    }
   };
 
   const handleAddSource = async () => {
@@ -164,13 +181,17 @@ export function CashFlowModal({
     const res = await fetch("/api/secondary-category", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ categoryName: newSecondaryCategory.trim() }),
+      body: JSON.stringify({
+        categoryName: newSecondaryCategory.trim(),
+        type: Number(newSecondaryCategoryType),
+      }),
     });
     if (res.ok) {
       const data = await res.json();
       setSecondaryCategories((prev) => [...prev, data]);
       setSecondaryCategoryIds((prev) => [...prev, data.id]);
       setNewSecondaryCategory("");
+      setNewSecondaryCategoryType("0");
     }
   };
 
@@ -206,11 +227,16 @@ export function CashFlowModal({
           body: JSON.stringify({ items: [payload] }),
         });
 
-    const data = await res.json();
+    let data: { error?: string } = {};
+    try {
+      data = await res.json();
+    } catch {
+      data = { error: "Máy chủ trả về phản hồi không hợp lệ" };
+    }
     setLoading(false);
 
     if (!res.ok) {
-      setError(data.error);
+      setError(data.error || "Đã xảy ra lỗi khi lưu giao dịch");
       return;
     }
 
@@ -412,20 +438,32 @@ export function CashFlowModal({
           <div className="space-y-2">
             <Label>Nhãn phân loại phụ</Label>
             <div className="flex flex-wrap gap-2 min-h-8">
-              {secondaryCategories.map((c) => (
-                <Badge
-                  key={c.id}
-                  variant={
-                    secondaryCategoryIds.includes(c.id) ? "default" : "outline"
-                  }
-                  className="cursor-pointer"
-                  onClick={() => toggleSecondaryCategory(c.id)}
-                >
-                  {c.categoryName}
-                </Badge>
-              ))}
+              {[...secondaryCategories]
+                .sort((a, b) => (a.type ?? 0) - (b.type ?? 0))
+                .map((c) => {
+                  const isSelected = secondaryCategoryIds.includes(c.id);
+
+                  return (
+                    <Badge
+                      key={c.id}
+                      variant="outline"
+                      className={cn(
+                        "cursor-pointer border-2 transition-all",
+                        getSecondaryCategoryBadgeClass(c.type),
+                        isSelected &&
+                          "shadow-md scale-[1.03] border-slate-900 bg-slate-900 text-white",
+                      )}
+                      onClick={() => toggleSecondaryCategory(c.id)}
+                    >
+                      {c.categoryName}
+                      {typeof c.type === "number" && (
+                        <span className="ml-1 opacity-80">[{c.type}]</span>
+                      )}
+                    </Badge>
+                  );
+                })}
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <Input
                 placeholder="Thêm nhãn phụ mới..."
                 value={newSecondaryCategory}
@@ -434,6 +472,14 @@ export function CashFlowModal({
                   e.key === "Enter" &&
                   (e.preventDefault(), handleAddSecondaryCategory())
                 }
+              />
+              <Input
+                type="number"
+                min="0"
+                value={newSecondaryCategoryType}
+                onChange={(e) => setNewSecondaryCategoryType(e.target.value)}
+                className="w-24"
+                placeholder="Loại"
               />
               <Button
                 type="button"

@@ -54,9 +54,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { CashFlowModal } from "@/components/cashflow-modal";
-import { cn } from "@/lib/utils";
+import { cn, getSecondaryCategoryBadgeClass } from "@/lib/utils";
 
-type Category = { id: string; categoryName: string };
+type Category = { id: string; categoryName: string; type?: number | null };
 type Source = { id: string; sourceName: string };
 type CashFlowItem = {
   id: string;
@@ -88,6 +88,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
   const [cashType, setCashType] = useState("all");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState("10");
 
   // Data
   const [items, setItems] = useState<CashFlowItem[]>([]);
@@ -117,22 +118,28 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    fetch("/api/source")
-      .then((r) => r.json())
-      .then(setSources);
-    fetch("/api/category")
-      .then((r) => r.json())
-      .then(setCategories);
-    fetch("/api/secondary-category")
-      .then((r) => r.json())
-      .then(setSecondaryCategories);
+    const safeJson = async (url: string) => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return [];
+        const text = await res.text();
+        if (!text) return [];
+        return JSON.parse(text);
+      } catch {
+        return [];
+      }
+    };
+
+    safeJson("/api/source").then(setSources);
+    safeJson("/api/category").then(setCategories);
+    safeJson("/api/secondary-category").then(setSecondaryCategories);
   }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams({
       page: String(page),
-      limit: "10",
+      limit,
       sortOrder,
       ...(search && { search }),
       ...(sourceId !== "all" && { sourceId }),
@@ -145,16 +152,27 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
       params.append("secondaryCategoryId", id),
     );
 
-    const res = await fetch(`/api/cashflow?${params}`);
-    const data = await res.json();
-    setItems(data.items || []);
-    setTotal(data.total || 0);
-    setTotalPages(data.totalPages || 1);
-    setTotalIncome(data.totalIncome || 0);
-    setTotalExpense(data.totalExpense || 0);
-    setLoading(false);
+    try {
+      const res = await fetch(`/api/cashflow?${params}`);
+      const text = await res.text();
+      const data = text ? JSON.parse(text) : {};
+      setItems(data.items || []);
+      setTotal(data.total || 0);
+      setTotalPages(data.totalPages || 1);
+      setTotalIncome(data.totalIncome || 0);
+      setTotalExpense(data.totalExpense || 0);
+    } catch {
+      setItems([]);
+      setTotal(0);
+      setTotalPages(1);
+      setTotalIncome(0);
+      setTotalExpense(0);
+    } finally {
+      setLoading(false);
+    }
   }, [
     page,
+    limit,
     sortOrder,
     search,
     sourceId,
@@ -169,7 +187,6 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
     fetchData();
   }, [fetchData, refreshKey]);
   useEffect(() => {
-    setPage(1);
     setSelectedIds([]);
   }, [
     search,
@@ -179,6 +196,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
     dateFrom,
     dateTo,
     secondaryCategoryIds,
+    limit,
   ]);
 
   const toggleSecondaryCategory = (id: string) => {
@@ -195,7 +213,6 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
     setCategoryId("all");
     setSecondaryCategoryIds([]);
     setCashType("all");
-    setPage(1);
   };
 
   // Checkbox handlers
@@ -360,18 +377,27 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
             {secondaryCategories.length === 0 ? (
               <p className="text-xs text-muted-foreground">Chưa có nhãn phụ</p>
             ) : (
-              secondaryCategories.map((c) => (
-                <Badge
-                  key={c.id}
-                  variant={
-                    secondaryCategoryIds.includes(c.id) ? "default" : "outline"
-                  }
-                  className="cursor-pointer select-none"
-                  onClick={() => toggleSecondaryCategory(c.id)}
-                >
-                  {c.categoryName}
-                </Badge>
-              ))
+              [...secondaryCategories]
+                .sort((a, b) => (a.type ?? 0) - (b.type ?? 0))
+                .map((c) => {
+                  const isSelected = secondaryCategoryIds.includes(c.id);
+
+                  return (
+                    <Badge
+                      key={c.id}
+                      variant="outline"
+                      className={cn(
+                        "cursor-pointer select-none border-2 transition-all",
+                        getSecondaryCategoryBadgeClass(c.type),
+                        isSelected &&
+                          "shadow-md scale-[1.03] border-slate-900 bg-slate-900 text-white",
+                      )}
+                      onClick={() => toggleSecondaryCategory(c.id)}
+                    >
+                      {c.categoryName}
+                    </Badge>
+                  );
+                })
             )}
           </div>
         </div>
@@ -401,6 +427,28 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
           <span>
             Tổng: <strong className="text-foreground">{total}</strong> giao dịch
           </span>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">Hiển thị</span>
+            <Select
+              value={limit}
+              onValueChange={(value) => {
+                setLimit(value);
+                setPage(1);
+                setSelectedIds([]);
+              }}
+            >
+              <SelectTrigger className="w-[60px] bg-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+                <SelectItem value="all">All</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <Button
             variant="ghost"
             size="sm"
@@ -509,17 +557,32 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {item.secondaryCategories.length > 0
-                            ? item.secondaryCategories.map(
-                                ({ secondaryCategory }) => (
+                            ? [...item.secondaryCategories]
+                                .sort(
+                                  (a, b) =>
+                                    (a.secondaryCategory.type ?? 0) -
+                                    (b.secondaryCategory.type ?? 0),
+                                )
+                                .map(({ secondaryCategory }) => (
                                   <Badge
                                     key={secondaryCategory.id}
                                     variant="outline"
-                                    className="text-xs"
+                                    className={cn(
+                                      "text-xs border-2",
+                                      getSecondaryCategoryBadgeClass(
+                                        secondaryCategory.type,
+                                      ),
+                                    )}
                                   >
                                     {secondaryCategory.categoryName}
+                                    {typeof secondaryCategory.type ===
+                                      "number" && (
+                                      <span className="ml-1 opacity-80">
+                                        [{secondaryCategory.type}]
+                                      </span>
+                                    )}
                                   </Badge>
-                                ),
-                              )
+                                ))
                             : "—"}
                         </div>
                       </TableCell>
@@ -550,7 +613,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
+      {limit !== "all" && totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
           <Button
             variant="outline"

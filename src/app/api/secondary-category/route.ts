@@ -12,7 +12,7 @@ export async function GET() {
     where: {
       OR: [{ userId: session.user.id }, { userId: null }],
     },
-    orderBy: { createdAt: "asc" },
+    orderBy: [{ type: "asc" }, { createdAt: "asc" }],
   });
 
   return NextResponse.json(categories);
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { categoryName } = await req.json();
+  const { categoryName, type } = await req.json();
 
   if (!categoryName?.trim()) {
     return NextResponse.json(
@@ -33,10 +33,13 @@ export async function POST(req: Request) {
     );
   }
 
+  const parsedType = Number.isInteger(type) ? type : 0;
+
   const category = await prisma.secondaryCategory.create({
     data: {
       user: { connect: { id: session.user.id } },
       categoryName: categoryName.trim(),
+      ...(typeof parsedType === "number" ? { type: parsedType } : {}),
     },
   });
 

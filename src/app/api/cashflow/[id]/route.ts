@@ -51,40 +51,61 @@ export async function PUT(
     ? primaryCategoryId
     : undefined;
 
-  const updated = await prisma.$transaction(async (tx) => {
-    // Xóa secondary categories cũ
-    await tx.cashFlowSecondaryCategory.deleteMany({
-      where: { cashFlowId: id },
-    });
+  try {
+    const updated = await prisma.$transaction(
+      async (tx) => {
+        // Xóa secondary categories cũ
+        await tx.cashFlowSecondaryCategory.deleteMany({
+          where: { cashFlowId: id },
+        });
 
-    return tx.cashFlow.update({
-      where: { id },
-      data: {
-        ...data,
-        datetime: data.datetime ? new Date(data.datetime) : existing.datetime,
-        source: normalizedSourceId
-          ? { connect: { id: normalizedSourceId } }
-          : undefined,
-        primaryCategory: normalizedPrimaryCategoryId
-          ? { connect: { id: normalizedPrimaryCategoryId } }
-          : undefined,
-        secondaryCategories: secondaryCategoryIds?.length
-          ? {
-              create: secondaryCategoryIds.map((id) => ({
-                secondaryCategoryId: id,
-              })),
-            }
-          : undefined,
+        return tx.cashFlow.update({
+          where: { id, userId: session.user.id },
+          data: {
+            ...data,
+            datetime: data.datetime
+              ? new Date(data.datetime)
+              : existing.datetime,
+            source: normalizedSourceId
+              ? { connect: { id: normalizedSourceId } }
+              : undefined,
+            primaryCategory: normalizedPrimaryCategoryId
+              ? { connect: { id: normalizedPrimaryCategoryId } }
+              : undefined,
+            secondaryCategories: secondaryCategoryIds?.length
+              ? {
+                  create: secondaryCategoryIds.map((secondaryCategoryId) => ({
+                    secondaryCategoryId,
+                  })),
+                }
+              : undefined,
+          },
+          include: {
+            source: true,
+            primaryCategory: true,
+            secondaryCategories: { include: { secondaryCategory: true } },
+          },
+        });
       },
-      include: {
-        source: true,
-        primaryCategory: true,
-        secondaryCategories: { include: { secondaryCategory: true } },
+      {
+        timeout: 30000,
+        maxWait: 30000,
       },
-    });
-  });
+    );
 
-  return NextResponse.json(updated);
+    return NextResponse.json(updated);
+  } catch (err: unknown) {
+    console.error("Failed to update cashflow", err);
+    return NextResponse.json(
+      {
+        error:
+          err instanceof Error
+            ? err.message
+            : "Không thể cập nhật giao dịch do lỗi máy chủ",
+      },
+      { status: 500 },
+    );
+  }
 }
 
 export async function DELETE(
