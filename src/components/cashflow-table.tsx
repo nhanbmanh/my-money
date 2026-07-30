@@ -56,6 +56,12 @@ import {
 import { CashFlowChartModal } from "@/components/cashflow-chart-modal";
 import { CashFlowModal } from "@/components/cashflow-modal";
 import { cn, getSecondaryCategoryBadgeClass } from "@/lib/utils";
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from "./ui/accordion";
 
 type Category = { id: string; categoryName: string; type?: number | null };
 type Source = { id: string; sourceName: string };
@@ -285,148 +291,153 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
   return (
     <div className="space-y-4">
       {/* Filter Section */}
-      <div className="bg-sky-50 ring-1 ring-gray-400 rounded-xl p-4 space-y-4 shadow-md shadow-sky-100">
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-sm">Bộ lọc</h3>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={resetFilters}
-            className="gap-1 text-muted-foreground"
-          >
-            <X className="h-3 w-3" />
-            Xóa bộ lọc
-          </Button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              className="pl-9 bg-white"
-              placeholder="Tìm theo tên giao dịch, mô tả..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className="justify-start text-left font-normal bg-white"
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                Từ: {format(dateFrom, "dd/MM/yyyy")}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0">
-              <Calendar
-                mode="single"
-                selected={dateFrom}
-                onSelect={(d) => d && setDateFrom(startOfDay(d))}
-              />
-            </PopoverContent>
-          </Popover>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className="justify-start text-left font-normal bg-white"
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                Đến: {format(dateTo, "dd/MM/yyyy")}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0">
-              <Calendar
-                mode="single"
-                selected={dateTo}
-                onSelect={(d) => d && setDateTo(endOfDay(d))}
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Select value={cashType} onValueChange={setCashType}>
-            <SelectTrigger className="bg-white w-full">
-              <SelectValue placeholder="Loại giao dịch" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tất cả loại giao dịch</SelectItem>
-              <SelectItem value="Income">💰 Thu nhập</SelectItem>
-              <SelectItem value="Expense">💸 Chi tiêu</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={sourceId} onValueChange={setSourceId}>
-            <SelectTrigger className="bg-white w-full">
-              <SelectValue placeholder="Nguồn tiền" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tất cả nguồn tiền</SelectItem>
-              {sources.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.sourceName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={categoryId} onValueChange={setCategoryId}>
-            <SelectTrigger className="bg-white w-full">
-              <SelectValue placeholder="Nhãn chính" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tất cả nhãn chính</SelectItem>
-              {categories.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.categoryName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">Nhãn phân loại phụ</p>
-          <div className="flex flex-wrap gap-2 min-h-9 px-3 py-2 rounded-md border border-input bg-white items-center">
-            {secondaryCategories.length === 0 ? (
-              <p className="text-xs text-muted-foreground">Chưa có nhãn phụ</p>
-            ) : (
-              [...secondaryCategories]
-                .sort((a, b) => (a.type ?? 0) - (b.type ?? 0))
-                .map((c) => {
-                  const isSelected = secondaryCategoryIds.includes(c.id);
-
-                  return (
-                    <Badge
-                      key={c.id}
+      <Accordion
+        type="single"
+        collapsible
+        className="w-full bg-sky-50 ring-1 ring-gray-400 rounded-xl px-4 py-2 space-y-4 shadow-md shadow-sky-100"
+      >
+        <AccordionItem value="item-1">
+          <AccordionTrigger>
+            <h3>Bộ lọc</h3>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    className="pl-9 bg-white"
+                    placeholder="Tìm theo tên giao dịch, mô tả..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
                       variant="outline"
-                      className={cn(
-                        "cursor-pointer select-none border-2 transition-all",
-                        getSecondaryCategoryBadgeClass(c.type),
-                        isSelected &&
-                          "shadow-md scale-[1.03] border-slate-900 bg-slate-900 text-white",
-                      )}
-                      onClick={() => toggleSecondaryCategory(c.id)}
+                      className="justify-start text-left font-normal bg-white"
                     >
-                      {c.categoryName}
-                    </Badge>
-                  );
-                })
-            )}
-          </div>
-        </div>
-        <Button
-          variant="destructive"
-          size="sm"
-          className="gap-1 w-full sm:w-auto justify-center"
-          disabled={selectedIds.length == 0}
-          onClick={() => handleDeleteConfirm(selectedIds)}
-        >
-          <Trash2 className="h-4 w-4" />
-          Xóa giao dịch
-        </Button>
-      </div>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      Từ: {format(dateFrom, "dd/MM/yyyy")}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={dateFrom}
+                      onSelect={(d) => d && setDateFrom(startOfDay(d))}
+                    />
+                  </PopoverContent>
+                </Popover>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="justify-start text-left font-normal bg-white"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      Đến: {format(dateTo, "dd/MM/yyyy")}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={dateTo}
+                      onSelect={(d) => d && setDateTo(endOfDay(d))}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Select value={cashType} onValueChange={setCashType}>
+                  <SelectTrigger className="bg-white w-full">
+                    <SelectValue placeholder="Loại giao dịch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả loại giao dịch</SelectItem>
+                    <SelectItem value="Income">💰 Thu nhập</SelectItem>
+                    <SelectItem value="Expense">💸 Chi tiêu</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={sourceId} onValueChange={setSourceId}>
+                  <SelectTrigger className="bg-white w-full">
+                    <SelectValue placeholder="Nguồn tiền" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả nguồn tiền</SelectItem>
+                    {sources.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.sourceName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={categoryId} onValueChange={setCategoryId}>
+                  <SelectTrigger className="bg-white w-full">
+                    <SelectValue placeholder="Nhãn chính" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả nhãn chính</SelectItem>
+                    {categories.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.categoryName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">
+                  Nhãn phân loại phụ
+                </p>
+                <div className="flex flex-wrap gap-2 min-h-9 px-3 py-2 rounded-md border border-input bg-white items-center">
+                  {secondaryCategories.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      Chưa có nhãn phụ
+                    </p>
+                  ) : (
+                    [...secondaryCategories]
+                      .sort((a, b) => (a.type ?? 0) - (b.type ?? 0))
+                      .map((c) => {
+                        const isSelected = secondaryCategoryIds.includes(c.id);
+
+                        return (
+                          <Badge
+                            key={c.id}
+                            variant="outline"
+                            className={cn(
+                              "cursor-pointer select-none border-2 transition-all",
+                              getSecondaryCategoryBadgeClass(c.type),
+                              isSelected &&
+                                "shadow-md scale-[1.03] border-slate-900 bg-slate-900 text-white",
+                            )}
+                            onClick={() => toggleSecondaryCategory(c.id)}
+                          >
+                            {c.categoryName}
+                          </Badge>
+                        );
+                      })
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={resetFilters}
+                  className="gap-1 w-full sm:w-auto justify-center text-muted-foreground"
+                >
+                  <X className="h-3 w-3" />
+                  Xóa bộ lọc
+                </Button>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       {/* Result info */}
       <div className="flex justify-between text-sm text-muted-foreground">
@@ -475,6 +486,16 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
             onClick={() => setChartOpen(true)}
           >
             Xem biểu đồ
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="gap-1 w-full sm:w-auto justify-center"
+            disabled={selectedIds.length == 0}
+            onClick={() => handleDeleteConfirm(selectedIds)}
+          >
+            <Trash2 className="h-4 w-4" />
+            Xóa giao dịch
           </Button>
         </div>
       </div>

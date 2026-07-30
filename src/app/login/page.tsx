@@ -53,7 +53,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">
-            Đăng nhập My Money
+            Đăng nhập Auto Money
           </CardTitle>
           <CardDescription>
             Nhập email hoặc username để tiếp tục
