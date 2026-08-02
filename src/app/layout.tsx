@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Cause } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
+import { AuthShell } from "@/components/auth-shell";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -30,8 +31,10 @@ export default function RootLayout({
       lang="en"
       className={`${inter.variable} ${autoMoney.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
-        <Providers>{children}</Providers>
+      <body className="min-h-screen bg-background">
+        <Providers>
+          <AuthShell>{children}</AuthShell>
+        </Providers>
       </body>
     </html>
   );
