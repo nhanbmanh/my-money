@@ -451,7 +451,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
 
             {/* Table */}
             <div className="flex flex-col-reverse xl:flex-col gap-2">
-              <div className="overflow-auto ring-1 ring-gray-400 shadow-md shadow-sky-100 max-h-[calc(100vh-14rem)]">
+              <div className="overflow-auto ring-1 ring-gray-400 shadow-md shadow-sky-100 max-h-[calc(100vh-23rem)] xl:max-h-[calc(100vh-14rem)]">
                 <Table>
                   <TableHeader className="bg-gray-900">
                     <TableRow>
@@ -615,7 +615,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                   </TableBody>
                 </Table>
               </div>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm text-muted-foreground">
+              <div className="flex flex-row gap-3 sm:items-center justify-between text-sm text-muted-foreground">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 text-sm">
                   <span
                     onClick={() =>
@@ -634,7 +634,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                     <strong>-{totalExpense.toLocaleString("vi-VN")}đ</strong>
                   </span>
                 </div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4 text-sm">
+                <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:gap-4 text-sm">
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground">Hiển thị</span>
                     <Select
