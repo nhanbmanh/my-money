@@ -17,7 +17,7 @@ export function Header({ onOpenModal }: HeaderProps) {
     <header className="bg-sky-50 border-b border-gray-200 shadow-sm px-6 py-4 relative">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Logo */}
-        <h1 className="text-xl font-bold text-sky-700">AUTO MONEY</h1>
+        <h1 className="text-xl font-bold text-sky-700">MyNOTE</h1>
 
         {/* Desktop nav */}
         <div className="hidden md:flex items-center gap-3">
@@ -25,12 +25,15 @@ export function Header({ onOpenModal }: HeaderProps) {
             <PlusCircle className="h-4 w-4" />
             Khai giao dịch
           </Button>
-          <a
-            href="/settings"
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          <button
+            type="button"
+            onClick={() =>
+              window.dispatchEvent(new CustomEvent("open-settings-modal"))
+            }
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
           >
             <Settings className="h-4 w-4" />
-          </a>
+          </button>
           <a
             href="/profile"
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -81,14 +84,17 @@ export function Header({ onOpenModal }: HeaderProps) {
               Xin chào, <strong>{session?.user?.name}</strong>
             </span>
           </a>
-          <a
-            href="/settings"
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground px-1 py-1 transition-colors"
-            onClick={() => setMenuOpen(false)}
+          <button
+            type="button"
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground px-1 py-1 transition-colors text-left cursor-pointer"
+            onClick={() => {
+              setMenuOpen(false);
+              window.dispatchEvent(new CustomEvent("open-settings-modal"));
+            }}
           >
             <Settings className="h-4 w-4" />
             Cài đặt
-          </a>
+          </button>
 
           <Button
             onClick={() => {

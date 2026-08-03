@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { format, subMonths, startOfDay, endOfDay } from "date-fns";
 import {
   CalendarIcon,
@@ -10,6 +10,8 @@ import {
   Search,
   X,
   Trash2,
+  List,
+  BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,6 +55,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DashboardSummaryCards } from "@/components/dashboard-summary-cards";
+import { DashboardAnalytics, CashFlowChartFilters } from "@/components/dashboard-analytics";
 import { CashFlowChartModal } from "@/components/cashflow-chart-modal";
 import { CashFlowModal } from "@/components/cashflow-modal";
 import { cn, getSecondaryCategoryBadgeClass } from "@/lib/utils";
@@ -196,6 +201,30 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
   useEffect(() => {
     fetchData();
   }, [fetchData, refreshKey]);
+
+  const chartFilters: CashFlowChartFilters = useMemo(
+    () => ({
+      search,
+      sourceId,
+      categoryId,
+      secondaryCategoryIds,
+      cashType,
+      dateFrom: dateFrom.toISOString(),
+      dateTo: dateTo.toISOString(),
+      sortOrder,
+    }),
+    [
+      search,
+      sourceId,
+      categoryId,
+      secondaryCategoryIds,
+      cashType,
+      dateFrom,
+      dateTo,
+      sortOrder,
+    ],
+  );
+
   useEffect(() => {
     setSelectedIds([]);
   }, [
@@ -277,17 +306,6 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
     return type === "Income" ? `+${formatted}` : `-${formatted}`;
   };
 
-  const chartFilters = {
-    search,
-    sourceId,
-    categoryId,
-    secondaryCategoryIds,
-    cashType,
-    dateFrom: dateFrom.toISOString(),
-    dateTo: dateTo.toISOString(),
-    sortOrder,
-  };
-
   const renderFilterContent = () => (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-3">
@@ -323,9 +341,9 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
           <PopoverTrigger asChild>
             <Button
               variant="outline"
-              className="justify-start text-left font-normal bg-white"
+              className="justify-start text-left font-normal bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100"
             >
-              <CalendarIcon className="mr-2 h-4 w-4" />
+              <CalendarIcon className="mr-2 h-4 w-4 text-sky-600 dark:text-sky-400" />
               Đến: {format(dateTo, "dd/MM/yyyy")}
             </Button>
           </PopoverTrigger>
@@ -341,7 +359,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
 
       <div className="grid grid-cols-1 gap-3">
         <Select value={cashType} onValueChange={setCashType}>
-          <SelectTrigger className="bg-white w-full">
+          <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 w-full">
             <SelectValue placeholder="Loại giao dịch" />
           </SelectTrigger>
           <SelectContent>
@@ -351,7 +369,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
           </SelectContent>
         </Select>
         <Select value={sourceId} onValueChange={setSourceId}>
-          <SelectTrigger className="bg-white w-full">
+          <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 w-full">
             <SelectValue placeholder="Nguồn tiền" />
           </SelectTrigger>
           <SelectContent>
@@ -364,7 +382,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
           </SelectContent>
         </Select>
         <Select value={categoryId} onValueChange={setCategoryId}>
-          <SelectTrigger className="bg-white w-full">
+          <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 w-full">
             <SelectValue placeholder="Nhãn chính" />
           </SelectTrigger>
           <SelectContent>
@@ -380,7 +398,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
 
       <div className="space-y-1">
         <p className="text-xs text-muted-foreground">Nhãn phân loại phụ</p>
-        <div className="flex flex-wrap gap-2 min-h-9 px-3 py-2 rounded-md border border-input bg-white items-center">
+        <div className="flex flex-wrap gap-2 min-h-9 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center">
           {secondaryCategories.length === 0 ? (
             <p className="text-xs text-muted-foreground">Chưa có nhãn phụ</p>
           ) : (
@@ -394,10 +412,10 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                     key={c.id}
                     variant="outline"
                     className={cn(
-                      "cursor-pointer select-none border-2 transition-all",
+                      "cursor-pointer select-none border transition-all",
                       getSecondaryCategoryBadgeClass(c.type),
                       isSelected &&
-                        "shadow-md scale-[1.03] border-slate-900 bg-slate-900 text-white",
+                        "shadow-xs scale-[1.03] border-slate-900 dark:border-slate-100 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 font-bold",
                     )}
                     onClick={() => toggleSecondaryCategory(c.id)}
                   >
@@ -423,37 +441,168 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
   );
 
   return (
-    <div>
-      {/* Filter Section */}
-      <div className="flex flex-col gap-2 w-full xl:flex-row xl:h-[calc(100vh-8rem)]">
+    <div className="space-y-4 flex flex-col flex-1 min-h-0">
+      {/* Top Summary Cards */}
+      <DashboardSummaryCards
+        totalIncome={totalIncome}
+        totalExpense={totalExpense}
+        totalTransactions={total}
+        loading={loading}
+      />
+
+      {/* Main Layout: Left = Shared Filter Sidebar, Right = View Switcher (Table vs Chart) */}
+      <div className="flex flex-col gap-3 w-full xl:flex-row xl:h-[calc(100vh-14rem)] flex-1 min-h-0">
+        {/* Mobile Accordion Filter */}
         <div className="block xl:hidden w-full">
           <Accordion
             type="single"
             collapsible
-            className="w-full bg-sky-50 ring-1 ring-gray-400 rounded-xl px-4 py-2 space-y-4 shadow-md shadow-sky-100"
+            className="w-full bg-sky-50 dark:bg-slate-900/90 ring-1 ring-slate-200 dark:ring-slate-800 rounded-xl px-4 py-2 space-y-4 shadow-xs"
           >
             <AccordionItem value="item-1">
               <AccordionTrigger>
-                <h3>Bộ lọc</h3>
+                <h3 className="text-slate-800 dark:text-slate-200">Bộ lọc</h3>
               </AccordionTrigger>
               <AccordionContent>{renderFilterContent()}</AccordionContent>
             </AccordionItem>
           </Accordion>
         </div>
 
-        <div className="hidden xl:block xl:w-[380px] xl:min-w-[380px] xl:h-full xl:min-h-0 xl:overflow-y-auto bg-sky-50 ring-1 ring-gray-400 px-4 py-4 space-y-4 shadow-md shadow-sky-100 xl:sticky xl:top-4">
+        {/* Desktop Filter Sidebar (Shared for BOTH Table and Chart views) */}
+        <div className="hidden xl:block xl:w-[380px] xl:min-w-[380px] xl:h-full xl:min-h-0 xl:overflow-y-auto bg-sky-50/60 dark:bg-slate-900/90 ring-1 ring-slate-200 dark:ring-slate-800 rounded-2xl px-4 py-4 space-y-4 shadow-xs xl:sticky xl:top-4">
           {renderFilterContent()}
         </div>
 
-        <div className="flex-1 min-w-0 w-full xl:h-full xl:min-h-0">
-          <div className="space-y-4 h-full xl:min-h-0">
-            {/* Result info */}
+        {/* Right Content Area: View Switcher (Table or Chart) */}
+        <div className="flex-1 min-w-0 w-full xl:h-full xl:min-h-0 flex flex-col">
+          <Tabs defaultValue="list" className="flex-1 flex flex-col min-h-0 space-y-3">
+            <div className="flex items-center justify-between gap-3 bg-white/80 dark:bg-slate-900/80 p-2 rounded-2xl border border-sky-100 dark:border-slate-800 shadow-2xs shrink-0">
+              <TabsList className="bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                <TabsTrigger
+                  value="list"
+                  className="text-xs font-bold gap-1.5 px-3.5 py-1.5 rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-xs transition-all"
+                >
+                  <List className="h-4 w-4" />
+                  Danh Sách Giao Dịch
+                </TabsTrigger>
+                <TabsTrigger
+                  value="chart"
+                  className="text-xs font-bold gap-1.5 px-3.5 py-1.5 rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-xs transition-all text-sky-600 dark:text-sky-400"
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  Biểu Đồ Thống Kê
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-            {/* Table */}
-            <div className="flex flex-col-reverse xl:flex-col gap-2">
-              <div className="overflow-auto ring-1 ring-gray-400 shadow-md shadow-sky-100 max-h-[calc(100vh-23rem)] xl:max-h-[calc(100vh-14rem)]">
+            {/* TAB 1: LIST VIEW */}
+            <TabsContent value="list" className="mt-0 flex-1 min-h-0 flex flex-col space-y-3">
+              {/* Top Controls Bar: Pagination (Left) & Actions (Right) */}
+              <div className="flex flex-wrap items-center justify-between gap-3 shrink-0 bg-white/60 dark:bg-slate-900/60 p-2 rounded-2xl border border-slate-200/60 dark:border-slate-800/60">
+                {/* Left: Pagination Controls */}
+                {limit !== "all" && totalPages > 1 ? (
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="h-8 text-xs font-medium px-2.5"
+                    >
+                      Trước
+                    </Button>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter(
+                          (p) =>
+                            p === 1 || p === totalPages || Math.abs(p - page) <= 1,
+                        )
+                        .reduce<(number | "...")[]>((acc, p, i, arr) => {
+                          if (i > 0 && p - (arr[i - 1] as number) > 1)
+                            acc.push("...");
+                          acc.push(p);
+                          return acc;
+                        }, [])
+                        .map((p, i) =>
+                          p === "..." ? (
+                            <span
+                              key={`ellipsis-${i}`}
+                              className="px-1 text-muted-foreground text-xs"
+                            >
+                              ...
+                            </span>
+                          ) : (
+                            <Button
+                              key={p}
+                              variant={page === p ? "default" : "outline"}
+                              size="sm"
+                              className="w-7 h-7 p-0 text-xs font-bold"
+                              onClick={() => setPage(p as number)}
+                            >
+                              {p}
+                            </Button>
+                          ),
+                        )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                      className="h-8 text-xs font-medium px-2.5"
+                    >
+                      Sau
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted-foreground font-medium px-1">
+                    Hiển thị <strong>{total}</strong> giao dịch
+                  </div>
+                )}
+
+                {/* Right: Actions (Limit Selector & Delete Button) */}
+                <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span>Hiển thị</span>
+                    <Select
+                      value={limit}
+                      onValueChange={(value) => {
+                        setLimit(value);
+                        setPage(1);
+                        setSelectedIds([]);
+                      }}
+                    >
+                      <SelectTrigger className="w-[65px] h-8 text-xs bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 font-medium">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="25">25</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                        <SelectItem value="all">All</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="h-8 text-xs font-bold gap-1.5 px-3"
+                    disabled={selectedIds.length === 0}
+                    onClick={() => handleDeleteConfirm(selectedIds)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Xóa giao dịch
+                    {selectedIds.length > 0 && ` (${selectedIds.length})`}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Table Area */}
+              <div className="flex-1 min-h-0 overflow-auto ring-1 ring-slate-200 dark:ring-slate-800 rounded-2xl shadow-xs max-h-[calc(100vh-25rem)] xl:max-h-[calc(100vh-22rem)] bg-white dark:bg-slate-900">
                 <Table>
-                  <TableHeader className="bg-gray-900">
+                  <TableHeader className="bg-slate-900 dark:bg-slate-950">
                     <TableRow>
                       <TableHead className="w-10">
                         <Checkbox
@@ -512,9 +661,9 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                           <ContextMenuTrigger asChild>
                             <TableRow
                               className={cn(
-                                "bg-white hover:bg-sky-50 cursor-context-menu",
+                                "bg-white dark:bg-slate-900 hover:bg-sky-50/60 dark:hover:bg-slate-800/80 cursor-context-menu border-b border-slate-100 dark:border-slate-800/60",
                                 selectedIds.includes(item.id) &&
-                                  "bg-sky-100 hover:bg-sky-100",
+                                  "bg-sky-100/70 dark:bg-sky-950/60 hover:bg-sky-100/80 dark:hover:bg-sky-900/60",
                               )}
                             >
                               <TableCell onClick={(e) => e.stopPropagation()}>
@@ -539,15 +688,8 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                                     : "💸 Chi"}
                                 </Badge>
                               </TableCell>
-                              <TableCell
-                                className={cn(
-                                  "font-semibold",
-                                  item.cashType === "Income"
-                                    ? "text-green-600"
-                                    : "text-red-500",
-                                )}
-                              >
-                                {formatMoney(item.amountOfMoney, item.cashType)}
+                              <TableCell className="font-semibold whitespace-nowrap">
+                                {item.amountOfMoney.toLocaleString("vi-VN")} ₫
                               </TableCell>
                               <TableCell>
                                 {item.source?.sourceName ?? "—"}
@@ -558,32 +700,29 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                               <TableCell>
                                 <div className="flex flex-wrap gap-1">
                                   {item.secondaryCategories.length > 0
-                                    ? [...item.secondaryCategories]
-                                        .sort(
-                                          (a, b) =>
-                                            (a.secondaryCategory.type ?? 0) -
-                                            (b.secondaryCategory.type ?? 0),
-                                        )
-                                        .map(({ secondaryCategory }) => (
+                                    ? item.secondaryCategories.map(
+                                        ({ secondaryCategory }) => (
                                           <Badge
                                             key={secondaryCategory.id}
                                             variant="outline"
                                             className={cn(
-                                              "text-xs border-2",
+                                              "text-xs font-normal border",
                                               getSecondaryCategoryBadgeClass(
                                                 secondaryCategory.type,
                                               ),
                                             )}
                                           >
                                             {secondaryCategory.categoryName}
-                                            {typeof secondaryCategory.type ===
-                                              "number" && (
-                                              <span className="ml-1 opacity-80">
-                                                [{secondaryCategory.type}]
-                                              </span>
-                                            )}
+                                            {secondaryCategory.type !==
+                                              undefined &&
+                                              secondaryCategory.type !== null && (
+                                                <span className="ml-1 opacity-80">
+                                                  [{secondaryCategory.type}]
+                                                </span>
+                                              )}
                                           </Badge>
-                                        ))
+                                        ),
+                                      )
                                     : "—"}
                                 </div>
                               </TableCell>
@@ -615,127 +754,13 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                   </TableBody>
                 </Table>
               </div>
-              <div className="flex flex-row gap-3 sm:items-center justify-between text-sm text-muted-foreground">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 text-sm">
-                  <span
-                    onClick={() =>
-                      setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"))
-                    }
-                  >
-                    SL: <strong className="text-foreground">{total}</strong> bản
-                    ghi
-                  </span>
-                  <span className="text-green-600">
-                    Thu:{" "}
-                    <strong>+{totalIncome.toLocaleString("vi-VN")}đ</strong>
-                  </span>
-                  <span className="text-red-500">
-                    Chi:{" "}
-                    <strong>-{totalExpense.toLocaleString("vi-VN")}đ</strong>
-                  </span>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:gap-4 text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">Hiển thị</span>
-                    <Select
-                      value={limit}
-                      onValueChange={(value) => {
-                        setLimit(value);
-                        setPage(1);
-                        setSelectedIds([]);
-                      }}
-                    >
-                      <SelectTrigger className="w-[60px] bg-white">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="10">10</SelectItem>
-                        <SelectItem value="25">25</SelectItem>
-                        <SelectItem value="50">50</SelectItem>
-                        <SelectItem value="100">100</SelectItem>
-                        <SelectItem value="all">All</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1"
-                      onClick={() => setChartOpen(true)}
-                    >
-                      Xem biểu đồ
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      className="gap-1 w-full sm:w-auto justify-center"
-                      disabled={selectedIds.length == 0}
-                      onClick={() => handleDeleteConfirm(selectedIds)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Xóa giao dịch
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
+            </TabsContent>
 
-            {/* Pagination */}
-            {limit !== "all" && totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                >
-                  Trước
-                </Button>
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1)
-                    .filter(
-                      (p) =>
-                        p === 1 || p === totalPages || Math.abs(p - page) <= 1,
-                    )
-                    .reduce<(number | "...")[]>((acc, p, i, arr) => {
-                      if (i > 0 && p - (arr[i - 1] as number) > 1)
-                        acc.push("...");
-                      acc.push(p);
-                      return acc;
-                    }, [])
-                    .map((p, i) =>
-                      p === "..." ? (
-                        <span
-                          key={`ellipsis-${i}`}
-                          className="px-2 text-muted-foreground"
-                        >
-                          ...
-                        </span>
-                      ) : (
-                        <Button
-                          key={p}
-                          variant={page === p ? "default" : "outline"}
-                          size="sm"
-                          className="w-8 h-8 p-0"
-                          onClick={() => setPage(p as number)}
-                        >
-                          {p}
-                        </Button>
-                      ),
-                    )}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                >
-                  Sau
-                </Button>
-              </div>
-            )}
-          </div>
+            {/* TAB 2: CHART VIEW */}
+            <TabsContent value="chart" className="mt-0 flex-1 min-h-0 overflow-y-auto">
+              <DashboardAnalytics filters={chartFilters} refreshKey={refreshKey} />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
 

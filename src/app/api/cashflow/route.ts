@@ -25,8 +25,18 @@ export async function GET(req: Request) {
   const cashType = searchParams.get("cashType") || "";
   const dateFrom = searchParams.get("dateFrom");
   const dateTo = searchParams.get("dateTo");
+  const sortBy = searchParams.get("sortBy") || "datetime";
   const sortOrder = (searchParams.get("sortOrder") ||
     "desc") as Prisma.SortOrder;
+
+  let orderBy: Prisma.CashFlowOrderByWithRelationInput = { datetime: sortOrder };
+  if (sortBy === "amountOfMoney") {
+    orderBy = { amountOfMoney: sortOrder };
+  } else if (sortBy === "title") {
+    orderBy = { title: sortOrder };
+  } else if (sortBy === "cashType") {
+    orderBy = { cashType: sortOrder };
+  }
 
   const where: Prisma.CashFlowWhereInput = {
     userId: session.user.id,
@@ -57,7 +67,7 @@ export async function GET(req: Request) {
       where,
       skip,
       take: limit ?? undefined,
-      orderBy: { datetime: sortOrder },
+      orderBy,
       include: {
         source: true,
         primaryCategory: true,

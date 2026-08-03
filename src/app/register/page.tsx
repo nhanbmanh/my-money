@@ -73,9 +73,7 @@ export default function RegisterPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">
-            Đăng ký Auto Money
-          </CardTitle>
+          <CardTitle className="text-2xl font-bold">Đăng ký MyNOTE</CardTitle>
           <CardDescription>
             Tạo tài khoản để bắt đầu quản lý chi tiêu
           </CardDescription>

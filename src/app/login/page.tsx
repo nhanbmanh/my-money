@@ -52,9 +52,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted px-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">
-            Đăng nhập Auto Money
-          </CardTitle>
+          <CardTitle className="text-2xl font-bold">Đăng nhập MyNOTE</CardTitle>
           <CardDescription>
             Nhập email hoặc username để tiếp tục
           </CardDescription>

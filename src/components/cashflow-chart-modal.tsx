@@ -251,7 +251,7 @@ export function CashFlowChartModal({ open, onOpenChange, filters }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!inset-0 !top-0 !left-0 !right-0 !bottom-0 !-translate-x-0 !-translate-y-0 h-screen w-screen !max-w-none rounded-none bg-sky-50 ring-1 ring-gray-400 overflow-hidden block">
+      <DialogContent className="!inset-0 !top-0 !left-0 !right-0 !bottom-0 !-translate-x-0 !-translate-y-0 h-screen w-screen !max-w-none rounded-none bg-white border-0 overflow-hidden block">
         <DialogHeader className="p-6 border-b border-slate-200">
           <DialogTitle className="text-2xl font-bold">
             Biểu đồ chi tiêu
