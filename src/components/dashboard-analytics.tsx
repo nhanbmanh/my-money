@@ -550,9 +550,9 @@ export function DashboardAnalytics({
                           <div
                             key={cat.name}
                             title={`${cat.name}: ${formatVND(cat.value)} (${cat.percent.toFixed(1)}%)`}
-                            className="group relative flex items-center justify-between p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-emerald-100 dark:border-emerald-900/40 text-xs transition-all hover:bg-emerald-50 dark:hover:bg-emerald-950/60 hover:border-emerald-300 hover:shadow-xs cursor-pointer"
+                            className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-900 border border-emerald-100 dark:border-emerald-900/40 text-xs transition-all hover:bg-emerald-50/80 dark:hover:bg-emerald-950/60 hover:border-emerald-300 shadow-2xs"
                           >
-                            <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex items-center gap-2 min-w-0 pr-2">
                               <span
                                 className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                                 style={{
@@ -560,16 +560,16 @@ export function DashboardAnalytics({
                                     INCOME_COLORS[idx % INCOME_COLORS.length],
                                 }}
                               />
-                              <span className="font-medium text-slate-700 dark:text-slate-200 truncate">
+                              <span className="font-semibold text-slate-700 dark:text-slate-200 truncate">
                                 {cat.name}
                               </span>
                             </div>
-                            <div className="text-right flex-shrink-0 ml-1.5 font-bold">
-                              <span className="text-emerald-600 dark:text-emerald-400 block group-hover:hidden transition-all">
-                                {cat.percent.toFixed(1)}%
-                              </span>
-                              <span className="text-emerald-700 dark:text-emerald-300 hidden group-hover:block transition-all animate-in fade-in duration-150">
+                            <div className="text-right flex-shrink-0 font-bold shrink-0">
+                              <span className="text-emerald-600 dark:text-emerald-400 block text-xs leading-tight">
                                 {formatVND(cat.value)}
+                              </span>
+                              <span className="text-[10px] text-emerald-700/70 dark:text-emerald-400/70 block font-semibold leading-tight mt-0.5">
+                                {cat.percent.toFixed(1)}%
                               </span>
                             </div>
                           </div>
@@ -622,9 +622,9 @@ export function DashboardAnalytics({
                           <div
                             key={cat.name}
                             title={`${cat.name}: ${formatVND(cat.value)} (${cat.percent.toFixed(1)}%)`}
-                            className="group relative flex items-center justify-between p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-rose-100 dark:border-rose-900/40 text-xs transition-all hover:bg-rose-50 dark:hover:bg-rose-950/60 hover:border-rose-300 hover:shadow-xs cursor-pointer"
+                            className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-900 border border-rose-100 dark:border-rose-900/40 text-xs transition-all hover:bg-rose-50/80 dark:hover:bg-rose-950/60 hover:border-rose-300 shadow-2xs"
                           >
-                            <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex items-center gap-2 min-w-0 pr-2">
                               <span
                                 className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                                 style={{
@@ -632,16 +632,16 @@ export function DashboardAnalytics({
                                     EXPENSE_COLORS[idx % EXPENSE_COLORS.length],
                                 }}
                               />
-                              <span className="font-medium text-slate-700 dark:text-slate-200 truncate">
+                              <span className="font-semibold text-slate-700 dark:text-slate-200 truncate">
                                 {cat.name}
                               </span>
                             </div>
-                            <div className="text-right flex-shrink-0 ml-1.5 font-bold">
-                              <span className="text-rose-600 dark:text-rose-400 block group-hover:hidden transition-all">
-                                {cat.percent.toFixed(1)}%
-                              </span>
-                              <span className="text-rose-700 dark:text-rose-300 hidden group-hover:block transition-all animate-in fade-in duration-150">
+                            <div className="text-right flex-shrink-0 font-bold shrink-0">
+                              <span className="text-rose-600 dark:text-rose-400 block text-xs leading-tight">
                                 {formatVND(cat.value)}
+                              </span>
+                              <span className="text-[10px] text-rose-700/70 dark:text-rose-400/70 block font-semibold leading-tight mt-0.5">
+                                {cat.percent.toFixed(1)}%
                               </span>
                             </div>
                           </div>
@@ -758,9 +758,9 @@ export function DashboardAnalytics({
                                 <div
                                   key={cat.name}
                                   title={`${cat.name}: ${formatVND(cat.value)} (${cat.percent.toFixed(1)}%)`}
-                                  className="group relative flex items-center justify-between p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-sky-100 dark:border-slate-800 text-xs transition-all hover:bg-sky-50 dark:hover:bg-slate-800 hover:border-sky-300 cursor-pointer"
+                                  className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-900 border border-sky-100 dark:border-slate-800 text-xs transition-all hover:bg-sky-50/80 dark:hover:bg-slate-800 hover:border-sky-300 shadow-2xs"
                                 >
-                                  <div className="flex items-center gap-2 min-w-0">
+                                  <div className="flex items-center gap-2 min-w-0 pr-2">
                                     <span
                                       className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                                       style={{
@@ -768,16 +768,16 @@ export function DashboardAnalytics({
                                           typeColors[idx % typeColors.length],
                                       }}
                                     />
-                                    <span className="font-medium text-slate-700 dark:text-slate-200 truncate">
+                                    <span className="font-semibold text-slate-700 dark:text-slate-200 truncate">
                                       {cat.name}
                                     </span>
                                   </div>
-                                  <div className="text-right flex-shrink-0 ml-1.5 font-bold">
-                                    <span className="text-sky-600 dark:text-sky-400 block group-hover:hidden transition-all">
-                                      {cat.percent.toFixed(1)}%
-                                    </span>
-                                    <span className="text-sky-700 dark:text-sky-300 hidden group-hover:block transition-all animate-in fade-in duration-150">
+                                  <div className="text-right flex-shrink-0 font-bold shrink-0">
+                                    <span className="text-sky-600 dark:text-sky-400 block text-xs leading-tight">
                                       {formatVND(cat.value)}
+                                    </span>
+                                    <span className="text-[10px] text-sky-700/70 dark:text-sky-400/70 block font-semibold leading-tight mt-0.5">
+                                      {cat.percent.toFixed(1)}%
                                     </span>
                                   </div>
                                 </div>

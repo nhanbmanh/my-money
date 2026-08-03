@@ -69,6 +69,18 @@ interface Props {
   editData?: CashFlowData | null;
 }
 
+const formatMoneyInput = (val: string | number): string => {
+  if (val === "" || val === null || val === undefined) return "";
+  const digitsOnly = String(val).replace(/\D/g, "");
+  if (!digitsOnly) return "";
+  return Number(digitsOnly).toLocaleString("vi-VN");
+};
+
+const parseMoneyInput = (val: string | number): number => {
+  const digitsOnly = String(val).replace(/\D/g, "");
+  return digitsOnly ? parseInt(digitsOnly, 10) : 0;
+};
+
 export function CashFlowModal({
   open,
   onOpenChange,
@@ -121,7 +133,7 @@ export function CashFlowModal({
         title: editData.title,
         description: editData.description || "",
         cashType: editData.cashType,
-        amountOfMoney: String(editData.amountOfMoney),
+        amountOfMoney: formatMoneyInput(editData.amountOfMoney),
         sourceId: editData.sourceId || "",
         primaryCategoryId: editData.primaryCategoryId || "",
       });
@@ -232,8 +244,9 @@ export function CashFlowModal({
   };
 
   const addPresetAmount = (addValue: number) => {
-    const current = parseFloat(form.amountOfMoney) || 0;
-    setForm({ ...form, amountOfMoney: String(current + addValue) });
+    const current = parseMoneyInput(form.amountOfMoney);
+    const next = current + addValue;
+    setForm({ ...form, amountOfMoney: formatMoneyInput(next) });
   };
 
   const clearAmount = () => {
@@ -263,7 +276,7 @@ export function CashFlowModal({
 
     const payload = {
       ...form,
-      amountOfMoney: parseFloat(form.amountOfMoney),
+      amountOfMoney: parseMoneyInput(form.amountOfMoney),
       datetime: datetime.toISOString(),
       secondaryCategoryIds,
       sourceId: form.sourceId || undefined,
@@ -300,8 +313,8 @@ export function CashFlowModal({
   };
 
   const formattedAmountPreview = useMemo(() => {
-    const num = parseFloat(form.amountOfMoney);
-    if (isNaN(num) || num <= 0) return "0 ₫";
+    const num = parseMoneyInput(form.amountOfMoney);
+    if (num <= 0) return "0 ₫";
     return num.toLocaleString("vi-VN") + " ₫";
   }, [form.amountOfMoney]);
 
@@ -390,12 +403,14 @@ export function CashFlowModal({
                 <div className="relative">
                   <Input
                     id="amount"
-                    type="number"
-                    min={0}
-                    step="any"
+                    type="text"
+                    inputMode="numeric"
                     value={form.amountOfMoney}
                     onChange={(e) =>
-                      setForm({ ...form, amountOfMoney: e.target.value })
+                      setForm({
+                        ...form,
+                        amountOfMoney: formatMoneyInput(e.target.value),
+                      })
                     }
                     placeholder="0"
                     required
