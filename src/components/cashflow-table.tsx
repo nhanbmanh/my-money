@@ -12,6 +12,11 @@ import {
   Trash2,
   List,
   BarChart3,
+  Newspaper,
+  Sparkles,
+  Filter,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,6 +63,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardSummaryCards } from "@/components/dashboard-summary-cards";
 import { DashboardAnalytics, CashFlowChartFilters } from "@/components/dashboard-analytics";
+import { CashFlowNewsfeed } from "@/components/cashflow-newsfeed";
+import { FinancialInsights } from "@/components/financial-insights";
+import { BudgetModal } from "@/components/budget-modal";
 import { CashFlowChartModal } from "@/components/cashflow-chart-modal";
 import { CashFlowModal } from "@/components/cashflow-modal";
 import { cn, getSecondaryCategoryBadgeClass } from "@/lib/utils";
@@ -126,6 +134,14 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
 
   // Chart modal
   const [chartOpen, setChartOpen] = useState(false);
+
+  // Budget & Refresh state
+  const [budgetModalOpen, setBudgetModalOpen] = useState(false);
+  const [budgetsUpdatedKey, setBudgetsUpdatedKey] = useState(0);
+  const [localRefreshKey, setLocalRefreshKey] = useState(0);
+  const combinedRefreshKey = refreshKey + localRefreshKey;
+  const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(true);
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
   // Delete confirm
   const [deleteIds, setDeleteIds] = useState<string[]>([]);
@@ -269,6 +285,12 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
     );
   };
 
+  const handleMutationSuccess = useCallback(() => {
+    fetchData();
+    setLocalRefreshKey((k) => k + 1);
+    setBudgetsUpdatedKey((k) => k + 1);
+  }, [fetchData]);
+
   // Delete handlers
   const handleDeleteConfirm = (ids: string[]) => {
     setDeleteIds(ids);
@@ -292,7 +314,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
     setDeleting(false);
     setConfirmOpen(false);
     setSelectedIds([]);
-    fetchData();
+    handleMutationSuccess();
   };
 
   // Edit handler
@@ -308,8 +330,28 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
 
   const renderFilterContent = () => (
     <div className="space-y-4">
+      <div className="flex items-center justify-between pb-2 border-b border-slate-200/80 dark:border-slate-800">
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-sky-500" />
+          <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+            Bộ Lọc Tìm Kiếm
+          </h3>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setIsDesktopSidebarOpen(false);
+            setIsMobileFilterOpen(false);
+          }}
+          className="h-7 w-7 p-0 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+          title="Thu gọn bộ lọc"
+        >
+          <PanelLeftClose className="h-4 w-4" />
+        </Button>
+      </div>
+
       <div className="grid grid-cols-1 gap-3">
-        <h3 className="font-bold hidden xl:block">Bộ lọc</h3>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -452,50 +494,128 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
 
       {/* Main Layout: Left = Shared Filter Sidebar, Right = View Switcher (Table vs Chart) */}
       <div className="flex flex-col gap-3 w-full xl:flex-row xl:h-[calc(100vh-14rem)] flex-1 min-h-0">
-        {/* Mobile Accordion Filter */}
-        <div className="block xl:hidden w-full">
-          <Accordion
-            type="single"
-            collapsible
-            className="w-full bg-sky-50 dark:bg-slate-900/90 ring-1 ring-slate-200 dark:ring-slate-800 rounded-xl px-4 py-2 space-y-4 shadow-xs"
-          >
-            <AccordionItem value="item-1">
-              <AccordionTrigger>
-                <h3 className="text-slate-800 dark:text-slate-200">Bộ lọc</h3>
-              </AccordionTrigger>
-              <AccordionContent>{renderFilterContent()}</AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        </div>
-
-        {/* Desktop Filter Sidebar (Shared for BOTH Table and Chart views) */}
-        <div className="hidden xl:block xl:w-[380px] xl:min-w-[380px] xl:h-full xl:min-h-0 xl:overflow-y-auto bg-sky-50/60 dark:bg-slate-900/90 ring-1 ring-slate-200 dark:ring-slate-800 rounded-2xl px-4 py-4 space-y-4 shadow-xs xl:sticky xl:top-4">
+        {/* Mobile Filter Panel (Top-Down Smooth Slide Animation) */}
+        <div
+          className={cn(
+            "block xl:hidden w-full transition-all duration-300 ease-in-out shrink-0 overflow-hidden",
+            isMobileFilterOpen
+              ? "max-h-[85vh] opacity-100 mb-2 bg-sky-50/90 dark:bg-slate-900/90 ring-1 ring-slate-200 dark:ring-slate-800 rounded-2xl p-4 shadow-md overflow-y-auto"
+              : "max-h-0 opacity-0 p-0 border-0 pointer-events-none"
+          )}
+        >
           {renderFilterContent()}
         </div>
 
-        {/* Right Content Area: View Switcher (Table or Chart) */}
-        <div className="flex-1 min-w-0 w-full xl:h-full xl:min-h-0 flex flex-col">
-          <Tabs defaultValue="list" className="flex-1 flex flex-col min-h-0 space-y-3">
-            <div className="flex items-center justify-between gap-3 bg-white/80 dark:bg-slate-900/80 p-2 rounded-2xl border border-sky-100 dark:border-slate-800 shadow-2xs shrink-0">
-              <TabsList className="bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                <TabsTrigger
-                  value="list"
-                  className="text-xs font-bold gap-1.5 px-3.5 py-1.5 rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-xs transition-all"
+        {/* Desktop Filter Sidebar (Collapsible for Desktop >= 1200px) */}
+        <div
+          className={cn(
+            "hidden xl:block transition-all duration-300 ease-in-out shrink-0 xl:sticky xl:top-4",
+            isDesktopSidebarOpen
+              ? "xl:w-[360px] xl:min-w-[360px] xl:h-full xl:min-h-0 xl:overflow-y-auto bg-sky-50/60 dark:bg-slate-900/90 ring-1 ring-slate-200 dark:ring-slate-800 rounded-2xl px-4 py-4 space-y-4 shadow-xs"
+              : "xl:w-0 xl:min-w-0 p-0 ring-0 overflow-hidden opacity-0 border-0 pointer-events-none"
+          )}
+        >
+          {renderFilterContent()}
+        </div>
+
+        {/* Right Content Area: View Switcher (Newsfeed, Table, Chart) */}
+        <div className="flex-1 min-w-0 w-full xl:h-full xl:min-h-0 flex flex-col transition-all duration-300">
+          <Tabs defaultValue="newsfeed" className="flex-1 flex flex-col min-h-0 space-y-3">
+            <div className="flex items-center justify-between gap-3 bg-white/80 dark:bg-slate-900/80 p-2 rounded-2xl border border-sky-100 dark:border-slate-800 shadow-2xs shrink-0 w-full overflow-hidden">
+              {/* Standalone Dedicated Toggle Button Block */}
+              <div className="shrink-0">
+                {/* Desktop Toggle Button */}
+                {!isDesktopSidebarOpen && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsDesktopSidebarOpen(true)}
+                    className="hidden xl:flex items-center gap-1.5 h-8.5 px-3 rounded-xl border-sky-200 dark:border-slate-700 bg-sky-50 dark:bg-slate-800 hover:bg-sky-100 dark:hover:bg-slate-700 text-xs font-bold text-sky-700 dark:text-sky-300 shrink-0 shadow-2xs transition-all"
+                    title="Mở thanh bộ lọc"
+                  >
+                    <PanelLeftOpen className="h-4 w-4 text-sky-500" />
+                    Hiện Bộ Lọc
+                  </Button>
+                )}
+
+                {/* Mobile Toggle Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsMobileFilterOpen(!isMobileFilterOpen)}
+                  className="flex xl:hidden items-center gap-1.5 h-8.5 px-3 rounded-xl border-sky-200 dark:border-slate-700 bg-sky-50 dark:bg-slate-800 hover:bg-sky-100 dark:hover:bg-slate-700 text-xs font-bold text-sky-700 dark:text-sky-300 shrink-0 shadow-2xs transition-all"
                 >
-                  <List className="h-4 w-4" />
-                  Danh Sách Giao Dịch
-                </TabsTrigger>
-                <TabsTrigger
-                  value="chart"
-                  className="text-xs font-bold gap-1.5 px-3.5 py-1.5 rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-xs transition-all text-sky-600 dark:text-sky-400"
-                >
-                  <BarChart3 className="h-4 w-4" />
-                  Biểu Đồ Thống Kê
-                </TabsTrigger>
-              </TabsList>
+                  <Filter className="h-3.5 w-3.5 text-sky-500" />
+                  {isMobileFilterOpen ? "Thu Gọn" : "Bộ Lọc"}
+                  {isMobileFilterOpen ? (
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </div>
+
+              {/* Dedicated Scrollable Tabs Bar */}
+              <div className="flex-1 min-w-0 overflow-x-auto scrollbar-none py-0.5 pr-2">
+                <TabsList className="bg-slate-100 dark:bg-slate-800 p-1.5 rounded-xl h-auto inline-flex items-center flex-nowrap min-w-max shrink-0 space-x-1">
+                  <TabsTrigger
+                    value="newsfeed"
+                    className="text-xs font-bold gap-1.5 px-3.5 py-1.5 rounded-lg shrink-0 whitespace-nowrap data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-xs transition-all text-sky-600 dark:text-sky-400"
+                  >
+                    <Newspaper className="h-4 w-4 shrink-0" />
+                    Bản Tin Giao Dịch
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="list"
+                    className="text-xs font-bold gap-1.5 px-3.5 py-1.5 rounded-lg shrink-0 whitespace-nowrap data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-xs transition-all"
+                  >
+                    <List className="h-4 w-4 shrink-0" />
+                    Danh Sách Bảng
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="chart"
+                    className="text-xs font-bold gap-1.5 px-3.5 py-1.5 rounded-lg shrink-0 whitespace-nowrap data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-xs transition-all text-purple-600 dark:text-purple-400"
+                  >
+                    <BarChart3 className="h-4 w-4 shrink-0" />
+                    Biểu Đồ Thống Kê
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="insights"
+                    className="text-xs font-bold gap-1.5 px-3.5 py-1.5 rounded-lg shrink-0 whitespace-nowrap data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-xs transition-all text-emerald-600 dark:text-emerald-400"
+                  >
+                    <Sparkles className="h-4 w-4 text-emerald-500 shrink-0" />
+                    Phân Tích & Ngân Sách
+                  </TabsTrigger>
+                </TabsList>
+              </div>
             </div>
 
-            {/* TAB 1: LIST VIEW */}
+            {/* TAB 1: NEWSFEED VIEW (DEFAULT - 1 ITEM PER ROW, INFINITE SCROLL) */}
+            <TabsContent value="newsfeed" className="mt-0 flex-1 min-h-0 flex flex-col">
+              <CashFlowNewsfeed
+                filters={{
+                  search,
+                  sourceId,
+                  categoryId,
+                  secondaryCategoryIds,
+                  cashType,
+                  dateFrom,
+                  dateTo,
+                  sortOrder,
+                  refreshKey: combinedRefreshKey,
+                }}
+                selectedIds={selectedIds}
+                toggleOne={toggleOne}
+                toggleAll={toggleAll}
+                isAllSelected={isAllSelected}
+                isIndeterminate={isIndeterminate}
+                handleEdit={handleEdit}
+                handleDeleteConfirm={handleDeleteConfirm}
+                onRefreshNeeded={handleMutationSuccess}
+              />
+            </TabsContent>
+
+            {/* TAB 2: LIST VIEW */}
             <TabsContent value="list" className="mt-0 flex-1 min-h-0 flex flex-col space-y-3">
               {/* Top Controls Bar: Pagination (Left) & Actions (Right) */}
               <div className="flex flex-wrap items-center justify-between gap-3 shrink-0 bg-white/60 dark:bg-slate-900/60 p-2 rounded-2xl border border-slate-200/60 dark:border-slate-800/60">
@@ -756,19 +876,41 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
               </div>
             </TabsContent>
 
-            {/* TAB 2: CHART VIEW */}
+            {/* TAB 3: CHART VIEW */}
             <TabsContent value="chart" className="mt-0 flex-1 min-h-0 overflow-y-auto">
               <DashboardAnalytics filters={chartFilters} refreshKey={refreshKey} />
+            </TabsContent>
+
+            {/* TAB 4: FINANCIAL INSIGHTS & BUDGET TRACKING */}
+            <TabsContent value="insights" className="mt-0 flex-1 min-h-0 overflow-y-auto pr-1">
+              <FinancialInsights
+                items={items}
+                categories={categories}
+                secondaryCategories={secondaryCategories}
+                sources={sources}
+                onOpenBudgetModal={() => setBudgetModalOpen(true)}
+                budgetsUpdatedKey={budgetsUpdatedKey}
+                onMutationNeeded={handleMutationSuccess}
+              />
             </TabsContent>
           </Tabs>
         </div>
       </div>
 
+      {/* Budget Modal */}
+      <BudgetModal
+        open={budgetModalOpen}
+        onOpenChange={setBudgetModalOpen}
+        categories={categories}
+        secondaryCategories={secondaryCategories}
+        onBudgetsUpdated={() => setBudgetsUpdatedKey((k) => k + 1)}
+      />
+
       {/* Edit Modal */}
       <CashFlowModal
         open={editModalOpen}
         onOpenChange={setEditModalOpen}
-        onSuccess={fetchData}
+        onSuccess={handleMutationSuccess}
         editData={editData}
       />
 

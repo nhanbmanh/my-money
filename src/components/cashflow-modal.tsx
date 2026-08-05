@@ -308,6 +308,13 @@ export function CashFlowModal({
       return;
     }
 
+    // Trigger budget alerts recalculation & toast notification
+    window.dispatchEvent(
+      new CustomEvent("refresh-budget-alerts", {
+        detail: { triggerToast: true },
+      })
+    );
+
     onOpenChange(false);
     onSuccess?.();
   };
