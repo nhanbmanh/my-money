@@ -12,7 +12,11 @@ export default auth((req) => {
   }
 
   if (isLoggedIn && isPublicRoute) {
-    return NextResponse.redirect(new URL("/", req.nextUrl));
+    const defaultRoute = req.cookies.get("default_app_route")?.value || "/financial-management";
+    const targetRoute = ["/financial-management", "/weather"].includes(defaultRoute)
+      ? defaultRoute
+      : "/financial-management";
+    return NextResponse.redirect(new URL(targetRoute, req.nextUrl));
   }
 
   return NextResponse.next();

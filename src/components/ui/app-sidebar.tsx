@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
@@ -23,14 +24,51 @@ import {
   Sun,
   Moon,
   Clock,
+  CloudSun,
+  Pin,
 } from "lucide-react";
 import { useTheme, ThemeMode } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
+
+const NAV_ITEMS = [
+  {
+    href: "/financial-management",
+    label: "Quản lý tài chính",
+    icon: Wallet,
+    iconColor: "text-sky-600 dark:text-sky-400",
+  },
+  {
+    href: "/weather",
+    label: "Dự báo thời tiết",
+    icon: CloudSun,
+    iconColor: "text-amber-500",
+  },
+];
 
 export function AppSidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const { mode, theme, setMode } = useTheme();
+
+  // Pinned Default Home Route State
+  const [pinnedRoute, setPinnedRoute] = useState<string>("/financial-management");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("default_app_route");
+      if (saved && NAV_ITEMS.some((i) => i.href === saved)) {
+        setPinnedRoute(saved);
+      }
+    }
+  }, []);
+
+  const handlePinRoute = (route: string) => {
+    setPinnedRoute(route);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("default_app_route", route);
+      document.cookie = `default_app_route=${route}; path=/; max-age=31536000`;
+    }
+  };
 
   return (
     <Sidebar collapsible="icon" className="border-r bg-sidebar">
@@ -56,21 +94,63 @@ export function AppSidebar() {
           <SidebarGroupLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
             Điều hướng
           </SidebarGroupLabel>
+
           <SidebarMenu>
-            <SidebarMenuItem className="flex items-center justify-center">
-              <SidebarMenuButton
-                asChild
-                isActive={pathname === "/"}
-                className="h-10 text-xs font-semibold rounded-xl"
-              >
-                <Link href="/" className="flex items-center gap-2.5">
-                  <Wallet className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-                  <span className="group-data-[collapsible=icon]:hidden">
-                    Quản lý tài chính
-                  </span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            {NAV_ITEMS.map((item) => {
+              const isPinned = pinnedRoute === item.href;
+              const isActive =
+                pathname === item.href || (item.href === "/financial-management" && pathname === "/");
+
+              return (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive}
+                    className="h-10 text-xs font-semibold rounded-xl"
+                  >
+                    <Link
+                      href={item.href}
+                      className="flex items-center justify-between gap-2.5 w-full group/link"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <item.icon className={cn("h-4 w-4 shrink-0", item.iconColor)} />
+                        <span className="group-data-[collapsible=icon]:hidden truncate">
+                          {item.label}
+                        </span>
+                      </div>
+
+                      {/* CLEAN PIN ICON ON THE RIGHT */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handlePinRoute(item.href);
+                        }}
+                        className={cn(
+                          "p-1 rounded-md transition-all cursor-pointer shrink-0 group-data-[collapsible=icon]:hidden",
+                          isPinned
+                            ? "text-amber-500 opacity-100"
+                            : "text-slate-400/40 opacity-0 group-hover/link:opacity-100 hover:text-amber-500"
+                        )}
+                        title={
+                          isPinned
+                            ? "Trang mặc định (Đã ghim)"
+                            : "Ghim làm trang mặc định khi truy cập"
+                        }
+                      >
+                        <Pin
+                          className={cn(
+                            "h-3.5 w-3.5 transition-transform",
+                            isPinned ? "fill-amber-500 rotate-45" : "-rotate-45"
+                          )}
+                        />
+                      </button>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
           </SidebarMenu>
         </SidebarGroup>
 
@@ -89,7 +169,7 @@ export function AppSidebar() {
                   "flex flex-col items-center justify-center py-1.5 px-1 rounded-lg text-[11px] font-bold transition-all gap-1 cursor-pointer",
                   mode === "light"
                     ? "bg-background text-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground",
+                    : "text-muted-foreground hover:text-foreground"
                 )}
                 title="Giao diện sáng"
               >
@@ -104,7 +184,7 @@ export function AppSidebar() {
                   "flex flex-col items-center justify-center py-1.5 px-1 rounded-lg text-[11px] font-bold transition-all gap-1 cursor-pointer",
                   mode === "dark"
                     ? "bg-background text-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground",
+                    : "text-muted-foreground hover:text-foreground"
                 )}
                 title="Giao diện tối"
               >
@@ -119,7 +199,7 @@ export function AppSidebar() {
                   "flex flex-col items-center justify-center py-1.5 px-1 rounded-lg text-[11px] font-bold transition-all gap-1 cursor-pointer",
                   mode === "auto"
                     ? "bg-background text-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground",
+                    : "text-muted-foreground hover:text-foreground"
                 )}
                 title="Tự động theo giờ hệ thống (6h-18h: Sáng, 18h-6h: Tối)"
               >

@@ -13,6 +13,7 @@ import {
   MoreVertical,
   FileText,
   Sparkles,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn, getSecondaryCategoryBadgeClass } from "@/lib/utils";
+import { checkIsIncomplete, getMissingFields } from "@/lib/incomplete-checker";
 
 export type Category = { id: string; categoryName: string; type?: number | null };
 export type Source = { id: string; sourceName: string };
@@ -231,6 +233,8 @@ export function CashFlowNewsfeed({
             {items.map((item) => {
               const isIncome = item.cashType === "Income";
               const isSelected = selectedIds.includes(item.id);
+              const isIncomplete = checkIsIncomplete(item);
+              const missingFields = isIncomplete ? getMissingFields(item) : [];
 
               return (
                 <div
@@ -239,11 +243,34 @@ export function CashFlowNewsfeed({
                     "bg-white dark:bg-slate-900 border shadow-2xs hover:shadow-md rounded-2xl p-4 transition-all duration-200 space-y-3 relative group w-full",
                     isSelected
                       ? "border-sky-500/80 ring-2 ring-sky-500/20 bg-sky-50/40 dark:bg-sky-950/30"
+                      : isIncomplete
+                      ? "border-2 border-amber-500 dark:border-amber-400 ring-4 ring-amber-500/20 dark:ring-amber-400/20 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent dark:from-amber-950/40 dark:via-slate-900 dark:to-slate-900 shadow-md shadow-amber-500/10"
                       : isIncome
                       ? "border-slate-200/80 dark:border-slate-800 hover:border-emerald-200 dark:hover:border-emerald-900/50"
                       : "border-slate-200/80 dark:border-slate-800 hover:border-rose-200 dark:hover:border-rose-900/50",
                   )}
                 >
+                  {/* Warning Callout Banner for Incomplete Transactions */}
+                  {isIncomplete && (
+                    <button
+                      type="button"
+                      onClick={() => handleEdit(item)}
+                      className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 text-slate-950 text-xs font-black shadow-md hover:brightness-110 transition-all cursor-pointer group/banner border border-amber-300 ring-2 ring-amber-400/30"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="bg-slate-950 text-amber-400 text-[10px] font-black px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0 animate-bounce">
+                          <AlertTriangle className="h-3 w-3 text-amber-400" />
+                          CẦN BỔ SUNG
+                        </span>
+                        <span className="truncate text-slate-950 font-bold">
+                          Thiếu: <strong className="underline decoration-slate-950 font-black">{missingFields.join(", ")}</strong>
+                        </span>
+                      </div>
+                      <span className="text-[11px] bg-slate-950 text-white px-2.5 py-1 rounded-lg font-extrabold flex items-center gap-1 shrink-0 group-hover/banner:scale-105 transition-transform shadow-xs">
+                        Cập nhật ngay ✏️
+                      </span>
+                    </button>
+                  )}
                   {/* Row 1: Header (Avatar, Title, Datetime, Right Checkbox & Popover Menu) */}
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -263,9 +290,16 @@ export function CashFlowNewsfeed({
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <h4 className="text-base font-bold text-slate-800 dark:text-slate-100 truncate group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">
-                          {item.title}
-                        </h4>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="text-base font-bold text-slate-800 dark:text-slate-100 truncate group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">
+                            {item.title}
+                          </h4>
+                          {isIncomplete && (
+                            <Badge className="bg-amber-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded-md shadow-xs animate-pulse border-none">
+                              ⚠️ THIẾU THÔNG TIN
+                            </Badge>
+                          )}
+                        </div>
                         <div className="flex items-center gap-1.5 text-xs font-medium text-slate-400 dark:text-slate-400 mt-0.5">
                           <Clock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                           <span>{formatDatetimeBadge(item.datetime)}</span>

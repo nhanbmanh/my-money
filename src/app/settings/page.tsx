@@ -7,7 +7,7 @@ export default function SettingsRedirectPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace("/");
+    router.replace("/financial-management");
     setTimeout(() => {
       window.dispatchEvent(new CustomEvent("open-settings-modal"));
     }, 100);

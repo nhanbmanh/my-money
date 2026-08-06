@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect } from "react";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import {
   TrendingUp,
+  TrendingDown,
   AlertTriangle,
   Sparkles,
   PieChart as PieIcon,
@@ -484,33 +485,61 @@ export function FinancialInsights({
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
             {/* Card 1: Tỷ lệ Tiết kiệm (Clickable) */}
-            <div
-              onClick={() =>
-                setSelectedDetail({
-                  title: "Chi tiết Dòng Tiền Tích Lũy (Thu nhập vs Chi tiêu)",
-                  subtitle: `Tổng thu: ${formatVND(totalIncome)} | Tổng chi: ${formatVND(totalExpense)}`,
-                  items: activeItems,
-                })
-              }
-              className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-50/60 to-teal-50/40 dark:from-emerald-950/30 dark:to-teal-950/20 border border-emerald-100 dark:border-emerald-900/40 space-y-1.5 cursor-pointer hover:shadow-md transition-all group"
-            >
-              <div className="flex items-center justify-between text-xs font-bold text-emerald-800 dark:text-emerald-300">
-                <span className="flex items-center gap-1.5">
-                  <TrendingUp className="h-4 w-4 text-emerald-500" />
-                  Tỷ Lệ Tích Lũy
-                </span>
-                <span>{savingsRate.toFixed(1)}%</span>
-              </div>
-              <div className="text-lg font-black text-emerald-700 dark:text-emerald-400">
-                {formatVND(netSavings)}
-              </div>
-              <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-0.5">
-                <span>Dòng tiền còn dư</span>
-                <span className="text-sky-600 dark:text-sky-400 font-semibold group-hover:underline flex items-center gap-0.5">
-                  Xem {activeItems.length} giao dịch <ChevronRight className="h-3 w-3" />
-                </span>
-              </div>
-            </div>
+            {(() => {
+              const isPositive = netSavings >= 0;
+              return (
+                <div
+                  onClick={() =>
+                    setSelectedDetail({
+                      title: "Chi tiết Dòng Tiền Tích Lũy (Thu nhập vs Chi tiêu)",
+                      subtitle: `Tổng thu: ${formatVND(totalIncome)} | Tổng chi: ${formatVND(totalExpense)}`,
+                      items: activeItems,
+                    })
+                  }
+                  className={cn(
+                    "p-3.5 rounded-2xl border space-y-1.5 cursor-pointer hover:shadow-md transition-all group",
+                    isPositive
+                      ? "bg-gradient-to-br from-emerald-50/60 to-teal-50/40 dark:from-emerald-950/30 dark:to-teal-950/20 border-emerald-100 dark:border-emerald-900/40"
+                      : "bg-gradient-to-br from-rose-50/60 to-red-50/40 dark:from-rose-950/30 dark:to-red-950/20 border-rose-100 dark:border-rose-900/40"
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "flex items-center justify-between text-xs font-bold",
+                      isPositive
+                        ? "text-emerald-800 dark:text-emerald-300"
+                        : "text-rose-800 dark:text-rose-300"
+                    )}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      {isPositive ? (
+                        <TrendingUp className="h-4 w-4 text-emerald-500" />
+                      ) : (
+                        <TrendingDown className="h-4 w-4 text-rose-500" />
+                      )}
+                      Tỷ Lệ Tích Lũy
+                    </span>
+                    <span>{savingsRate.toFixed(1)}%</span>
+                  </div>
+                  <div
+                    className={cn(
+                      "text-lg font-black",
+                      isPositive
+                        ? "text-emerald-700 dark:text-emerald-400"
+                        : "text-rose-700 dark:text-rose-400"
+                    )}
+                  >
+                    {formatVND(netSavings)}
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-0.5">
+                    <span>{isPositive ? "Dòng tiền còn dư" : "Thâm hụt dòng tiền"}</span>
+                    <span className="text-sky-600 dark:text-sky-400 font-semibold group-hover:underline flex items-center gap-0.5">
+                      Xem {activeItems.length} giao dịch <ChevronRight className="h-3 w-3" />
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Card 2: Top 3 Chi Cao Nhất (Clickable xem chi tiết 3 giao dịch) */}
             <div

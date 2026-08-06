@@ -44,7 +44,8 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/");
+    const defaultRoute = localStorage.getItem("default_app_route") || "/financial-management";
+    router.push(defaultRoute);
     router.refresh();
   };
 

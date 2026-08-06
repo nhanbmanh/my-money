@@ -17,7 +17,9 @@ import {
   Filter,
   PanelLeftClose,
   PanelLeftOpen,
+  AlertTriangle,
 } from "lucide-react";
+import { checkIsIncomplete, getMissingFields } from "@/lib/incomplete-checker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -776,51 +778,96 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      items.map((item) => (
-                        <ContextMenu key={item.id}>
-                          <ContextMenuTrigger asChild>
-                            <TableRow
-                              className={cn(
-                                "bg-white dark:bg-slate-900 hover:bg-sky-50/60 dark:hover:bg-slate-800/80 cursor-context-menu border-b border-slate-100 dark:border-slate-800/60",
-                                selectedIds.includes(item.id) &&
-                                  "bg-sky-100/70 dark:bg-sky-950/60 hover:bg-sky-100/80 dark:hover:bg-sky-900/60",
-                              )}
-                            >
-                              <TableCell onClick={(e) => e.stopPropagation()}>
-                                <Checkbox
-                                  checked={selectedIds.includes(item.id)}
-                                  onCheckedChange={() => toggleOne(item.id)}
-                                />
-                              </TableCell>
-                              <TableCell className="font-medium">
-                                {item.title}
-                              </TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant={
-                                    item.cashType === "Income"
-                                      ? "default"
-                                      : "destructive"
-                                  }
-                                >
-                                  {item.cashType === "Income"
-                                    ? "💰 Thu"
-                                    : "💸 Chi"}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="font-semibold whitespace-nowrap">
-                                {item.amountOfMoney.toLocaleString("vi-VN")} ₫
-                              </TableCell>
-                              <TableCell>
-                                {item.source?.sourceName ?? "—"}
-                              </TableCell>
-                              <TableCell>
-                                {item.primaryCategory?.categoryName ?? "—"}
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex flex-wrap gap-1">
-                                  {item.secondaryCategories.length > 0
-                                    ? item.secondaryCategories.map(
+                      items.map((item) => {
+                        const isIncomplete = checkIsIncomplete(item);
+                        const missingFields = isIncomplete ? getMissingFields(item) : [];
+
+                        return (
+                          <ContextMenu key={item.id}>
+                            <ContextMenuTrigger asChild>
+                              <TableRow
+                                className={cn(
+                                  "bg-white dark:bg-slate-900 hover:bg-sky-50/60 dark:hover:bg-slate-800/80 cursor-context-menu border-b border-slate-100 dark:border-slate-800/60 transition-colors",
+                                  isIncomplete &&
+                                    "bg-amber-500/15 dark:bg-amber-950/50 border-l-8 border-l-amber-500 border-amber-300 dark:border-amber-700/80",
+                                  selectedIds.includes(item.id) &&
+                                    "bg-sky-100/70 dark:bg-sky-950/60 hover:bg-sky-100/80 dark:hover:bg-sky-900/60",
+                                )}
+                              >
+                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                  <Checkbox
+                                    checked={selectedIds.includes(item.id)}
+                                    onCheckedChange={() => toggleOne(item.id)}
+                                  />
+                                </TableCell>
+                                <TableCell className="font-medium">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className={cn(isIncomplete && "font-extrabold text-amber-950 dark:text-amber-200")}>{item.title}</span>
+                                    {isIncomplete && (
+                                      <Badge
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleEdit(item);
+                                        }}
+                                        className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[10px] gap-1 transition-all cursor-pointer shrink-0 shadow-xs border-none animate-pulse"
+                                        title={`Bổ sung: ${missingFields.join(", ")}`}
+                                      >
+                                        <AlertTriangle className="h-3 w-3 text-slate-950" />
+                                        THIẾU: {missingFields.join(", ").toUpperCase()} ✏️
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge
+                                    variant={
+                                      item.cashType === "Income"
+                                        ? "default"
+                                        : "destructive"
+                                    }
+                                  >
+                                    {item.cashType === "Income"
+                                      ? "💰 Thu"
+                                      : "💸 Chi"}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="font-semibold whitespace-nowrap">
+                                  {item.amountOfMoney.toLocaleString("vi-VN")} ₫
+                                </TableCell>
+                                <TableCell>
+                                  {item.source?.sourceName ? (
+                                    item.source.sourceName
+                                  ) : (
+                                    <span
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEdit(item);
+                                      }}
+                                      className="text-xs font-black text-slate-950 bg-amber-400 hover:bg-amber-300 px-2 py-0.5 rounded-md shadow-xs cursor-pointer transition-colors inline-block"
+                                    >
+                                      ⚠️ CHỌN NGUỒN
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {item.primaryCategory?.categoryName ? (
+                                    item.primaryCategory.categoryName
+                                  ) : (
+                                    <span
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEdit(item);
+                                      }}
+                                      className="text-xs font-black text-slate-950 bg-amber-400 hover:bg-amber-300 px-2 py-0.5 rounded-md shadow-xs cursor-pointer transition-colors inline-block"
+                                    >
+                                      ⚠️ CHỌN NHÃN CHÍNH
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex flex-wrap gap-1">
+                                    {item.secondaryCategories && item.secondaryCategories.length > 0 ? (
+                                      item.secondaryCategories.map(
                                         ({ secondaryCategory }) => (
                                           <Badge
                                             key={secondaryCategory.id}
@@ -843,19 +890,41 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                                           </Badge>
                                         ),
                                       )
-                                    : "—"}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                                {format(
-                                  new Date(item.datetime),
-                                  "HH:mm dd/MM/yyyy",
-                                )}
-                              </TableCell>
-                              <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate">
-                                {item.description ?? "—"}
-                              </TableCell>
-                            </TableRow>
+                                    ) : (
+                                      <span
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleEdit(item);
+                                        }}
+                                        className="text-xs font-black text-slate-950 bg-amber-400 hover:bg-amber-300 px-2 py-0.5 rounded-md shadow-xs cursor-pointer transition-colors inline-block"
+                                      >
+                                        ⚠️ CHỌN NHÃN PHỤ
+                                      </span>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                                  {item.datetime ? (
+                                    format(
+                                      new Date(item.datetime),
+                                      "HH:mm dd/MM/yyyy",
+                                    )
+                                  ) : (
+                                    <span
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEdit(item);
+                                      }}
+                                      className="text-xs font-black text-slate-950 bg-amber-400 hover:bg-amber-300 px-2 py-0.5 rounded-md shadow-xs cursor-pointer transition-colors inline-block"
+                                    >
+                                      ⚠️ CHỌN THỜI GIAN
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate">
+                                  {item.description ?? "—"}
+                                </TableCell>
+                              </TableRow>
                           </ContextMenuTrigger>
                           <ContextMenuContent>
                             <ContextMenuItem onClick={() => handleEdit(item)}>
@@ -869,8 +938,9 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                             </ContextMenuItem>
                           </ContextMenuContent>
                         </ContextMenu>
-                      ))
-                    )}
+                      );
+                    })
+                  )}
                   </TableBody>
                 </Table>
               </div>

@@ -164,3 +164,71 @@
 .dark * {
   scrollbar-color: rgba(100, 116, 139, 0.45) transparent;
 }
+
+/* Weather Animated Background Effects */
+@keyframes raindrop-fall {
+  0% {
+    transform: translateY(-20px) scaleY(1);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translateY(340px) scaleY(1.4);
+    opacity: 0;
+  }
+}
+
+@keyframes cloud-float {
+  0% {
+    transform: translateX(-8%);
+  }
+  50% {
+    transform: translateX(12%);
+  }
+  100% {
+    transform: translateX(-8%);
+  }
+}
+
+@keyframes snow-fall {
+  0% {
+    transform: translateY(-10px) rotate(0deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(320px) rotate(360deg);
+    opacity: 0.2;
+  }
+}
+
+@keyframes sun-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.35;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.65;
+  }
+}
+
+.animate-raindrop {
+  animation: raindrop-fall linear infinite;
+}
+
+.animate-cloud-float {
+  animation: cloud-float 22s ease-in-out infinite;
+}
+
+.animate-snow-fall {
+  animation: snow-fall linear infinite;
+}
+
+.animate-sun-pulse {
+  animation: sun-pulse 4s ease-in-out infinite;
+}
