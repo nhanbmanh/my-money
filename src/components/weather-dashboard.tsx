@@ -184,12 +184,12 @@ export function WeatherDashboard() {
   };
 
   const getUvLevelInfo = (uv: number) => {
-    if (uv === 0) return { text: "Không có (Đêm)", color: "text-slate-400 bg-slate-50 dark:bg-slate-900 border-slate-200" };
+    if (uv === 0) return { text: "Ban đêm", color: "text-slate-400 bg-slate-50 dark:bg-slate-900 border-slate-200" };
     if (uv <= 2) return { text: "Thấp", color: "text-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200" };
-    if (uv <= 5) return { text: "Vừa phải", color: "text-amber-500 bg-amber-50 dark:bg-amber-950/60 border-amber-200" };
+    if (uv <= 5) return { text: "Vừa", color: "text-amber-500 bg-amber-50 dark:bg-amber-950/60 border-amber-200" };
     if (uv <= 7) return { text: "Cao", color: "text-orange-500 bg-orange-50 dark:bg-orange-950/60 border-orange-200" };
     if (uv <= 10) return { text: "Rất cao", color: "text-rose-600 bg-rose-50 dark:bg-rose-950/60 border-rose-200" };
-    return { text: "Cực kỳ nguy hiểm", color: "text-purple-600 bg-purple-50 dark:bg-purple-950/60 border-purple-200" };
+    return { text: "Nguy hiểm", color: "text-purple-600 bg-purple-50 dark:bg-purple-950/60 border-purple-200" };
   };
 
   // Generate Weather Summary Texts
@@ -279,9 +279,9 @@ export function WeatherDashboard() {
     : null;
 
   return (
-    <div className="space-y-4 max-w-6xl mx-auto w-full pb-8">
+    <div className="space-y-4 w-full max-w-[1400px] mx-auto pb-8 min-w-0">
       {/* SECTION 1: HEADER CONTROLS & CITY SEARCH */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3.5 bg-white/90 dark:bg-slate-900/90 backdrop-blur p-4 sm:p-5 rounded-3xl border border-sky-100 dark:border-slate-800 shadow-xs">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3.5 bg-white/90 dark:bg-slate-900/90 backdrop-blur p-4 sm:p-5 rounded-3xl border border-sky-100 dark:border-slate-800 shadow-xs relative z-30">
         {/* Left Location Indicator */}
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-11 h-11 rounded-2xl bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 shadow-xs">
@@ -300,9 +300,9 @@ export function WeatherDashboard() {
         </div>
 
         {/* Right Search Input & GPS Locator */}
-        <div className="flex items-center gap-2 relative">
+        <div className="flex items-center gap-2 relative z-40">
           <div className="relative flex-1 sm:w-72">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 z-10" />
             <Input
               type="text"
               placeholder="Tìm thành phố (Hà Nội, Đà Nẵng...)"
@@ -312,12 +312,12 @@ export function WeatherDashboard() {
               className="pl-10 pr-8 h-11 sm:h-9 text-sm sm:text-xs font-bold bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-xl"
             />
             {searching && (
-              <Spinner className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-sky-500" />
+              <Spinner className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-sky-500 z-10" />
             )}
 
             {/* Autocomplete Dropdown */}
             {showDropdown && searchResults.length > 0 && (
-              <div className="absolute top-full mt-1.5 left-0 right-0 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto p-1">
+              <div className="absolute top-full mt-1.5 left-0 right-0 z-[100] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto p-1">
                 {searchResults.map((loc, idx) => (
                   <button
                     key={idx}
@@ -433,9 +433,9 @@ export function WeatherDashboard() {
 
             {/* 2. ANIMATED DRIFTING CLOUDS */}
             {(weatherTheme.type === "cloud" || weatherTheme.type === "rain") && (
-              <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 opacity-20 animate-cloud-float">
-                <div className="absolute -top-6 -left-10 text-9xl">☁️</div>
-                <div className="absolute top-10 right-10 text-8xl">☁️</div>
+              <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 opacity-15 animate-cloud-float">
+                <div className="absolute top-2 left-6 text-7xl">☁️</div>
+                <div className="absolute top-8 right-12 text-6xl">☁️</div>
               </div>
             )}
 
@@ -472,39 +472,29 @@ export function WeatherDashboard() {
               }
             </div>
 
-            <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-              <div className="space-y-3.5 w-full md:w-auto">
-                <div className="flex items-center justify-between gap-2 w-full">
-                  <Badge className="bg-white/25 hover:bg-white/35 text-white border-white/40 backdrop-blur text-xs font-black px-3.5 py-1 rounded-full">
+            <div className="relative z-10 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 min-w-0">
+              <div className="space-y-3.5 w-full xl:w-1/2 min-w-0">
+                <div>
+                  <Badge className="bg-white/25 hover:bg-white/35 text-white border-white/40 backdrop-blur text-xs font-black px-3.5 py-1 rounded-full inline-block truncate">
                     {weatherData.current.isDay ? "☀️ Ban Ngày" : "🌙 Ban Đêm"} • Hạn Cập Nhật Mới Nhất
                   </Badge>
-
-                  {/* CLEAN SOLID WHITE SUMMARY BUTTON */}
-                  <Button
-                    size="icon"
-                    onClick={() => setSummaryOpen(true)}
-                    className="h-10 w-10 sm:h-9 sm:w-9 rounded-full bg-white hover:bg-slate-100 text-sky-700 border-2 border-white shadow-lg flex items-center justify-center cursor-pointer transition-all hover:scale-110 shrink-0"
-                    title="Xem tóm tắt thời tiết nhanh"
-                  >
-                    <FileText className="h-5.5 w-5.5 sm:h-5 sm:w-5 text-sky-600 font-black" />
-                  </Button>
                 </div>
 
                 <div className="flex items-baseline gap-4 pt-1">
-                  <h1 className="text-7xl sm:text-7xl font-black tracking-tight drop-shadow-md">
+                  <h1 className="text-6xl sm:text-7xl font-black tracking-tight drop-shadow-md">
                     {weatherData.current.temperature}°
-                    <span className="text-5xl font-black text-sky-100">C</span>
+                    <span className="text-4xl sm:text-5xl font-black text-sky-100">C</span>
                   </h1>
-                  <div className="text-5xl sm:text-5xl drop-shadow-sm">
+                  <div className="text-4xl sm:text-5xl drop-shadow-sm">
                     {getWmoWeatherInfo(weatherData.current.weatherCode, weatherData.current.isDay).icon}
                   </div>
                 </div>
 
-                <h3 className="text-2xl sm:text-2xl font-black text-white tracking-wide">
+                <h3 className="text-xl sm:text-2xl font-black text-white tracking-wide truncate">
                   {weatherData.current.weatherDesc}
                 </h3>
 
-                <p className="text-sm sm:text-sm font-extrabold text-sky-100 flex items-center gap-2">
+                <p className="text-xs sm:text-sm font-extrabold text-sky-100 flex items-center gap-2 truncate">
                   <span>Cảm giác như {weatherData.current.feelsLike}°C</span>
                   <span>•</span>
                   <span>Độ ẩm {weatherData.current.humidity}%</span>
@@ -512,61 +502,61 @@ export function WeatherDashboard() {
               </div>
 
               {/* Grid of Key Weather Metrics */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full md:w-auto shrink-0">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 w-full xl:w-1/2 min-w-0">
                 <div
-                  className="bg-white/15 backdrop-blur border border-white/25 rounded-2xl p-3.5 text-center space-y-1 cursor-help"
+                  className="bg-white/15 backdrop-blur border border-white/25 rounded-2xl p-2.5 sm:p-3 text-center space-y-1 cursor-help min-w-0"
                   title={summary?.humidityExplanation}
                 >
-                  <div className="flex items-center justify-center gap-1.5 text-xs font-black text-sky-100">
-                    <Droplets className="h-4 w-4" /> Độ Ẩm
+                  <div className="flex items-center justify-center gap-1 text-[11px] font-black text-sky-100 truncate">
+                    <Droplets className="h-3.5 w-3.5 shrink-0" /> Độ Ẩm
                   </div>
-                  <div className="text-xl sm:text-lg font-black text-white">{weatherData.current.humidity}%</div>
+                  <div className="text-base sm:text-lg font-black text-white truncate">{weatherData.current.humidity}%</div>
                 </div>
 
                 <div
-                  className="bg-white/15 backdrop-blur border border-white/25 rounded-2xl p-3.5 text-center space-y-1 cursor-help"
+                  className="bg-white/15 backdrop-blur border border-white/25 rounded-2xl p-2.5 sm:p-3 text-center space-y-1 cursor-help min-w-0"
                   title="Tốc độ gió di chuyển không khí"
                 >
-                  <div className="flex items-center justify-center gap-1.5 text-xs font-black text-sky-100">
-                    <Wind className="h-4 w-4" /> Tốc Độ Gió
+                  <div className="flex items-center justify-center gap-1 text-[11px] font-black text-sky-100 truncate">
+                    <Wind className="h-3.5 w-3.5 shrink-0" /> Tốc Độ Gió
                   </div>
-                  <div className="text-xl sm:text-lg font-black text-white">{weatherData.current.windSpeed} km/h</div>
+                  <div className="text-base sm:text-lg font-black text-white truncate">{weatherData.current.windSpeed} km/h</div>
                 </div>
 
                 <div
-                  className="bg-white/15 backdrop-blur border border-white/25 rounded-2xl p-3.5 text-center space-y-1 cursor-help"
+                  className="bg-white/15 backdrop-blur border border-white/25 rounded-2xl p-2.5 sm:p-3 text-center space-y-1 cursor-help min-w-0"
                   title={summary?.uvExplanation}
                 >
-                  <div className="flex items-center justify-center gap-1.5 text-xs font-black text-sky-100">
-                    <Sun className="h-4 w-4" /> Chỉ Số UV
+                  <div className="flex items-center justify-center gap-1 text-[11px] font-black text-sky-100 truncate">
+                    <Sun className="h-3.5 w-3.5 shrink-0" /> Chỉ Số UV
                   </div>
-                  <div className="text-xl sm:text-lg font-black text-white">
+                  <div className="text-base sm:text-lg font-black text-white truncate">
                     {weatherData.current.uvIndex} ({getUvLevelInfo(weatherData.current.uvIndex).text})
                   </div>
                 </div>
 
                 <div
-                  className="bg-white/15 backdrop-blur border border-white/25 rounded-2xl p-3.5 text-center space-y-1 cursor-help"
+                  className="bg-white/15 backdrop-blur border border-white/25 rounded-2xl p-2.5 sm:p-3 text-center space-y-1 cursor-help min-w-0"
                   title={summary?.pressureExplanation}
                 >
-                  <div className="flex items-center justify-center gap-1.5 text-xs font-black text-sky-100">
-                    <Gauge className="h-4 w-4" /> Áp Suất
+                  <div className="flex items-center justify-center gap-1 text-[11px] font-black text-sky-100 truncate">
+                    <Gauge className="h-3.5 w-3.5 shrink-0" /> Áp Suất
                   </div>
-                  <div className="text-xl sm:text-lg font-black text-white">{weatherData.current.pressure} hPa</div>
+                  <div className="text-base sm:text-lg font-black text-white truncate">{weatherData.current.pressure} hPa</div>
                 </div>
 
-                <div className="bg-white/15 backdrop-blur border border-white/25 rounded-2xl p-3.5 text-center space-y-1">
-                  <div className="flex items-center justify-center gap-1.5 text-xs font-black text-sky-100">
-                    <CloudRain className="h-4 w-4" /> Lượng Mưa
+                <div className="bg-white/15 backdrop-blur border border-white/25 rounded-2xl p-2.5 sm:p-3 text-center space-y-1 min-w-0">
+                  <div className="flex items-center justify-center gap-1 text-[11px] font-black text-sky-100 truncate">
+                    <CloudRain className="h-3.5 w-3.5 shrink-0" /> Lượng Mưa
                   </div>
-                  <div className="text-xl sm:text-lg font-black text-white">{weatherData.current.rain} mm</div>
+                  <div className="text-base sm:text-lg font-black text-white truncate">{weatherData.current.rain} mm</div>
                 </div>
 
-                <div className="bg-white/15 backdrop-blur border border-white/25 rounded-2xl p-3.5 text-center space-y-1">
-                  <div className="flex items-center justify-center gap-1.5 text-xs font-black text-sky-100">
-                    <Sunrise className="h-4 w-4" /> Mọc / Lặn
+                <div className="bg-white/15 backdrop-blur border border-white/25 rounded-2xl p-2.5 sm:p-3 text-center space-y-1 min-w-0">
+                  <div className="flex items-center justify-center gap-1 text-[11px] font-black text-sky-100 truncate">
+                    <Sunrise className="h-3.5 w-3.5 shrink-0" /> Mọc / Lặn
                   </div>
-                  <div className="text-sm font-black text-white">{weatherData.current.sunrise} / {weatherData.current.sunset}</div>
+                  <div className="text-xs sm:text-sm font-black text-white truncate">{weatherData.current.sunrise} / {weatherData.current.sunset}</div>
                 </div>
               </div>
             </div>

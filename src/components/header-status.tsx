@@ -27,11 +27,11 @@ export function HeaderStatus() {
   });
 
   return (
-    <span className="text-sm text-muted-foreground leading-6">
+    <span className="text-xs sm:text-sm text-muted-foreground leading-6 truncate min-w-0">
       Xin chào,{" "}
       <strong className="text-foreground">{session?.user?.name}</strong>
-      <span className="block sm:inline">
-        <span className="hidden sm:inline"> · </span>
+      <span className="hidden sm:inline">
+        <span> · </span>
         Bây giờ là{" "}
         <strong>
           {timeLabel} · {dateLabel}

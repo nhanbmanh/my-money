@@ -43,14 +43,14 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen xl:h-screen w-full xl:overflow-hidden">
+      <div className="flex min-h-screen xl:h-screen w-full xl:overflow-hidden min-w-0">
         <AppSidebar />
 
-        <SidebarInset className="min-h-screen xl:h-screen flex flex-col xl:min-h-0 xl:overflow-hidden bg-background">
+        <SidebarInset className="min-h-screen xl:h-screen flex flex-col xl:min-h-0 min-w-0 w-full overflow-x-hidden bg-background">
           {/* Top Page Header Bar */}
-          <header className="flex h-16 shrink-0 items-center justify-between border-b bg-background px-3 sm:px-4">
+          <header className="flex h-16 shrink-0 items-center justify-between border-b bg-background px-3 sm:px-4 min-w-0">
             {/* Left Header Status & Sidebar Trigger */}
-            <div className="flex items-center gap-2 min-w-0 pr-2">
+            <div className="flex items-center gap-2 min-w-0 pr-2 overflow-hidden">
               <SidebarTrigger />
               <HeaderStatus />
             </div>
@@ -74,7 +74,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
                   variant="outline"
                   size="icon"
                   onClick={() => window.dispatchEvent(new CustomEvent("refresh-weather-location"))}
-                  className="h-9 w-9 rounded-xl border-slate-200/80 text-slate-600 dark:text-slate-300 hover:bg-sky-50 hover:text-sky-600 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                  className="h-9 w-9 rounded-xl border-slate-200/80 text-slate-600 dark:text-slate-300 hover:bg-sky-50 hover:text-sky-600 dark:hover:bg-slate-800 transition-all cursor-pointer shrink-0"
                   title="Làm mới thời tiết theo vị trí GPS"
                 >
                   <RefreshCw className="h-4 w-4 text-sky-600 dark:text-sky-400" />
@@ -256,7 +256,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
             )}
           </header>
 
-          <div className="flex-1 xl:min-h-0 flex flex-col xl:overflow-hidden">
+          <div className="flex-1 min-w-0 flex flex-col xl:overflow-hidden overflow-y-auto p-3 sm:p-5">
             {children}
           </div>
         </SidebarInset>
