@@ -768,36 +768,34 @@ export function WeatherDashboard() {
                     key={idx}
                     className="flex items-center justify-between p-4 rounded-2xl bg-slate-50/95 dark:bg-slate-800/95 border border-slate-200/90 dark:border-slate-700 gap-3 shadow-xs"
                   >
-                    {/* Time */}
-                    <div className="w-28 flex items-center gap-1.5 shrink-0">
-                      <span className="text-base font-black text-slate-900 dark:text-slate-100">
-                        {idx === 0 ? "Bây giờ" : item.time}
-                      </span>
-                      {idx === 0 && (
-                        <Badge className="bg-sky-500 text-white text-[10px] px-1.5 py-0.5 font-bold rounded-md">
-                          Hiện tại
-                        </Badge>
-                      )}
-                    </div>
-
-                    {/* Icon & Weather Description */}
-                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                      <span className="text-3xl shrink-0">
-                        {getWmoWeatherInfo(item.weatherCode, item.isDay).icon}
-                      </span>
-                      <span className="truncate text-sm font-bold text-slate-700 dark:text-slate-200">
+                    {/* Time & Weather Description */}
+                    <div className="w-32 flex flex-col justify-center min-w-0 shrink-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-base font-black text-slate-900 dark:text-slate-100">
+                          {idx === 0 ? "Bây giờ" : item.time}
+                        </span>
+                        {idx === 0 && (
+                          <Badge className="bg-sky-500 text-white text-[9px] px-1.5 py-0.5 font-bold rounded-md">
+                            Hiện tại
+                          </Badge>
+                        )}
+                      </div>
+                      <span className="text-xs font-bold text-slate-500 dark:text-slate-400 truncate leading-tight mt-0.5">
                         {item.weatherDesc}
                       </span>
                     </div>
 
-                    {/* Rain Probability */}
-                    <div className="w-20 text-right shrink-0">
+                    {/* Icon & Rain Probability */}
+                    <div className="flex items-center gap-2 min-w-0 flex-1 justify-center">
+                      <span className="text-2xl shrink-0">
+                        {getWmoWeatherInfo(item.weatherCode, item.isDay).icon}
+                      </span>
                       {item.pop > 0 ? (
-                        <span className="text-xs font-black text-sky-700 dark:text-sky-300 bg-sky-500/15 px-2.5 py-1 rounded-lg">
+                        <span className="text-xs font-black text-sky-700 dark:text-sky-300 bg-sky-500/15 px-2 py-0.5 rounded-lg shrink-0">
                           💧 {item.pop}%
                         </span>
                       ) : (
-                        <span className="text-xs text-slate-400 font-semibold">—</span>
+                        <span className="text-xs text-slate-400 font-semibold shrink-0">—</span>
                       )}
                     </div>
 
@@ -814,7 +812,8 @@ export function WeatherDashboard() {
                 {hourlyList.map((item, idx) => (
                   <div
                     key={idx}
-                    className="flex flex-col items-center justify-between p-2.5 sm:p-3 rounded-2xl bg-slate-50/80 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-800 w-full min-w-0 space-y-1.5 hover:border-sky-300 dark:hover:border-sky-700 transition-all text-center"
+                    title={`${item.time}: ${item.weatherDesc} • ${item.temperature}°C`}
+                    className="flex flex-col items-center justify-between p-2 sm:p-2.5 rounded-2xl bg-slate-50/80 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-800 w-full min-w-0 space-y-1 hover:border-sky-300 dark:hover:border-sky-700 transition-all text-center cursor-help"
                   >
                     <span className="text-[11px] sm:text-xs font-bold text-slate-600 dark:text-slate-300 truncate w-full">
                       {idx === 0 ? "Bây giờ" : item.time}
@@ -822,6 +821,11 @@ export function WeatherDashboard() {
 
                     <span className="text-xl sm:text-2xl py-0.5">
                       {getWmoWeatherInfo(item.weatherCode, item.isDay).icon}
+                    </span>
+
+                    {/* Weather Description Text Label */}
+                    <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 truncate w-full leading-tight">
+                      {item.weatherDesc}
                     </span>
 
                     <span className="text-sm sm:text-base font-black text-slate-800 dark:text-slate-100 truncate w-full">
