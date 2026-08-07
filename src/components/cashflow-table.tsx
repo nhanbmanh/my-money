@@ -291,6 +291,11 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
     fetchData();
     setLocalRefreshKey((k) => k + 1);
     setBudgetsUpdatedKey((k) => k + 1);
+    window.dispatchEvent(
+      new CustomEvent("refresh-budget-alerts", {
+        detail: { triggerModal: false },
+      })
+    );
   }, [fetchData]);
 
   // Delete handlers

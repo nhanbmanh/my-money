@@ -15,6 +15,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { fetchCurrentMonthAlerts, BudgetAlertItem } from "@/lib/budget-checker";
 import { checkIsIncomplete, getMissingFields } from "@/lib/incomplete-checker";
 import { cn } from "@/lib/utils";
@@ -27,21 +34,12 @@ export function NotificationsPopover() {
   const [activeTab, setActiveTab] = useState<"budget" | "incomplete">(
     "incomplete"
   );
-  const [toastAlert, setToastAlert] = useState<BudgetAlertItem | null>(null);
 
-  const loadAlerts = useCallback(async (triggerToast = false) => {
+  const loadAlerts = useCallback(async () => {
     setLoading(true);
     try {
       const data = await fetchCurrentMonthAlerts();
       setAlerts(data);
-
-      if (triggerToast && data.length > 0) {
-        const topAlert = data[0];
-        setToastAlert(topAlert);
-        setTimeout(() => {
-          setToastAlert(null);
-        }, 6000);
-      }
     } catch {
       setAlerts([]);
     } finally {
@@ -62,13 +60,11 @@ export function NotificationsPopover() {
   }, []);
 
   useEffect(() => {
-    loadAlerts(false);
+    loadAlerts();
     loadIncompleteItems();
 
-    const handleRefresh = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      const shouldToast = customEvent?.detail?.triggerToast ?? true;
-      loadAlerts(shouldToast);
+    const handleRefresh = () => {
+      loadAlerts();
       loadIncompleteItems();
     };
 
@@ -341,34 +337,6 @@ export function NotificationsPopover() {
           )}
         </PopoverContent>
       </Popover>
-
-      {/* FLOATING TOAST ALERT UPON CREATING A TRANSACTION THAT TRIGGERS AN ALERT */}
-      {toastAlert && (
-        <div className="fixed top-20 right-4 z-50 max-w-sm w-full bg-white dark:bg-slate-900 border-2 border-rose-500/80 rounded-2xl p-4 shadow-2xl animate-in slide-in-from-top-5 duration-300 flex items-start justify-between gap-3">
-          <div className="flex items-start gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0 mt-0.5">
-              <AlertTriangle className="h-4.5 w-4.5" />
-            </div>
-            <div className="space-y-1 min-w-0">
-              <h5 className="text-xs font-bold text-rose-600 dark:text-rose-400">
-                ⚠️ Cảnh Báo Ngân Sách Hạn Mức Tháng
-              </h5>
-              <p className="text-xs font-medium text-slate-700 dark:text-slate-200">
-                {toastAlert.message}
-              </p>
-              <p className="text-[11px] text-slate-400">
-                Đã chi {formatVND(toastAlert.spent)} / Hạn mức {formatVND(toastAlert.budgetLimit)}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setToastAlert(null)}
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold shrink-0 p-1"
-          >
-            ✕
-          </button>
-        </div>
-      )}
     </>
   );
 }

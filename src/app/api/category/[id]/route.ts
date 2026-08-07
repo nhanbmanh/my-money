@@ -34,7 +34,14 @@ export async function PUT(
   }
 
   const categoryName =
-    typeof body?.categoryName === "string" ? body.categoryName.trim() : "";
+    typeof body?.categoryName === "string" ? body.categoryName.trim() : existing.categoryName;
+  const budgetLimit = body?.budgetLimit;
+  const parsedBudgetLimit =
+    budgetLimit !== undefined && budgetLimit !== null && Number(budgetLimit) >= 0
+      ? Number(budgetLimit)
+      : budgetLimit === null || budgetLimit === -1
+      ? -1
+      : existing.budgetLimit;
 
   if (!categoryName) {
     return NextResponse.json(
@@ -45,7 +52,10 @@ export async function PUT(
 
   const updated = await prisma.category.update({
     where: { id },
-    data: { categoryName },
+    data: {
+      categoryName,
+      budgetLimit: parsedBudgetLimit,
+    },
   });
 
   return NextResponse.json(updated);

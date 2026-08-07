@@ -156,7 +156,7 @@ export function ImportExcelModal({
         if (data.successCount > 0) {
           window.dispatchEvent(
             new CustomEvent("refresh-budget-alerts", {
-              detail: { triggerToast: true },
+              detail: { triggerToast: true, triggerModal: true },
             })
           );
           onImportSuccess?.();

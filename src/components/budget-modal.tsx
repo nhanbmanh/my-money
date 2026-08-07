@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Target, Save, RotateCcw, Tag, Layers } from "lucide-react";
 
-export type Category = { id: string; categoryName: string };
+export type Category = { id: string; categoryName: string; budgetLimit?: number | null };
 
 interface BudgetModalProps {
   open: boolean;
@@ -20,6 +20,7 @@ interface BudgetModalProps {
 
 export const BUDGET_STORAGE_KEY = "my_money_category_budgets";
 
+// Backward compatibility helper (returns map of category id -> budgetLimit from category objects)
 export function getStoredBudgets(): Record<string, number> {
   if (typeof window === "undefined") return {};
   try {
@@ -48,16 +49,20 @@ export function BudgetModal({
 }: BudgetModalProps) {
   const [budgets, setBudgets] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<"primary" | "secondary">("primary");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
-      const stored = getStoredBudgets();
       const initial: Record<string, string> = {};
-      
       const allCats = [...categories, ...secondaryCategories];
+      
       allCats.forEach((cat) => {
-        const val = stored[cat.id] || stored[cat.categoryName];
-        initial[cat.id] = val ? Number(val).toLocaleString("vi-VN") : "";
+        const val = cat.budgetLimit;
+        if (val !== undefined && val !== null && val > 0) {
+          initial[cat.id] = Number(val).toLocaleString("vi-VN");
+        } else {
+          initial[cat.id] = "";
+        }
       });
       setBudgets(initial);
     }
@@ -73,22 +78,45 @@ export function BudgetModal({
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    setSaving(true);
     const toSave: Record<string, number> = {};
     const allCats = [...categories, ...secondaryCategories];
+    
     allCats.forEach((cat) => {
       const rawVal = budgets[cat.id] || "";
       const digitsOnly = rawVal.replace(/\D/g, "");
       if (digitsOnly) {
         toSave[cat.id] = parseInt(digitsOnly, 10);
+      } else {
+        toSave[cat.id] = -1; // -1 means unlimited
       }
     });
-    saveStoredBudgets(toSave);
-    window.dispatchEvent(
-      new CustomEvent("refresh-budget-alerts", { detail: { triggerToast: false } })
-    );
-    onBudgetsUpdated();
-    onOpenChange(false);
+
+    try {
+      const res = await fetch("/api/budgets", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ budgets: toSave }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        console.error("Failed to save budgets to DB:", err);
+      } else {
+        // Also save to localStorage as backup/cache
+        saveStoredBudgets(toSave);
+      }
+    } catch (e) {
+      console.error("Error saving budgets:", e);
+    } finally {
+      setSaving(false);
+      window.dispatchEvent(
+        new CustomEvent("refresh-budget-alerts", { detail: { triggerToast: false } })
+      );
+      onBudgetsUpdated();
+      onOpenChange(false);
+    }
   };
 
   const handleClearAll = () => {
@@ -195,11 +223,12 @@ export function BudgetModal({
             <Button
               type="button"
               size="sm"
+              disabled={saving}
               onClick={handleSave}
               className="text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white rounded-xl gap-1.5"
             >
               <Save className="h-3.5 w-3.5" />
-              Lưu Ngân Sách
+              {saving ? "Đang lưu..." : "Lưu Ngân Sách"}
             </Button>
           </div>
         </DialogFooter>

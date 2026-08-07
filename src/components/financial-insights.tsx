@@ -51,7 +51,7 @@ import { cn } from "@/lib/utils";
 import { ImportExcelModal } from "@/components/import-excel-modal";
 import { exportCashflowToExcel } from "@/lib/excel-import-utils";
 
-export type Category = { id: string; categoryName: string; type?: number | null };
+export type Category = { id: string; categoryName: string; type?: number | null; budgetLimit?: number | null };
 export type Source = { id: string; sourceName: string };
 
 export type CashFlowItem = {
@@ -329,7 +329,11 @@ export function FinancialInsights({
 
     // Primary categories with budget set
     categories.forEach((cat) => {
-      const budgetLimit = storedBudgets[cat.id] || 0;
+      const budgetLimit =
+        cat.budgetLimit !== undefined && cat.budgetLimit !== null && cat.budgetLimit > 0
+          ? cat.budgetLimit
+          : storedBudgets[cat.id] || 0;
+
       if (budgetLimit > 0) {
         const entry = expenseByPrimaryMap.get(cat.id) || { spent: 0, catItems: [] };
         const percent = (entry.spent / budgetLimit) * 100;
@@ -346,7 +350,11 @@ export function FinancialInsights({
 
     // Secondary categories with budget set
     (secondaryCategories || []).forEach((secCat) => {
-      const budgetLimit = storedBudgets[secCat.id] || 0;
+      const budgetLimit =
+        secCat.budgetLimit !== undefined && secCat.budgetLimit !== null && secCat.budgetLimit > 0
+          ? secCat.budgetLimit
+          : storedBudgets[secCat.id] || 0;
+
       if (budgetLimit > 0) {
         const entry = expenseBySecondaryMap.get(secCat.id) || { spent: 0, catItems: [] };
         const percent = (entry.spent / budgetLimit) * 100;

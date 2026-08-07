@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { categoryName } = await req.json();
+  const { categoryName, budgetLimit } = await req.json();
 
   if (!categoryName?.trim()) {
     return NextResponse.json(
@@ -33,10 +33,16 @@ export async function POST(req: Request) {
     );
   }
 
+  const parsedBudgetLimit =
+    budgetLimit !== undefined && budgetLimit !== null && Number(budgetLimit) >= 0
+      ? Number(budgetLimit)
+      : -1;
+
   const category = await prisma.category.create({
     data: {
       user: { connect: { id: session.user.id } },
       categoryName: categoryName.trim(),
+      budgetLimit: parsedBudgetLimit,
     },
   });
 

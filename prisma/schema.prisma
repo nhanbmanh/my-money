@@ -64,6 +64,7 @@ model Category {
   userId       String?
   user         User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
   categoryName String
+  budgetLimit  Float?     @default(-1)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -78,6 +79,7 @@ model SecondaryCategory {
   user         User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
   categoryName String
   type         Int        @default(0)
+  budgetLimit  Float?     @default(-1)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 

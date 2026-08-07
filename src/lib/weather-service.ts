@@ -190,7 +190,7 @@ export async function fetchWeatherData(
   lng: number,
   locationName?: string
 ): Promise<WeatherData> {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,weather_code,surface_pressure,wind_speed_10m,uv_index&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,weather_code,wind_speed_10m,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum,precipitation_probability_max,uv_index_max&timezone=auto&_t=${Date.now()}`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,showers,weather_code,surface_pressure,wind_speed_10m,uv_index&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,weather_code,wind_speed_10m,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum,precipitation_probability_max,uv_index_max&timezone=auto&_t=${Date.now()}`;
 
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) {
@@ -255,13 +255,13 @@ export async function fetchWeatherData(
     weatherDesc: currentInfo.desc,
     isDay,
     uvIndex: currentUv,
-    rain: currentData.rain || currentData.precipitation || 0,
+    rain: currentData.rain || currentData.showers || currentData.precipitation || 0,
     sunrise: formatLocalTimeStr(dailyData?.sunrise?.[0]) || "05:32",
     sunset: formatLocalTimeStr(dailyData?.sunset?.[0]) || "18:32",
   };
 
   const hourly: HourlyForecastItem[] = [];
-  for (let i = startIndex; i < Math.min(startIndex + 24, hourlyData.time.length); i++) {
+  for (let i = startIndex; i < Math.min(startIndex + 12, hourlyData.time.length); i++) {
     const timeStr = hourlyData.time[i];
     const hourStr = formatLocalTimeStr(timeStr); // e.g. "22:00"
     const hourNum = parseInt(hourStr.split(":")[0], 10) || 0;

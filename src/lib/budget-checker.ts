@@ -27,11 +27,6 @@ export async function fetchCurrentMonthAlerts(): Promise<BudgetAlertItem[]> {
   if (typeof window === "undefined") return [];
 
   const storedBudgets = getStoredBudgets();
-  const budgetCategoryIds = Object.keys(storedBudgets).filter(
-    (id) => storedBudgets[id] > 0
-  );
-
-  if (budgetCategoryIds.length === 0) return [];
 
   const now = new Date();
   const dateFrom = startOfMonth(now).toISOString();
@@ -77,7 +72,11 @@ export async function fetchCurrentMonthAlerts(): Promise<BudgetAlertItem[]> {
 
     // Check primary categories
     primaryCats.forEach((cat: any) => {
-      const budgetLimit = storedBudgets[cat.id] || 0;
+      const budgetLimit =
+        cat.budgetLimit !== undefined && cat.budgetLimit !== null && cat.budgetLimit > 0
+          ? cat.budgetLimit
+          : storedBudgets[cat.id] || 0;
+
       if (budgetLimit > 0) {
         const spent = expenseByPrimaryMap.get(cat.id) || 0;
         const percent = (spent / budgetLimit) * 100;
@@ -102,7 +101,11 @@ export async function fetchCurrentMonthAlerts(): Promise<BudgetAlertItem[]> {
 
     // Check secondary categories
     secondaryCats.forEach((cat: any) => {
-      const budgetLimit = storedBudgets[cat.id] || 0;
+      const budgetLimit =
+        cat.budgetLimit !== undefined && cat.budgetLimit !== null && cat.budgetLimit > 0
+          ? cat.budgetLimit
+          : storedBudgets[cat.id] || 0;
+
       if (budgetLimit > 0) {
         const spent = expenseBySecondaryMap.get(cat.id) || 0;
         const percent = (spent / budgetLimit) * 100;

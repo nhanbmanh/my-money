@@ -21,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { HeaderStatus } from "@/components/header-status";
 import { NotificationsPopover } from "@/components/notifications-popover";
+import { BudgetWarningModal } from "@/components/budget-warning-modal";
 import {
   Popover,
   PopoverContent,
@@ -43,6 +44,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider>
+      <BudgetWarningModal />
       <div className="flex min-h-screen xl:h-screen w-full xl:overflow-hidden min-w-0">
         <AppSidebar />
 

@@ -64,11 +64,6 @@ export default function FinancialManagementPage() {
         editData={editData}
         onSuccess={() => {
           setRefreshKey((k) => k + 1);
-          window.dispatchEvent(
-            new CustomEvent("refresh-budget-alerts", {
-              detail: { triggerToast: false },
-            })
-          );
         }}
       />
 

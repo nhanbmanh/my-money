@@ -137,7 +137,10 @@ export async function buildAndSendMonthlyReportEmail({
   const budgetRows: BudgetRow[] = [];
 
   userPrimaryCategories.forEach((cat) => {
-    const limit = storedBudgets[cat.id] || 0;
+    const limit =
+      cat.budgetLimit !== undefined && cat.budgetLimit !== null && cat.budgetLimit > 0
+        ? cat.budgetLimit
+        : storedBudgets[cat.id] || 0;
     if (limit > 0) {
       const spent = expenseByPrimaryMap.get(cat.id) || 0;
       const percent = (spent / limit) * 100;
@@ -157,7 +160,10 @@ export async function buildAndSendMonthlyReportEmail({
   });
 
   userSecondaryCategories.forEach((cat) => {
-    const limit = storedBudgets[cat.id] || 0;
+    const limit =
+      cat.budgetLimit !== undefined && cat.budgetLimit !== null && cat.budgetLimit > 0
+        ? cat.budgetLimit
+        : storedBudgets[cat.id] || 0;
     if (limit > 0) {
       const spent = expenseBySecondaryMap.get(cat.id) || 0;
       const percent = (spent / limit) * 100;

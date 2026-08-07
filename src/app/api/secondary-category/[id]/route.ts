@@ -34,9 +34,16 @@ export async function PUT(
   }
 
   const categoryName =
-    typeof body?.categoryName === "string" ? body.categoryName.trim() : "";
+    typeof body?.categoryName === "string" ? body.categoryName.trim() : existing.categoryName;
   const type = body?.type;
   const parsedType = Number.isInteger(type) ? type : existing.type;
+  const budgetLimit = body?.budgetLimit;
+  const parsedBudgetLimit =
+    budgetLimit !== undefined && budgetLimit !== null && Number(budgetLimit) >= 0
+      ? Number(budgetLimit)
+      : budgetLimit === null || budgetLimit === -1
+      ? -1
+      : existing.budgetLimit;
 
   if (!categoryName) {
     return NextResponse.json(
@@ -49,6 +56,7 @@ export async function PUT(
     where: { id },
     data: {
       categoryName,
+      budgetLimit: parsedBudgetLimit,
       ...(typeof parsedType === "number" ? { type: parsedType } : {}),
     },
   });

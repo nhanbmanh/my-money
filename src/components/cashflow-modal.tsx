@@ -308,10 +308,15 @@ export function CashFlowModal({
       return;
     }
 
-    // Trigger budget alerts recalculation & toast notification
+    // Trigger budget alerts recalculation & modal notification for target categories
     window.dispatchEvent(
       new CustomEvent("refresh-budget-alerts", {
-        detail: { triggerToast: true },
+        detail: {
+          triggerToast: true,
+          triggerModal: true,
+          targetPrimaryCategoryId: payload.primaryCategoryId,
+          targetSecondaryCategoryIds: secondaryCategoryIds,
+        },
       })
     );
 
