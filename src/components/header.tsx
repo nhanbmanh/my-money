@@ -17,7 +17,10 @@ export function Header({ onOpenModal }: HeaderProps) {
     <header className="bg-sky-50 border-b border-gray-200 shadow-sm px-6 py-4 relative">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Logo */}
-        <h1 className="text-xl font-bold text-sky-700">MyNOTE</h1>
+        <div>
+          <h1 className="text-xl font-extrabold tracking-tight text-sky-700">MyNOTE</h1>
+          <p className="text-[10px] font-bold text-sky-500 tracking-wider uppercase -mt-1">Note my life</p>
+        </div>
 
         {/* Desktop nav */}
         <div className="hidden md:flex items-center gap-3">

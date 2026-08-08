@@ -1,16 +1,14 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider  = "postgresql"
-  url       = env("POSTGRES_PRISMA_URL")
-  directUrl = env("POSTGRES_URL_NON_POOLING")
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 model User {
@@ -24,11 +22,16 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  otpCodes      OtpCode[]
+  otpCodes            OtpCode[]
   sources             Source[]
   categories          Category[]
   secondaryCategories SecondaryCategory[]
   cashFlows           CashFlow[]
+
+  // Wealth Management Relations
+  holdings           Holding[]
+  wealthTransactions WealthTransaction[]
+  liabilities        Liability[]
 
   @@map("users")
 }
@@ -85,7 +88,7 @@ model SecondaryCategory {
 
   cashFlowSecondaryCategories CashFlowSecondaryCategory[]
 
-  @@map("secondary_categories")   // <-- đổi tên này
+  @@map("secondary_categories")
 }
 
 model CashFlow {
@@ -126,4 +129,108 @@ model CashFlowSecondaryCategory {
 enum CashType {
   Income
   Expense
+}
+
+// --------------------------------------------------------
+// WEALTH MANAGEMENT SYSTEM MODELS (QUẢN LÝ GIA SẢN)
+// --------------------------------------------------------
+
+model MacroCategory {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  orderIndex  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  holdings           Holding[]
+  wealthTransactions WealthTransaction[]
+
+  @@map("macro_categories")
+}
+
+model Asset {
+  id             String   @id @default(uuid())
+  symbolOrTicker String
+  assetName      String
+  isMarketDriven Boolean  @default(true)
+  assetClass     String   @default("STOCKS") // STOCKS, CRYPTO, GOLD, BOND, REAL_ESTATE, VEHICLE, LOAN, CASH
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  holdings           Holding[]
+  wealthTransactions WealthTransaction[]
+
+  @@index([symbolOrTicker])
+  @@map("assets")
+}
+
+model Holding {
+  id                 String        @id @default(uuid())
+  userId             String
+  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  macroCategoryId    String
+  macroCategory      MacroCategory @relation(fields: [macroCategoryId], references: [id])
+  assetId            String
+  asset              Asset         @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  quantity           Float         @default(0)
+  averageCostBasis   Float         @default(0)
+  currentValue       Float         @default(0)
+  investableFlag     Boolean       @default(true)
+  linkedLiabilityId  String?       @unique
+  linkedLiability    Liability?    @relation("HoldingLiabilityLink", fields: [linkedLiabilityId], references: [id])
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  liabilitiesAttached Liability[] @relation("AttachedHolding")
+
+  @@index([userId])
+  @@index([macroCategoryId])
+  @@index([assetId])
+  @@map("holdings")
+}
+
+model WealthTransaction {
+  id              String         @id @default(uuid())
+  userId          String
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date            DateTime       @default(now())
+  transactionType String         // BUY, SELL, DEPOSIT, WITHDRAW, DIVIDEND, EXPENSE, REVALUATION, TRANSFER
+  macroCategoryId String?
+  macroCategory   MacroCategory? @relation(fields: [macroCategoryId], references: [id], onDelete: SetNull)
+  assetId         String?
+  asset           Asset?         @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  quantity        Float?         @default(0)
+  price           Float?         @default(0)
+  costBasis       Float?         @default(0)
+  fee             Float?         @default(0)
+  currency        String         @default("VND")
+  notes           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([userId, date])
+  @@index([macroCategoryId])
+  @@map("wealth_transactions")
+}
+
+model Liability {
+  id               String    @id @default(uuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name             String
+  totalDebt        Float     @default(0)
+  interestRate     Float     @default(0)
+  dueDate          DateTime?
+  linkedHoldingId  String?
+  linkedHolding    Holding?  @relation("AttachedHolding", fields: [linkedHoldingId], references: [id], onDelete: SetNull)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  holdingReference Holding?  @relation("HoldingLiabilityLink")
+
+  @@index([userId])
+  @@map("liabilities")
 }

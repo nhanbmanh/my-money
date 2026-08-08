@@ -18,6 +18,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   AlertTriangle,
+  RefreshCw,
 } from "lucide-react";
 import { checkIsIncomplete, getMissingFields } from "@/lib/incomplete-checker";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -490,7 +492,18 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
   );
 
   return (
-    <div className="space-y-4 flex flex-col flex-1 min-h-0">
+    <div className="space-y-4 flex flex-col flex-1 min-h-0 relative">
+      {/* Top Animated Loading Bar & Glassmorphic Floating Badge */}
+      {loading && items.length > 0 && (
+        <div className="fixed top-0 left-0 right-0 z-[300] pointer-events-none">
+          <div className="h-1 w-full bg-gradient-to-r from-sky-500 via-blue-600 to-emerald-500 animate-pulse" />
+          <div className="absolute top-4 right-6 backdrop-blur-md bg-slate-900/90 border border-sky-500/30 text-sky-400 px-3.5 py-1.5 rounded-full text-xs font-bold shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+            <RefreshCw className="h-3.5 w-3.5 animate-spin text-sky-400" />
+            <span>Đang cập nhật dòng tiền mới...</span>
+          </div>
+        </div>
+      )}
+
       {/* Top Summary Cards */}
       <DashboardSummaryCards
         totalIncome={totalIncome}
@@ -768,11 +781,19 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                   </TableHeader>
                   <TableBody>
                     {loading ? (
-                      <TableRow>
-                        <TableCell colSpan={9} className="text-center py-12">
-                          <Spinner className="mx-auto" />
-                        </TableCell>
-                      </TableRow>
+                      Array.from({ length: 6 }).map((_, idx) => (
+                        <TableRow key={idx} className="animate-pulse">
+                          <TableCell className="py-3"><Skeleton className="h-4 w-4 rounded-md" /></TableCell>
+                          <TableCell className="py-3"><Skeleton className="h-5 w-20 rounded-lg bg-sky-500/20" /></TableCell>
+                          <TableCell className="py-3"><Skeleton className="h-5 w-24 rounded-lg" /></TableCell>
+                          <TableCell className="py-3"><Skeleton className="h-5 w-32 rounded-lg" /></TableCell>
+                          <TableCell className="py-3"><Skeleton className="h-5 w-24 rounded-lg" /></TableCell>
+                          <TableCell className="py-3"><Skeleton className="h-5 w-16 rounded-lg" /></TableCell>
+                          <TableCell className="py-3"><Skeleton className="h-5 w-24 rounded-lg" /></TableCell>
+                          <TableCell className="py-3"><Skeleton className="h-5 w-36 rounded-lg" /></TableCell>
+                          <TableCell className="py-3"><Skeleton className="h-8 w-20 rounded-xl ms-auto" /></TableCell>
+                        </TableRow>
+                      ))
                     ) : items.length === 0 ? (
                       <TableRow>
                         <TableCell

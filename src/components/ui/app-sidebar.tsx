@@ -26,6 +26,7 @@ import {
   Clock,
   CloudSun,
   Pin,
+  Landmark,
 } from "lucide-react";
 import { useTheme, ThemeMode } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,12 @@ const NAV_ITEMS = [
     label: "Quản lý tài chính",
     icon: Wallet,
     iconColor: "text-sky-600 dark:text-sky-400",
+  },
+  {
+    href: "/wealth-management",
+    label: "Quản lý gia sản",
+    icon: Landmark,
+    iconColor: "text-emerald-600 dark:text-emerald-400",
   },
   {
     href: "/weather",
@@ -74,14 +81,14 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r bg-sidebar">
       <SidebarHeader className="border-b border-sidebar-border px-4 py-4 group-data-[collapsible=icon]:px-2">
         <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-600 to-blue-700 text-white shadow-md shadow-sky-600/20">
-            <Layers className="h-5 w-5" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-sky-500 via-blue-600 to-emerald-500 text-white shadow-lg shadow-sky-500/20">
+            <Layers className="h-5 w-5 text-white" />
           </div>
           <div className="group-data-[collapsible=icon]:hidden">
-            <p className="text-base font-extrabold tracking-tight text-sidebar-foreground">
-              MyNOTE
+            <p className="text-base font-extrabold tracking-tight text-sidebar-foreground flex items-center gap-1.5">
+              <span>MyNOTE</span>
             </p>
-            <p className="text-xs text-muted-foreground font-medium">
+            <p className="text-[10px] font-extrabold text-sky-500 tracking-wider uppercase -mt-0.5">
               Note my life
             </p>
           </div>

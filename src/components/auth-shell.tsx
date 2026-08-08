@@ -41,14 +41,15 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
 
   const isWeatherPage = pathname === "/weather";
   const isFinancePage = pathname === "/financial-management" || pathname === "/";
+  const isWealthPage = pathname === "/wealth-management";
 
   return (
     <SidebarProvider>
       <BudgetWarningModal />
-      <div className="flex min-h-screen xl:h-screen w-full xl:overflow-hidden min-w-0">
+      <div className="flex min-h-screen w-full min-w-0">
         <AppSidebar />
 
-        <SidebarInset className="min-h-screen xl:h-screen flex flex-col xl:min-h-0 min-w-0 w-full overflow-x-hidden bg-background">
+        <SidebarInset className="min-h-screen flex flex-col min-w-0 w-full overflow-x-hidden bg-background">
           {/* Top Page Header Bar */}
           <header className="flex h-16 shrink-0 items-center justify-between border-b bg-background px-3 sm:px-4 min-w-0">
             {/* Left Header Status & Sidebar Trigger */}
@@ -56,6 +57,23 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
               <SidebarTrigger />
               <HeaderStatus />
             </div>
+
+            {/* Wealth Management Header Actions */}
+            {isWealthPage && (
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                <NotificationsPopover />
+                <Button
+                  onClick={() =>
+                    window.dispatchEvent(new CustomEvent("open-wealth-creation-modal"))
+                  }
+                  className="h-9 px-2.5 sm:px-3.5 text-xs font-bold gap-1.5 bg-gradient-to-r from-sky-500 via-blue-600 to-emerald-500 hover:from-sky-600 hover:to-emerald-600 text-white rounded-xl shadow-lg shadow-sky-500/20 transition-all border-0 cursor-pointer shrink-0"
+                  title="Thêm tài sản mới"
+                >
+                  <PlusCircle className="h-4 w-4 shrink-0" />
+                  <span className="hidden sm:inline">Thêm tài sản</span>
+                </Button>
+              </div>
+            )}
 
             {/* Weather Page Header Actions */}
             {isWeatherPage && (
@@ -95,7 +113,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
                   {/* Khai Giao Dịch Action Menu Dropdown */}
                   <Popover open={actionMenuOpen} onOpenChange={setActionMenuOpen}>
                     <PopoverTrigger asChild>
-                      <Button className="h-9 px-3 text-xs font-bold gap-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl shadow-xs transition-all">
+                      <Button className="h-9 px-3.5 text-xs font-bold gap-1.5 bg-gradient-to-r from-sky-500 via-blue-600 to-emerald-500 hover:from-sky-600 hover:to-emerald-600 text-white rounded-xl shadow-lg shadow-sky-500/20 transition-all border-0 cursor-pointer">
                         <PlusCircle className="h-4 w-4" />
                         <span>Khai giao dịch</span>
                         <ChevronDown className="h-3.5 w-3.5 opacity-80" />
@@ -173,7 +191,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
                     <PopoverTrigger asChild>
                       <Button
                         size="icon"
-                        className="h-9 w-9 bg-sky-600 hover:bg-sky-700 text-white rounded-xl shadow-xs transition-all"
+                        className="h-9 w-9 bg-gradient-to-r from-sky-500 via-blue-600 to-emerald-500 hover:from-sky-600 hover:to-emerald-600 text-white rounded-xl shadow-lg shadow-sky-500/20 border-0 transition-all cursor-pointer"
                         title="Menu Thao Tác"
                       >
                         <PlusCircle className="h-5 w-5" />
@@ -258,7 +276,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
             )}
           </header>
 
-          <div className="flex-1 min-w-0 flex flex-col xl:overflow-hidden overflow-y-auto p-3 sm:p-5">
+          <div className="flex-1 min-w-0 flex flex-col p-3 sm:p-5">
             {children}
           </div>
         </SidebarInset>

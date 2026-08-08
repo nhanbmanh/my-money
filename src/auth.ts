@@ -7,17 +7,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Credentials({
       credentials: {
-        identifier: { label: "Email hoặc username", type: "text" },
+        email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
       authorize: async (credentials) => {
-        const identifier = credentials?.identifier as string;
+        const email = (credentials?.email as string)?.trim()?.toLowerCase();
         const password = credentials?.password as string;
 
-        if (!identifier || !password) return null;
+        if (!email || !password) return null;
 
-        const user = await prisma.user.findFirst({
-          where: { OR: [{ email: identifier }, { username: identifier }] },
+        const user = await prisma.user.findUnique({
+          where: { email },
         });
 
         if (!user) return null;

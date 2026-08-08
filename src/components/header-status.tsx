@@ -27,16 +27,17 @@ export function HeaderStatus() {
   });
 
   return (
-    <span className="text-xs sm:text-sm text-muted-foreground leading-6 truncate min-w-0">
-      Xin chào,{" "}
-      <strong className="text-foreground">{session?.user?.name}</strong>
-      <span className="hidden sm:inline">
-        <span> · </span>
+    <div className="flex flex-col sm:flex-row sm:items-center text-xs text-muted-foreground leading-tight sm:leading-snug min-w-0">
+      <span className="truncate">
+        Xin chào, <strong className="text-foreground">{session?.user?.name}</strong>
+      </span>
+      <span className="hidden sm:inline mx-1 text-slate-400">·</span>
+      <span className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium">
         Bây giờ là{" "}
-        <strong>
+        <strong className="text-foreground font-semibold">
           {timeLabel} · {dateLabel}
         </strong>
       </span>
-    </span>
+    </div>
   );
 }
