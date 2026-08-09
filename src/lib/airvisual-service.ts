@@ -23,8 +23,45 @@ export type AirVisualFullData = {
   daily: DailyForecastItem[];
 };
 
-export function getAirVisualWeatherInfo(iconCode: string): { desc: string; icon: string; isDay: boolean } {
+export function getAirVisualWeatherInfo(iconCode: string, lang: "vi" | "en" = "vi"): { desc: string; icon: string; isDay: boolean } {
   const isDay = iconCode.endsWith("d");
+  if (lang === "en") {
+    switch (iconCode) {
+      case "01d":
+        return { desc: "Clear sky", icon: "☀️", isDay: true };
+      case "01n":
+        return { desc: "Clear night", icon: "🌙", isDay: false };
+      case "02d":
+        return { desc: "Few clouds", icon: "🌤️", isDay: true };
+      case "02n":
+        return { desc: "Few clouds at night", icon: "🌙", isDay: false };
+      case "03d":
+      case "03n":
+        return { desc: "Scattered clouds", icon: "⛅", isDay };
+      case "04d":
+      case "04n":
+        return { desc: "Overcast", icon: "☁️", isDay };
+      case "09d":
+      case "09n":
+        return { desc: "Rain showers", icon: "🌧️", isDay };
+      case "10d":
+        return { desc: "Light rain & sun", icon: "🌦️", isDay: true };
+      case "10n":
+        return { desc: "Night rain", icon: "🌧️", isDay: false };
+      case "11d":
+      case "11n":
+        return { desc: "Thunderstorm", icon: "⛈️", isDay };
+      case "13d":
+      case "13n":
+        return { desc: "Snowfall", icon: "❄️", isDay };
+      case "50d":
+      case "50n":
+        return { desc: "Haze / Mist", icon: "🌫️", isDay };
+      default:
+        return { desc: "Fair weather", icon: isDay ? "⛅" : "🌙", isDay };
+    }
+  }
+
   switch (iconCode) {
     case "01d":
       return { desc: "Trời quang, nắng đẹp", icon: "☀️", isDay: true };
@@ -61,23 +98,23 @@ export function getAirVisualWeatherInfo(iconCode: string): { desc: string; icon:
   }
 }
 
-export function getAqiLevelInfo(aqi: number) {
+export function getAqiLevelInfo(aqi: number, lang: "vi" | "en" = "vi") {
   if (aqi <= 50) {
-    return { text: "Tốt (Tươi mát)", color: "text-emerald-400 bg-emerald-500/20 border-emerald-500/30" };
+    return { text: lang === "vi" ? "Tốt (Tươi mát)" : "Good (Fresh)", color: "text-emerald-400 bg-emerald-500/20 border-emerald-500/30" };
   }
   if (aqi <= 100) {
-    return { text: "Trung bình", color: "text-amber-400 bg-amber-500/20 border-amber-500/30" };
+    return { text: lang === "vi" ? "Trung bình" : "Moderate", color: "text-amber-400 bg-amber-500/20 border-amber-500/30" };
   }
   if (aqi <= 150) {
-    return { text: "Kém (Nhạy cảm)", color: "text-orange-400 bg-orange-500/20 border-orange-500/30" };
+    return { text: lang === "vi" ? "Kém (Nhạy cảm)" : "Unhealthy for Sensitive Groups", color: "text-orange-400 bg-orange-500/20 border-orange-500/30" };
   }
   if (aqi <= 200) {
-    return { text: "Xấu (Hại sức khỏe)", color: "text-rose-400 bg-rose-500/20 border-rose-500/30" };
+    return { text: lang === "vi" ? "Xấu (Hại sức khỏe)" : "Unhealthy", color: "text-rose-400 bg-rose-500/20 border-rose-500/30" };
   }
   if (aqi <= 300) {
-    return { text: "Rất xấu (Cảnh báo)", color: "text-purple-400 bg-purple-500/20 border-purple-500/30" };
+    return { text: lang === "vi" ? "Rất xấu (Cảnh báo)" : "Very Unhealthy", color: "text-purple-400 bg-purple-500/20 border-purple-500/30" };
   }
-  return { text: "Nguy hại", color: "text-red-500 bg-red-600/30 border-red-500/50" };
+  return { text: lang === "vi" ? "Nguy hại" : "Hazardous", color: "text-red-500 bg-red-600/30 border-red-500/50" };
 }
 
 export async function fetchAirVisualData(

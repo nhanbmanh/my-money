@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { parse } from "date-fns";
+import { adjustLiquidAssetBalance } from "@/lib/wealth-service";
 
 export type ImportRowPayload = {
   cashTypeStr?: string; // "Chi tiêu" | "Thu nhập"
@@ -244,6 +245,9 @@ export async function POST(req: Request) {
         },
       });
       createdCount++;
+
+      const delta = item.cashType === "Income" ? item.amountOfMoney : -item.amountOfMoney;
+      await adjustLiquidAssetBalance(userId, delta, item.sourceId);
     }
 
     return NextResponse.json({

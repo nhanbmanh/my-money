@@ -80,6 +80,8 @@ import {
   AccordionContent,
 } from "./ui/accordion";
 
+import { useLanguage } from "@/components/language-provider";
+
 type Category = { id: string; categoryName: string; type?: number | null };
 type Source = { id: string; sourceName: string };
 type CashFlowItem = {
@@ -100,6 +102,7 @@ const DEFAULT_DATE_FROM = startOfDay(subMonths(new Date(), 1));
 const DEFAULT_DATE_TO = endOfDay(new Date());
 
 export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
+  const { t, language } = useLanguage();
   // Filter states
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState<Date>(DEFAULT_DATE_FROM);
@@ -310,20 +313,32 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
     setDeleting(true);
     const isBulk = deleteIds.length > 1;
 
-    if (isBulk) {
-      await fetch("/api/cashflow/bulk-delete", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: deleteIds }),
-      });
-    } else {
-      await fetch(`/api/cashflow/${deleteIds[0]}`, { method: "DELETE" });
-    }
+    try {
+      let res: Response;
+      if (isBulk) {
+        res = await fetch("/api/cashflow/bulk-delete", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: deleteIds }),
+        });
+      } else {
+        res = await fetch(`/api/cashflow/${deleteIds[0]}`, { method: "DELETE" });
+      }
 
-    setDeleting(false);
-    setConfirmOpen(false);
-    setSelectedIds([]);
-    handleMutationSuccess();
+      if (res.ok) {
+        setConfirmOpen(false);
+        setSelectedIds([]);
+        handleMutationSuccess();
+      } else {
+        const json = await res.json().catch(() => ({}));
+        alert(json.error || "Không thể xóa giao dịch");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Đã xảy ra lỗi khi kết nối tới máy chủ");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   // Edit handler
@@ -343,7 +358,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
         <div className="flex items-center gap-2">
           <Filter className="h-4 w-4 text-sky-500" />
           <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-            Bộ Lọc Tìm Kiếm
+            {t("financial.filterHeader")}
           </h3>
         </div>
         <Button
@@ -354,7 +369,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
             setIsMobileFilterOpen(false);
           }}
           className="h-7 w-7 p-0 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-          title="Thu gọn bộ lọc"
+          title={t("financial.filterHide")}
         >
           <PanelLeftClose className="h-4 w-4" />
         </Button>
@@ -365,7 +380,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             className="pl-9 bg-white"
-            placeholder="Tìm theo tên giao dịch, mô tả..."
+            placeholder={t("financial.filterSearchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -377,7 +392,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
               className="justify-start text-left font-normal bg-white"
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
-              Từ: {format(dateFrom, "dd/MM/yyyy")}
+              {t("financial.filterDateFrom")}: {format(dateFrom, "dd/MM/yyyy")}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0">
@@ -395,7 +410,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
               className="justify-start text-left font-normal bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100"
             >
               <CalendarIcon className="mr-2 h-4 w-4 text-sky-600 dark:text-sky-400" />
-              Đến: {format(dateTo, "dd/MM/yyyy")}
+              {t("financial.filterDateTo")}: {format(dateTo, "dd/MM/yyyy")}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0">
@@ -411,20 +426,20 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
       <div className="grid grid-cols-1 gap-3">
         <Select value={cashType} onValueChange={setCashType}>
           <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 w-full">
-            <SelectValue placeholder="Loại giao dịch" />
+            <SelectValue placeholder={t("financial.filterAllCashTypes")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tất cả loại giao dịch</SelectItem>
-            <SelectItem value="Income">💰 Thu nhập</SelectItem>
-            <SelectItem value="Expense">💸 Chi tiêu</SelectItem>
+            <SelectItem value="all">{t("financial.filterAllCashTypes")}</SelectItem>
+            <SelectItem value="Income">💰 {t("financial.income")}</SelectItem>
+            <SelectItem value="Expense">💸 {t("financial.expense")}</SelectItem>
           </SelectContent>
         </Select>
         <Select value={sourceId} onValueChange={setSourceId}>
           <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 w-full">
-            <SelectValue placeholder="Nguồn tiền" />
+            <SelectValue placeholder={t("financial.filterAllSources")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tất cả nguồn tiền</SelectItem>
+            <SelectItem value="all">{t("financial.filterAllSources")}</SelectItem>
             {sources.map((s) => (
               <SelectItem key={s.id} value={s.id}>
                 {s.sourceName}
@@ -434,10 +449,10 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
         </Select>
         <Select value={categoryId} onValueChange={setCategoryId}>
           <SelectTrigger className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 w-full">
-            <SelectValue placeholder="Nhãn chính" />
+            <SelectValue placeholder={t("financial.filterAllPrimary")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tất cả nhãn chính</SelectItem>
+            <SelectItem value="all">{t("financial.filterAllPrimary")}</SelectItem>
             {categories.map((c) => (
               <SelectItem key={c.id} value={c.id}>
                 {c.categoryName}
@@ -448,10 +463,10 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
       </div>
 
       <div className="space-y-1">
-        <p className="text-xs text-muted-foreground">Nhãn phân loại phụ</p>
+        <p className="text-xs text-muted-foreground">{t("financial.filterSecondaryLabel")}</p>
         <div className="flex flex-wrap gap-2 min-h-9 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center">
           {secondaryCategories.length === 0 ? (
-            <p className="text-xs text-muted-foreground">Chưa có nhãn phụ</p>
+            <p className="text-xs text-muted-foreground">{t("common.noData")}</p>
           ) : (
             [...secondaryCategories]
               .sort((a, b) => (a.type ?? 0) - (b.type ?? 0))
@@ -485,7 +500,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
           className="gap-1 w-full sm:w-auto justify-center text-muted-foreground"
         >
           <X className="h-3 w-3" />
-          Xóa bộ lọc
+          {t("financial.filterClear")}
         </Button>
       </div>
     </div>
@@ -499,7 +514,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
           <div className="h-1 w-full bg-gradient-to-r from-sky-500 via-blue-600 to-emerald-500 animate-pulse" />
           <div className="absolute top-4 right-6 backdrop-blur-md bg-slate-900/90 border border-sky-500/30 text-sky-400 px-3.5 py-1.5 rounded-full text-xs font-bold shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
             <RefreshCw className="h-3.5 w-3.5 animate-spin text-sky-400" />
-            <span>Đang cập nhật dòng tiền mới...</span>
+            <span>{t("common.loading")}</span>
           </div>
         </div>
       )}
@@ -551,10 +566,10 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                     size="sm"
                     onClick={() => setIsDesktopSidebarOpen(true)}
                     className="hidden xl:flex items-center gap-1.5 h-8.5 px-3 rounded-xl border-sky-200 dark:border-slate-700 bg-sky-50 dark:bg-slate-800 hover:bg-sky-100 dark:hover:bg-slate-700 text-xs font-bold text-sky-700 dark:text-sky-300 shrink-0 shadow-2xs transition-all"
-                    title="Mở thanh bộ lọc"
+                    title={t("financial.filterShow")}
                   >
                     <PanelLeftOpen className="h-4 w-4 text-sky-500" />
-                    Hiện Bộ Lọc
+                    {t("financial.filterShow")}
                   </Button>
                 )}
 
@@ -566,7 +581,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                   className="flex xl:hidden items-center gap-1.5 h-8.5 px-3 rounded-xl border-sky-200 dark:border-slate-700 bg-sky-50 dark:bg-slate-800 hover:bg-sky-100 dark:hover:bg-slate-700 text-xs font-bold text-sky-700 dark:text-sky-300 shrink-0 shadow-2xs transition-all"
                 >
                   <Filter className="h-3.5 w-3.5 text-sky-500" />
-                  {isMobileFilterOpen ? "Thu Gọn" : "Bộ Lọc"}
+                  {isMobileFilterOpen ? t("financial.filterHide") : t("common.filter")}
                   {isMobileFilterOpen ? (
                     <ChevronUp className="h-3.5 w-3.5" />
                   ) : (
@@ -583,28 +598,28 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                     className="text-xs font-bold gap-1.5 px-3.5 py-1.5 rounded-lg shrink-0 whitespace-nowrap data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-xs transition-all text-sky-600 dark:text-sky-400"
                   >
                     <Newspaper className="h-4 w-4 shrink-0" />
-                    Bản Tin Giao Dịch
+                    {language === "vi" ? "Bản Tin Giao Dịch" : "Transaction Feed"}
                   </TabsTrigger>
                   <TabsTrigger
                     value="list"
                     className="text-xs font-bold gap-1.5 px-3.5 py-1.5 rounded-lg shrink-0 whitespace-nowrap data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-xs transition-all"
                   >
                     <List className="h-4 w-4 shrink-0" />
-                    Danh Sách Bảng
+                    {t("financial.tabTransactionList")}
                   </TabsTrigger>
                   <TabsTrigger
                     value="chart"
                     className="text-xs font-bold gap-1.5 px-3.5 py-1.5 rounded-lg shrink-0 whitespace-nowrap data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-xs transition-all text-purple-600 dark:text-purple-400"
                   >
                     <BarChart3 className="h-4 w-4 shrink-0" />
-                    Biểu Đồ Thống Kê
+                    {t("financial.tabChartAnalysis")}
                   </TabsTrigger>
                   <TabsTrigger
                     value="insights"
                     className="text-xs font-bold gap-1.5 px-3.5 py-1.5 rounded-lg shrink-0 whitespace-nowrap data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-xs transition-all text-emerald-600 dark:text-emerald-400"
                   >
                     <Sparkles className="h-4 w-4 text-emerald-500 shrink-0" />
-                    Phân Tích & Ngân Sách
+                    {t("financial.tabBudget")}
                   </TabsTrigger>
                 </TabsList>
               </div>
@@ -649,7 +664,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                       disabled={page === 1}
                       className="h-8 text-xs font-medium px-2.5"
                     >
-                      Trước
+                      {language === "vi" ? "Trước" : "Previous"}
                     </Button>
                     <div className="flex items-center gap-1">
                       {Array.from({ length: totalPages }, (_, i) => i + 1)
@@ -691,19 +706,19 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                       disabled={page === totalPages}
                       className="h-8 text-xs font-medium px-2.5"
                     >
-                      Sau
+                      {language === "vi" ? "Sau" : "Next"}
                     </Button>
                   </div>
                 ) : (
                   <div className="text-xs text-muted-foreground font-medium px-1">
-                    Hiển thị <strong>{total}</strong> giao dịch
+                    {language === "vi" ? "Hiển thị" : "Showing"} <strong>{total}</strong> {language === "vi" ? "giao dịch" : "transactions"}
                   </div>
                 )}
 
                 {/* Right: Actions (Limit Selector & Delete Button) */}
                 <div className="flex items-center gap-2.5">
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span>Hiển thị</span>
+                    <span>{language === "vi" ? "Hiển thị" : "Show"}</span>
                     <Select
                       value={limit}
                       onValueChange={(value) => {
@@ -733,8 +748,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                     onClick={() => handleDeleteConfirm(selectedIds)}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
-                    Xóa giao dịch
-                    {selectedIds.length > 0 && ` (${selectedIds.length})`}
+                    {t("financial.btnDeleteSelected", { count: selectedIds.length })}
                   </Button>
                 </div>
               </div>
@@ -754,28 +768,28 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                         />
                       </TableHead>
                       <TableHead className="font-bold text-white">
-                        Tên
+                        {t("financial.tableTitle")}
                       </TableHead>
                       <TableHead className="font-bold text-white">
-                        Loại
+                        {t("common.type")}
                       </TableHead>
                       <TableHead className="font-bold text-white">
-                        Số tiền
+                        {t("common.amount")}
                       </TableHead>
                       <TableHead className="font-bold text-white">
-                        Nguồn
+                        {t("common.source")}
                       </TableHead>
                       <TableHead className="font-bold text-white">
-                        Nhãn chính
+                        {t("financial.tableCategory")}
                       </TableHead>
                       <TableHead className="font-bold text-white">
-                        Nhãn phụ
+                        {t("financial.tableSecondary")}
                       </TableHead>
                       <TableHead className="font-bold text-white">
-                        Thời gian
+                        {t("financial.tableDateTime")}
                       </TableHead>
                       <TableHead className="font-bold text-white">
-                        Mô tả
+                        {t("common.notes")}
                       </TableHead>
                     </TableRow>
                   </TableHeader>
@@ -853,8 +867,8 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                                     }
                                   >
                                     {item.cashType === "Income"
-                                      ? "💰 Thu"
-                                      : "💸 Chi"}
+                                      ? `💰 ${t("financial.income")}`
+                                      : `💸 ${t("financial.expense")}`}
                                   </Badge>
                                 </TableCell>
                                 <TableCell className="font-semibold whitespace-nowrap">
@@ -871,7 +885,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                                       }}
                                       className="text-xs font-black text-slate-950 bg-amber-400 hover:bg-amber-300 px-2 py-0.5 rounded-md shadow-xs cursor-pointer transition-colors inline-block"
                                     >
-                                      ⚠️ CHỌN NGUỒN
+                                      ⚠️ {language === "vi" ? "CHỌN NGUỒN" : "SELECT SOURCE"}
                                     </span>
                                   )}
                                 </TableCell>
@@ -886,7 +900,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                                       }}
                                       className="text-xs font-black text-slate-950 bg-amber-400 hover:bg-amber-300 px-2 py-0.5 rounded-md shadow-xs cursor-pointer transition-colors inline-block"
                                     >
-                                      ⚠️ CHỌN NHÃN CHÍNH
+                                      ⚠️ {language === "vi" ? "CHỌN NHÃN CHÍNH" : "SELECT CATEGORY"}
                                     </span>
                                   )}
                                 </TableCell>
@@ -924,7 +938,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                                         }}
                                         className="text-xs font-black text-slate-950 bg-amber-400 hover:bg-amber-300 px-2 py-0.5 rounded-md shadow-xs cursor-pointer transition-colors inline-block"
                                       >
-                                        ⚠️ CHỌN NHÃN PHỤ
+                                        ⚠️ {language === "vi" ? "CHỌN NHÃN PHỤ" : "SELECT TAGS"}
                                       </span>
                                     )}
                                   </div>
@@ -943,7 +957,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                                       }}
                                       className="text-xs font-black text-slate-950 bg-amber-400 hover:bg-amber-300 px-2 py-0.5 rounded-md shadow-xs cursor-pointer transition-colors inline-block"
                                     >
-                                      ⚠️ CHỌN THỜI GIAN
+                                      ⚠️ {language === "vi" ? "CHỌN THỜI GIAN" : "SELECT DATETIME"}
                                     </span>
                                   )}
                                 </TableCell>
@@ -954,13 +968,13 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                           </ContextMenuTrigger>
                           <ContextMenuContent>
                             <ContextMenuItem onClick={() => handleEdit(item)}>
-                              ✏️ Sửa giao dịch
+                              ✏️ {t("common.edit")}
                             </ContextMenuItem>
                             <ContextMenuItem
                               className="text-red-500 focus:text-red-500"
                               onClick={() => handleDeleteConfirm([item.id])}
                             >
-                              🗑️ Xóa giao dịch
+                              🗑️ {t("common.delete")}
                             </ContextMenuItem>
                           </ContextMenuContent>
                         </ContextMenu>
@@ -1020,29 +1034,30 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Xác nhận xóa</AlertDialogTitle>
+            <AlertDialogTitle>{t("financial.confirmDeleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteIds.length > 1
-                ? `Bạn có chắc muốn xóa ${deleteIds.length} giao dịch đã chọn không? Hành động này không thể hoàn tác.`
-                : "Bạn có chắc muốn xóa giao dịch này không? Hành động này không thể hoàn tác."}
+                ? t("financial.confirmBulkDeleteDesc", { count: deleteIds.length })
+                : t("financial.confirmDeleteDesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Hủy</AlertDialogCancel>
-            <AlertDialogAction
+            <AlertDialogCancel disabled={deleting}>{t("common.cancel")}</AlertDialogCancel>
+            <Button
+              type="button"
               onClick={handleDelete}
               disabled={deleting}
-              className="bg-red-500 hover:bg-red-600"
+              className="bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl text-xs px-4 h-9 cursor-pointer"
             >
               {deleting ? (
                 <>
                   <Spinner className="mr-2" />
-                  Đang xóa...
+                  {t("common.deleting")}
                 </>
               ) : (
-                "Xóa"
+                t("common.delete")
               )}
-            </AlertDialogAction>
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -12,6 +12,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/components/language-provider";
 
 interface DashboardSummaryCardsProps {
   totalIncome: number;
@@ -26,6 +27,7 @@ export function DashboardSummaryCards({
   totalTransactions,
   loading = false,
 }: DashboardSummaryCardsProps) {
+  const { t, language } = useLanguage();
   const [showAmounts, setShowAmounts] = useState<boolean>(false);
 
   useEffect(() => {
@@ -95,13 +97,13 @@ export function DashboardSummaryCards({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 mb-0.5">
                 <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 truncate">
-                  Thu nhập
+                  {t("financial.totalIncome")}
                 </p>
                 <button
                   type="button"
                   onClick={toggleShowAmounts}
                   className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-0.5"
-                  title={showAmounts ? "Ẩn số tiền nhạy cảm" : "Hiển thị số tiền"}
+                  title={showAmounts ? (language === "vi" ? "Ẩn số tiền nhạy cảm" : "Hide amounts") : (language === "vi" ? "Hiển thị số tiền" : "Show amounts")}
                 >
                   {showAmounts ? (
                     <Eye className="h-3 w-3 text-slate-400" />
@@ -126,13 +128,13 @@ export function DashboardSummaryCards({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 mb-0.5">
                 <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-400 truncate">
-                  Chi tiêu
+                  {t("financial.totalExpense")}
                 </p>
                 <button
                   type="button"
                   onClick={toggleShowAmounts}
                   className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-0.5"
-                  title={showAmounts ? "Ẩn số tiền nhạy cảm" : "Hiển thị số tiền"}
+                  title={showAmounts ? (language === "vi" ? "Ẩn số tiền nhạy cảm" : "Hide amounts") : (language === "vi" ? "Hiển thị số tiền" : "Show amounts")}
                 >
                   {showAmounts ? (
                     <Eye className="h-3 w-3 text-slate-400" />
@@ -157,13 +159,13 @@ export function DashboardSummaryCards({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 mb-0.5">
                 <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-sky-600 dark:text-sky-400 truncate">
-                  Số dư
+                  {t("financial.netBalance")}
                 </p>
                 <button
                   type="button"
                   onClick={toggleShowAmounts}
                   className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-0.5"
-                  title={showAmounts ? "Ẩn số tiền nhạy cảm" : "Hiển thị số tiền"}
+                  title={showAmounts ? (language === "vi" ? "Ẩn số tiền nhạy cảm" : "Hide amounts") : (language === "vi" ? "Hiển thị số tiền" : "Show amounts")}
                 >
                   {showAmounts ? (
                     <Eye className="h-3 w-3 text-slate-400" />
@@ -195,7 +197,7 @@ export function DashboardSummaryCards({
           <CardContent className="p-2.5 sm:px-4 sm:py-3 flex items-center justify-between">
             <div className="min-w-0 flex-1">
               <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-0.5 truncate">
-                Giao dịch
+                {t("financial.totalTransactions")}
               </p>
               <h3 className="text-xs sm:text-base lg:text-xl font-bold text-slate-800 dark:text-slate-100 truncate">
                 {totalTransactions.toLocaleString("vi-VN")}

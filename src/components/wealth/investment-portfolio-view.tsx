@@ -20,6 +20,7 @@ import {
   Legend
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLanguage } from "@/components/language-provider";
 
 interface PortfolioProps {
   summary: {
@@ -43,6 +44,8 @@ const COLOR_PALETTE = [
 ];
 
 export function InvestmentPortfolioView({ summary, holdings = [] }: PortfolioProps) {
+  const { t, language } = useLanguage();
+
   const formatVND = (val: number) => {
     return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(val);
   };
@@ -57,11 +60,11 @@ export function InvestmentPortfolioView({ summary, holdings = [] }: PortfolioPro
     assetClassMap[cls] = (assetClassMap[cls] || 0) + h.currentValue;
 
     const meta = h.asset.metadata || {};
-      const risk = meta.riskProfile || (cls === "CRYPTO" ? "Rủi ro cao" : cls === "STOCKS" ? "Tăng trưởng" : "An toàn");
-      riskProfileMap[risk] = (riskProfileMap[risk] || 0) + h.currentValue;
+    const risk = meta.riskProfile || (cls === "CRYPTO" ? (language === "vi" ? "Rủi ro cao" : "High Risk") : cls === "STOCKS" ? (language === "vi" ? "Tăng trưởng" : "Growth") : (language === "vi" ? "An toàn" : "Safe"));
+    riskProfileMap[risk] = (riskProfileMap[risk] || 0) + h.currentValue;
 
-      const liq = meta.liquidityIndex || (cls === "REAL_ESTATE" ? "T30+ (Thanh khoản thấp)" : cls === "CASH" ? "T0 (Ngay lập tức)" : "T2.5 (Thanh khoản TB)");
-      liquidityMap[liq] = (liquidityMap[liq] || 0) + h.currentValue;
+    const liq = meta.liquidityIndex || (cls === "REAL_ESTATE" ? "T30+" : cls === "CASH" ? "T0" : "T2.5");
+    liquidityMap[liq] = (liquidityMap[liq] || 0) + h.currentValue;
   });
 
   const assetClassData = Object.keys(assetClassMap).map((k) => ({ name: k, value: assetClassMap[k] }));
@@ -77,28 +80,28 @@ export function InvestmentPortfolioView({ summary, holdings = [] }: PortfolioPro
         <Card className="border-sky-200/60 dark:border-sky-900/50 bg-gradient-to-br from-sky-500/10 via-background to-blue-600/5 shadow-md">
           <CardHeader className="pb-2">
             <span className="text-xs font-bold uppercase tracking-wider text-sky-700 dark:text-sky-400">
-              Tổng Giá Vốn Đầu Tư
+              {t("wealth.totalCostBasis")}
             </span>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-extrabold text-slate-900 dark:text-slate-100">
               {formatVND(summary.totalInvestedCostBasis)}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">Số tiền vốn thực tế đã bỏ ra</p>
+            <p className="mt-1 text-xs text-muted-foreground">{language === "vi" ? "Số tiền vốn thực tế đã bỏ ra" : "Actual capital invested"}</p>
           </CardContent>
         </Card>
 
         <Card className="border-emerald-200/60 dark:border-emerald-900/50 bg-gradient-to-br from-emerald-500/10 via-background to-teal-600/5 shadow-md">
           <CardHeader className="pb-2">
             <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-              Giá Trị Thị Trường Hiện Tại
+              {t("wealth.currentMarketValue")}
             </span>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-extrabold text-slate-900 dark:text-slate-100">
               {formatVND(summary.totalMarketValueInvestments)}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">Mark-to-market theo thị trường</p>
+            <p className="mt-1 text-xs text-muted-foreground">Mark-to-market</p>
           </CardContent>
         </Card>
 
@@ -109,7 +112,7 @@ export function InvestmentPortfolioView({ summary, holdings = [] }: PortfolioPro
         >
           <CardHeader className="pb-2">
             <span className={`text-xs font-bold uppercase tracking-wider ${isProfit ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}`}>
-              Lợi Nhuận Chưa Thực Hiện
+              {t("wealth.unrealizedPnl")}
             </span>
           </CardHeader>
           <CardContent>
@@ -131,7 +134,7 @@ export function InvestmentPortfolioView({ summary, holdings = [] }: PortfolioPro
           <CardHeader>
             <CardTitle className="text-sm font-bold flex items-center gap-2">
               <Layers className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-              <span>Phân Bổ Theo Loại Tài Sản</span>
+              <span>{t("wealth.assetAllocation")}</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col items-center">

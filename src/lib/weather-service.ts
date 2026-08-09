@@ -50,7 +50,57 @@ export type WeatherData = {
   daily: DailyForecastItem[];
 };
 
-export function getWmoWeatherInfo(code: number, isDay = true): { desc: string; icon: string } {
+export function getWmoWeatherInfo(code: number, isDay = true, lang: "vi" | "en" = "vi"): { desc: string; icon: string } {
+  if (lang === "en") {
+    switch (code) {
+      case 0:
+        return { desc: isDay ? "Clear sky" : "Clear night", icon: isDay ? "☀️" : "🌙" };
+      case 1:
+        return { desc: "Mainly clear", icon: isDay ? "🌤️" : "🌙" };
+      case 2:
+        return { desc: "Partly cloudy", icon: "⛅" };
+      case 3:
+        return { desc: "Overcast", icon: "☁️" };
+      case 45:
+      case 48:
+        return { desc: "Foggy", icon: "🌫️" };
+      case 51:
+      case 53:
+      case 55:
+        return { desc: "Light drizzle", icon: "🌦️" };
+      case 56:
+      case 57:
+        return { desc: "Freezing drizzle", icon: "🌧️" };
+      case 61:
+      case 63:
+        return { desc: "Rain showers", icon: "🌧️" };
+      case 65:
+        return { desc: "Heavy rain", icon: "🌧️" };
+      case 66:
+      case 67:
+        return { desc: "Freezing rain", icon: "🌨️" };
+      case 71:
+      case 73:
+      case 75:
+      case 77:
+        return { desc: "Snowfall", icon: "❄️" };
+      case 80:
+      case 81:
+      case 82:
+        return { desc: "Heavy rain showers", icon: "🌧️" };
+      case 85:
+      case 86:
+        return { desc: "Snow showers", icon: "🌨️" };
+      case 95:
+        return { desc: "Thunderstorm", icon: "⛈️" };
+      case 96:
+      case 99:
+        return { desc: "Thunderstorm with hail", icon: "⛈️" };
+      default:
+        return { desc: "Fair weather", icon: "⛅" };
+    }
+  }
+
   switch (code) {
     case 0:
       return { desc: isDay ? "Trời quang, nắng đẹp" : "Đêm quang mây", icon: isDay ? "☀️" : "🌙" };

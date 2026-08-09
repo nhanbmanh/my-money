@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, LogOut, User, Menu, X, Settings } from "lucide-react";
+import { useLanguage } from "@/components/language-provider";
 
 interface HeaderProps {
   onOpenModal: () => void;
@@ -11,6 +12,7 @@ interface HeaderProps {
 
 export function Header({ onOpenModal }: HeaderProps) {
   const { data: session } = useSession();
+  const { t, language } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -26,7 +28,7 @@ export function Header({ onOpenModal }: HeaderProps) {
         <div className="hidden md:flex items-center gap-3">
           <Button onClick={onOpenModal} className="gap-2" size="sm">
             <PlusCircle className="h-4 w-4" />
-            Khai giao dịch
+            {t("header.addTransaction")}
           </Button>
           <button
             type="button"
@@ -34,6 +36,7 @@ export function Header({ onOpenModal }: HeaderProps) {
               window.dispatchEvent(new CustomEvent("open-settings-modal"))
             }
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            title={t("header.settings")}
           >
             <Settings className="h-4 w-4" />
           </button>
@@ -43,7 +46,7 @@ export function Header({ onOpenModal }: HeaderProps) {
           >
             <User className="h-4 w-4" />
             <span>
-              Xin chào, <strong>{session?.user?.name}</strong>
+              {t("header.hello")}, <strong>{session?.user?.name}</strong>
             </span>
           </a>
           <Button
@@ -51,6 +54,7 @@ export function Header({ onOpenModal }: HeaderProps) {
             size="sm"
             onClick={() => signOut({ callbackUrl: "/login" })}
             className="gap-2 text-muted-foreground"
+            title={t("common.logout")}
           >
             <LogOut className="h-4 w-4" />
           </Button>
@@ -84,7 +88,7 @@ export function Header({ onOpenModal }: HeaderProps) {
           >
             <User className="h-4 w-4" />
             <span>
-              Xin chào, <strong>{session?.user?.name}</strong>
+              {t("header.hello")}, <strong>{session?.user?.name}</strong>
             </span>
           </a>
           <button
@@ -96,7 +100,7 @@ export function Header({ onOpenModal }: HeaderProps) {
             }}
           >
             <Settings className="h-4 w-4" />
-            Cài đặt
+            {t("header.settings")}
           </button>
 
           <Button
@@ -108,7 +112,7 @@ export function Header({ onOpenModal }: HeaderProps) {
             size="sm"
           >
             <PlusCircle className="h-4 w-4" />
-            Khai giao dịch
+            {t("header.addTransaction")}
           </Button>
 
           <Button
@@ -118,7 +122,7 @@ export function Header({ onOpenModal }: HeaderProps) {
             className="gap-2 w-full justify-start text-muted-foreground"
           >
             <LogOut className="h-4 w-4" />
-            Đăng xuất
+            {t("common.logout")}
           </Button>
         </div>
       </div>

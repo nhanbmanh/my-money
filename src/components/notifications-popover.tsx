@@ -25,8 +25,10 @@ import {
 import { fetchCurrentMonthAlerts, BudgetAlertItem } from "@/lib/budget-checker";
 import { checkIsIncomplete, getMissingFields } from "@/lib/incomplete-checker";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/components/language-provider";
 
 export function NotificationsPopover() {
+  const { t, language } = useLanguage();
   const [alerts, setAlerts] = useState<BudgetAlertItem[]>([]);
   const [incompleteItems, setIncompleteItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -135,12 +137,12 @@ export function NotificationsPopover() {
               <div className="flex items-center gap-2">
                 <Bell className="h-4 w-4 text-sky-500" />
                 <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                  Trung Tâm Thông Báo
+                  {language === "vi" ? "Trung Tâm Thông Báo" : "Notification Center"}
                 </h4>
               </div>
               {totalNotificationCount > 0 && (
                 <Badge className="bg-amber-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded-md">
-                  {totalNotificationCount} thông báo
+                  {totalNotificationCount} {language === "vi" ? "thông báo" : "alerts"}
                 </Badge>
               )}
             </div>
@@ -158,7 +160,7 @@ export function NotificationsPopover() {
                 )}
               >
                 <AlertTriangle className="h-3 w-3" />
-                Cần Bổ Sung ({incompleteItems.length})
+                {language === "vi" ? "Cần Bổ Sung" : "Incomplete"} ({incompleteItems.length})
               </button>
 
               <button
@@ -172,7 +174,7 @@ export function NotificationsPopover() {
                 )}
               >
                 <Bell className="h-3 w-3" />
-                Hạn Mức ({alerts.length})
+                {language === "vi" ? "Hạn Mức" : "Budgets"} ({alerts.length})
               </button>
             </div>
           </div>
@@ -184,10 +186,10 @@ export function NotificationsPopover() {
                 <div className="flex flex-col items-center justify-center py-8 text-center space-y-2">
                   <CheckCircle2 className="h-8 w-8 text-emerald-500" />
                   <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                    Tuyệt vời! Tất cả giao dịch đã đầy đủ thông tin
+                    {language === "vi" ? "Tuyệt vời! Tất cả giao dịch đã đầy đủ thông tin" : "Awesome! All transactions are fully categorized"}
                   </p>
                   <p className="text-[11px] text-slate-400">
-                    Không có giao dịch nào bị thiếu Nguồn, Nhãn chính hay Nhãn phụ.
+                    {language === "vi" ? "Không có giao dịch nào bị thiếu Nguồn, Nhãn chính hay Nhãn phụ." : "No missing Source, Primary Category or Secondary Tags."}
                   </p>
                 </div>
               ) : (
@@ -221,8 +223,8 @@ export function NotificationsPopover() {
                           </div>
                           <div className="text-[10px] text-slate-400 mt-0.5">
                             {item.datetime
-                              ? new Date(item.datetime).toLocaleDateString("vi-VN")
-                              : "Chưa chọn ngày"}
+                              ? new Date(item.datetime).toLocaleDateString(language === "vi" ? "vi-VN" : "en-US")
+                              : (language === "vi" ? "Chưa chọn ngày" : "No date")}
                           </div>
                         </div>
 
@@ -232,14 +234,14 @@ export function NotificationsPopover() {
                           className="h-7 px-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] rounded-lg shrink-0 gap-1 shadow-2xs cursor-pointer"
                         >
                           <Edit3 className="h-3 w-3" />
-                          Cập nhật
+                          {t("common.edit")}
                         </Button>
                       </div>
 
                       <div className="text-[11px] font-extrabold text-amber-900 dark:text-amber-200 bg-amber-400/20 dark:bg-amber-900/40 px-2 py-1 rounded-lg border border-amber-400/30 flex items-center gap-1">
                         <AlertTriangle className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
                         <span>
-                          Thiếu: <strong className="underline">{missingFields.join(", ")}</strong>
+                          {language === "vi" ? "Thiếu:" : "Missing:"} <strong className="underline">{missingFields.join(", ")}</strong>
                         </span>
                       </div>
                     </div>
@@ -256,10 +258,10 @@ export function NotificationsPopover() {
                 <div className="flex flex-col items-center justify-center py-8 text-center space-y-2">
                   <CheckCircle2 className="h-8 w-8 text-emerald-500" />
                   <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                    Tất cả các nhãn chi tiêu đều an toàn
+                    {language === "vi" ? "Tất cả các nhãn chi tiêu đều an toàn" : "All spending budgets are safe"}
                   </p>
                   <p className="text-[11px] text-slate-400">
-                    Chưa có danh mục nào chạm ngưỡng hoặc vượt hạn mức trong tháng này.
+                    {language === "vi" ? "Chưa có danh mục nào chạm ngưỡng hoặc vượt hạn mức trong tháng này." : "No categories approaching or exceeding limits this month."}
                   </p>
                 </div>
               ) : (
@@ -287,7 +289,7 @@ export function NotificationsPopover() {
                               : "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/30"
                           )}
                         >
-                          {alert.isSecondary ? "Nhãn phụ" : "Nhãn chính"}
+                          {alert.isSecondary ? (language === "vi" ? "Nhãn phụ" : "Secondary") : (language === "vi" ? "Nhãn chính" : "Primary")}
                         </Badge>
                       </div>
 
@@ -299,13 +301,13 @@ export function NotificationsPopover() {
                             : "bg-amber-500 text-white"
                         )}
                       >
-                        {alert.type === "OVER" ? "🔴 VƯỢT HẠN MỨC" : "🟡 CHẠM NGƯỠNG"}
+                        {alert.type === "OVER" ? (language === "vi" ? "🔴 VƯỢT HẠN MỨC" : "🔴 OVER LIMIT") : (language === "vi" ? "🟡 CHẠM NGƯỠNG" : "🟡 WARNING")}
                       </Badge>
                     </div>
 
                     <div className="flex items-baseline justify-between text-[11px] font-semibold">
                       <span className="text-slate-600 dark:text-slate-300">
-                        Đã chi:{" "}
+                        {language === "vi" ? "Đã chi:" : "Spent:"}{" "}
                         <strong
                           className={
                             alert.type === "OVER"
@@ -317,7 +319,7 @@ export function NotificationsPopover() {
                         </strong>
                       </span>
                       <span className="text-slate-400 font-medium">
-                        Hạn mức: {formatVND(alert.budgetLimit)} ({alert.percent.toFixed(0)}%)
+                        {language === "vi" ? "Hạn mức:" : "Limit:"} {formatVND(alert.budgetLimit)} ({alert.percent.toFixed(0)}%)
                       </span>
                     </div>
 

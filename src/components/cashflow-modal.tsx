@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { cn, getSecondaryCategoryBadgeClass } from "@/lib/utils";
+import { useLanguage } from "@/components/language-provider";
 
 type Category = { id: string; categoryName: string; type?: number | null };
 type Source = { id: string; sourceName: string; sourceType: string };
@@ -53,13 +54,10 @@ type CashFlowData = {
   amountOfMoney: number;
   sourceId: string | null;
   primaryCategoryId: string | null;
-  secondaryCategories: {
-    secondaryCategory: {
-      id: string;
-      categoryName: string;
-      type?: number | null;
-    };
-  }[];
+  secondaryCategories: Array<{
+    secondaryCategoryId?: string;
+    secondaryCategory: Category;
+  }>;
 };
 
 interface Props {
@@ -87,6 +85,7 @@ export function CashFlowModal({
   onSuccess,
   editData,
 }: Props) {
+  const { t, language } = useLanguage();
   const isEdit = !!editData;
 
   const [form, setForm] = useState({
@@ -332,7 +331,11 @@ export function CashFlowModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl max-h-[85vh] flex flex-col p-0 overflow-hidden bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xl rounded-3xl">
+      <DialogContent
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+        className="sm:max-w-xl max-h-[85vh] flex flex-col p-0 overflow-hidden bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xl rounded-3xl"
+      >
         {/* Fixed Header */}
         <DialogHeader className="p-5 pb-3.5 border-b border-slate-100 dark:border-slate-800 shrink-0 bg-white dark:bg-slate-900 z-10">
           <div className="flex items-center gap-3">
@@ -348,12 +351,12 @@ export function CashFlowModal({
             </div>
             <div>
               <DialogTitle className="text-base font-bold text-slate-800 dark:text-slate-100">
-                {isEdit ? "Sửa Giao Dịch" : "Khai Báo Giao Dịch"}
+                {isEdit ? t("financial.modalEditTitle") : t("financial.modalCreateTitle")}
               </DialogTitle>
               <p className="text-xs text-slate-400 font-medium mt-0.5">
                 {isEdit
-                  ? "Cập nhật thông tin thu chi cá nhân"
-                  : "Ghi nhận dòng tiền thu chi cá nhân"}
+                  ? (language === "vi" ? "Cập nhật thông tin thu chi cá nhân" : "Update personal cashflow record")
+                  : (language === "vi" ? "Ghi nhận dòng tiền thu chi cá nhân" : "Record personal cashflow transaction")}
               </p>
             </div>
           </div>
@@ -383,7 +386,7 @@ export function CashFlowModal({
                       : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/50 dark:hover:bg-slate-800/50",
                   )}
                 >
-                  💸 Chi tiêu
+                  💸 {t("financial.expense")}
                 </button>
                 <button
                   type="button"
@@ -395,7 +398,7 @@ export function CashFlowModal({
                       : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/50 dark:hover:bg-slate-800/50",
                   )}
                 >
-                  💰 Thu nhập
+                  💰 {t("financial.income")}
                 </button>
               </div>
 
@@ -406,7 +409,7 @@ export function CashFlowModal({
                     htmlFor="amount"
                     className="text-xs font-bold text-slate-700 dark:text-slate-200"
                   >
-                    Số tiền (VND) <span className="text-rose-500">*</span>
+                    {language === "vi" ? "Số tiền (VND)" : "Amount (VND)"} <span className="text-rose-500">*</span>
                   </Label>
                   <span className="text-xs font-extrabold text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 shadow-2xs">
                     {formattedAmountPreview}
@@ -441,7 +444,7 @@ export function CashFlowModal({
                 {/* Quick Amount Preset Pills */}
                 <div className="flex flex-wrap items-center gap-1 pt-1">
                   <span className="text-[10px] text-slate-400 font-semibold mr-1">
-                    Nhanh:
+                    {language === "vi" ? "Nhanh:" : "Quick:"}
                   </span>
                   <button
                     type="button"
@@ -483,7 +486,7 @@ export function CashFlowModal({
                     onClick={clearAmount}
                     className="text-[11px] font-semibold px-2 py-0.5 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 rounded-md hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-all ml-auto flex items-center gap-0.5 cursor-pointer"
                   >
-                    <RotateCcw className="h-2.5 w-2.5" /> Xóa
+                    <RotateCcw className="h-2.5 w-2.5" /> {language === "vi" ? "Xóa" : "Clear"}
                   </button>
                 </div>
               </div>
@@ -498,13 +501,13 @@ export function CashFlowModal({
                   className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1"
                 >
                   <Sparkles className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
-                  Tên giao dịch <span className="text-rose-500">*</span>
+                  {language === "vi" ? "Tên giao dịch" : "Transaction Name"} <span className="text-rose-500">*</span>
                 </Label>
                 <Input
                   id="title"
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  placeholder="VD: Ăn sáng, Tiền điện tháng 8, Lương công ty..."
+                  placeholder={language === "vi" ? "VD: Ăn sáng, Tiền điện tháng 8, Lương công ty..." : "E.g. Breakfast, Electricity bill, Salary..."}
                   required
                   className="h-10 text-xs sm:text-sm bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 rounded-xl font-medium focus:border-sky-500"
                 />
@@ -514,7 +517,7 @@ export function CashFlowModal({
               <div className="space-y-1.5 sm:col-span-2">
                 <Label className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1">
                   <CalendarIcon className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
-                  Thời gian giao dịch
+                  {language === "vi" ? "Thời gian giao dịch" : "Transaction Time"}
                 </Label>
                 <Popover>
                   <PopoverTrigger asChild>
@@ -534,7 +537,7 @@ export function CashFlowModal({
                     />
                     <div className="p-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
                       <Label className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                        Thời gian (Giờ:Phút)
+                        {language === "vi" ? "Thời gian (Giờ:Phút)" : "Time (HH:mm)"}
                       </Label>
                       <Input
                         type="time"
@@ -557,7 +560,7 @@ export function CashFlowModal({
                 <div className="flex items-center justify-between">
                   <Label className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1">
                     <Wallet className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
-                    Nguồn tiền
+                    {t("financial.source")}
                   </Label>
                   <button
                     type="button"
@@ -565,7 +568,7 @@ export function CashFlowModal({
                     className="text-[11px] font-medium text-sky-600 dark:text-sky-400 hover:text-sky-700 flex items-center gap-0.5 cursor-pointer"
                   >
                     <Plus className="h-3 w-3" />
-                    {showAddSource ? "Ẩn" : "Thêm mới"}
+                    {showAddSource ? (language === "vi" ? "Ẩn" : "Hide") : t("common.add")}
                   </button>
                 </div>
 
@@ -574,7 +577,7 @@ export function CashFlowModal({
                   onValueChange={(value) => setForm({ ...form, sourceId: value })}
                 >
                   <SelectTrigger className="w-full h-10 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 rounded-xl text-xs font-medium">
-                    <SelectValue placeholder="Chọn nguồn tiền..." />
+                    <SelectValue placeholder={t("financial.selectSource")} />
                   </SelectTrigger>
                   <SelectContent>
                     {sources.map((s) => (
@@ -588,7 +591,7 @@ export function CashFlowModal({
                 {showAddSource && (
                   <div className="flex gap-1.5 pt-1 animate-in fade-in duration-150">
                     <Input
-                      placeholder="Nhập tên nguồn tiền mới..."
+                      placeholder={language === "vi" ? "Nhập tên nguồn tiền mới..." : "Enter new source name..."}
                       value={newSource}
                       onChange={(e) => setNewSource(e.target.value)}
                       className="h-8 text-xs bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 rounded-lg"
@@ -600,10 +603,10 @@ export function CashFlowModal({
                     <Button
                       type="button"
                       size="sm"
-                      className="h-8 px-2.5 bg-sky-600 text-white rounded-lg text-xs font-semibold shrink-0"
+                      className="h-8 px-2.5 bg-sky-600 text-white rounded-lg text-xs font-semibold shrink-0 cursor-pointer"
                       onClick={handleAddSource}
                     >
-                      Tạo mới
+                      {t("common.add")}
                     </Button>
                   </div>
                 )}
@@ -614,7 +617,7 @@ export function CashFlowModal({
                 <div className="flex items-center justify-between">
                   <Label className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1">
                     <FolderKanban className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
-                    Nhãn chính
+                    {t("financial.primaryCategory")}
                   </Label>
                   <button
                     type="button"
@@ -622,7 +625,7 @@ export function CashFlowModal({
                     className="text-[11px] font-medium text-sky-600 dark:text-sky-400 hover:text-sky-700 flex items-center gap-0.5 cursor-pointer"
                   >
                     <Plus className="h-3 w-3" />
-                    {showAddCategory ? "Ẩn" : "Thêm mới"}
+                    {showAddCategory ? (language === "vi" ? "Ẩn" : "Hide") : t("common.add")}
                   </button>
                 </div>
 
@@ -633,7 +636,7 @@ export function CashFlowModal({
                   }
                 >
                   <SelectTrigger className="w-full h-10 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 rounded-xl text-xs font-medium">
-                    <SelectValue placeholder="Chọn nhãn chính..." />
+                    <SelectValue placeholder={t("financial.selectPrimaryCategory")} />
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((c) => (
@@ -647,7 +650,7 @@ export function CashFlowModal({
                 {showAddCategory && (
                   <div className="flex gap-1.5 pt-1 animate-in fade-in duration-150">
                     <Input
-                      placeholder="Nhập tên nhãn chính mới..."
+                      placeholder={language === "vi" ? "Nhập tên nhãn chính mới..." : "Enter new primary category name..."}
                       value={newCategory}
                       onChange={(e) => setNewCategory(e.target.value)}
                       className="h-8 text-xs bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 rounded-lg"
@@ -659,10 +662,10 @@ export function CashFlowModal({
                     <Button
                       type="button"
                       size="sm"
-                      className="h-8 px-2.5 bg-sky-600 text-white rounded-lg text-xs font-semibold shrink-0"
+                      className="h-8 px-2.5 bg-sky-600 text-white rounded-lg text-xs font-semibold shrink-0 cursor-pointer"
                       onClick={handleAddCategory}
                     >
-                      Tạo mới
+                      {t("common.add")}
                     </Button>
                   </div>
                 )}
@@ -676,7 +679,7 @@ export function CashFlowModal({
                 <div className="flex items-center justify-between">
                   <Label className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1">
                     <Tags className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
-                    Nhãn phụ (Có thể chọn nhiều)
+                    {t("financial.secondaryCategory")} {language === "vi" ? "(Có thể chọn nhiều)" : "(Multiple choice)"}
                   </Label>
                   <button
                     type="button"
@@ -684,14 +687,14 @@ export function CashFlowModal({
                     className="text-[11px] font-medium text-sky-600 dark:text-sky-400 hover:text-sky-700 flex items-center gap-0.5 cursor-pointer"
                   >
                     <Plus className="h-3 w-3" />
-                    {showAddSecondary ? "Ẩn" : "Thêm mới"}
+                    {showAddSecondary ? (language === "vi" ? "Ẩn" : "Hide") : t("common.add")}
                   </button>
                 </div>
 
                 {showAddSecondary && (
                   <div className="flex flex-col sm:flex-row gap-2 p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-800 animate-in fade-in duration-150">
                     <Input
-                      placeholder="Nhập tên nhãn phụ mới..."
+                      placeholder={language === "vi" ? "Nhập tên nhãn phụ mới..." : "Enter new secondary tag name..."}
                       value={newSecondaryCategory}
                       onChange={(e) => setNewSecondaryCategory(e.target.value)}
                       className="h-8 text-xs bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg flex-1"
@@ -702,7 +705,7 @@ export function CashFlowModal({
                     />
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap font-medium">
-                        Loại:
+                        {language === "vi" ? "Loại:" : "Type:"}
                       </span>
                       <Input
                         type="number"
@@ -716,10 +719,10 @@ export function CashFlowModal({
                       <Button
                         type="button"
                         size="sm"
-                        className="h-8 px-3 bg-sky-600 text-white rounded-lg text-xs font-semibold shrink-0"
+                        className="h-8 px-3 bg-sky-600 text-white rounded-lg text-xs font-semibold shrink-0 cursor-pointer"
                         onClick={handleAddSecondaryCategory}
                       >
-                        Tạo mới
+                        {t("common.add")}
                       </Button>
                     </div>
                   </div>
@@ -729,13 +732,13 @@ export function CashFlowModal({
                 <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
                   {secondaryGrouped.length === 0 ? (
                     <p className="text-xs text-slate-400 italic">
-                      Chưa có nhãn phụ nào
+                      {language === "vi" ? "Chưa có nhãn phụ nào" : "No secondary tags yet"}
                     </p>
                   ) : (
                     secondaryGrouped.map((group) => (
                       <div key={`group-${group.type}`} className="space-y-1">
                         <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                          Nhóm Type {group.type}
+                          {language === "vi" ? `Nhóm TYPE ${group.type}` : `TYPE GROUP ${group.type}`}
                         </div>
                         <div className="flex flex-wrap gap-1.5">
                           {group.cats.map((c) => {
@@ -775,7 +778,7 @@ export function CashFlowModal({
                   className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1"
                 >
                   <FileText className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
-                  Mô tả ngắn / Ghi chú
+                  {language === "vi" ? "Mô tả ngắn / Ghi chú" : "Short Description / Notes"}
                 </Label>
                 <Textarea
                   id="description"
@@ -783,7 +786,7 @@ export function CashFlowModal({
                   onChange={(e) =>
                     setForm({ ...form, description: e.target.value })
                   }
-                  placeholder="Ghi chú thêm thông tin giao dịch..."
+                  placeholder={language === "vi" ? "Ghi chú thêm thông tin giao dịch..." : "Additional notes for this transaction..."}
                   rows={2}
                   className="text-xs bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 rounded-xl resize-none"
                 />
@@ -802,16 +805,16 @@ export function CashFlowModal({
             <Button
               type="button"
               variant="outline"
-              className="flex-1 h-10 text-xs font-bold rounded-xl border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+              className="flex-1 h-10 text-xs font-bold rounded-xl border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
               onClick={() => onOpenChange(false)}
             >
-              Hủy
+              {t("common.cancel")}
             </Button>
             <Button
               type="submit"
               disabled={loading}
               className={cn(
-                "flex-1 h-10 text-xs font-bold rounded-xl text-white shadow-md transition-all",
+                "flex-1 h-10 text-xs font-bold rounded-xl text-white shadow-md transition-all cursor-pointer",
                 form.cashType === "Income"
                   ? "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-emerald-600/20"
                   : "bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 shadow-rose-600/20",
@@ -820,12 +823,12 @@ export function CashFlowModal({
               {loading ? (
                 <>
                   <Spinner className="mr-2" />
-                  Đang xử lý...
+                  {t("common.loading")}
                 </>
               ) : isEdit ? (
-                "Lưu Thay Đổi"
+                (language === "vi" ? "Lưu Thay Đổi" : "Save Changes")
               ) : (
-                "Tạo Giao Dịch"
+                (language === "vi" ? "Tạo Giao Dịch" : "Create Transaction")
               )}
             </Button>
           </div>

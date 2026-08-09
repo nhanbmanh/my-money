@@ -45,9 +45,11 @@ import {
   fetchAirVisualFullData,
   AirVisualFullData,
   AirVisualWeatherData,
+  getAirVisualWeatherInfo,
+  getAqiLevelInfo,
 } from "@/lib/airvisual-service";
-import { fetchJmaWeatherData } from "@/lib/jma-weather-service";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/components/language-provider";
 
 const PRESET_CITIES: WeatherLocation[] = [
   { name: "Hà Nội", latitude: 21.0285, longitude: 105.8542, country: "Việt Nam" },
@@ -61,11 +63,11 @@ const PRESET_CITIES: WeatherLocation[] = [
 ];
 
 export function WeatherDashboard() {
+  const { t, language } = useLanguage();
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [airVisualFullData, setAirVisualFullData] = useState<AirVisualFullData | null>(null);
-  const [jmaData, setJmaData] = useState<WeatherData | null>(null);
-  const [hourlySource, setHourlySource] = useState<"openmeteo" | "airvisual" | "jma">("openmeteo");
-  const [dailySource, setDailySource] = useState<"openmeteo" | "airvisual" | "jma">("openmeteo");
+  const [hourlySource, setHourlySource] = useState<"airvisual" | "openmeteo">("airvisual");
+  const [dailySource, setDailySource] = useState<"airvisual" | "openmeteo">("airvisual");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -82,14 +84,12 @@ export function WeatherDashboard() {
     setLoading(true);
     setError(null);
     try {
-      const [data, avFullData, jmaDataResult] = await Promise.all([
+      const [data, avFullData] = await Promise.all([
         fetchWeatherData(lat, lng, locName),
         fetchAirVisualFullData(lat, lng),
-        fetchJmaWeatherData(lat, lng, locName).catch(() => null),
       ]);
       setWeatherData(data);
       setAirVisualFullData(avFullData);
-      setJmaData(jmaDataResult);
     } catch (err: any) {
       setError(err?.message || "Không thể tải dữ liệu thời tiết");
     } finally {
@@ -200,87 +200,144 @@ export function WeatherDashboard() {
   };
 
   const getUvLevelInfo = (uv: number) => {
-    if (uv === 0) return { text: "Ban đêm", color: "text-slate-400 bg-slate-50 dark:bg-slate-900 border-slate-200" };
-    if (uv <= 2) return { text: "Thấp", color: "text-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200" };
-    if (uv <= 5) return { text: "Vừa", color: "text-amber-500 bg-amber-50 dark:bg-amber-950/60 border-amber-200" };
-    if (uv <= 7) return { text: "Cao", color: "text-orange-500 bg-orange-50 dark:bg-orange-950/60 border-orange-200" };
-    if (uv <= 10) return { text: "Rất cao", color: "text-rose-600 bg-rose-50 dark:bg-rose-950/60 border-rose-200" };
-    return { text: "Nguy hiểm", color: "text-purple-600 bg-purple-50 dark:bg-purple-950/60 border-purple-200" };
+    if (uv === 0) return { text: language === "vi" ? "Ban đêm" : "Nighttime", color: "text-slate-400 bg-slate-50 dark:bg-slate-900 border-slate-200" };
+    if (uv <= 2) return { text: language === "vi" ? "Thấp" : "Low", color: "text-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200" };
+    if (uv <= 5) return { text: language === "vi" ? "Vừa" : "Moderate", color: "text-amber-500 bg-amber-50 dark:bg-amber-950/60 border-amber-200" };
+    if (uv <= 7) return { text: language === "vi" ? "Cao" : "High", color: "text-orange-500 bg-orange-50 dark:bg-orange-950/60 border-orange-200" };
+    if (uv <= 10) return { text: language === "vi" ? "Rất cao" : "Very High", color: "text-rose-600 bg-rose-50 dark:bg-rose-950/60 border-rose-200" };
+    return { text: language === "vi" ? "Nguy hiểm" : "Extreme", color: "text-purple-600 bg-purple-50 dark:bg-purple-950/60 border-purple-200" };
   };
 
-  // Generate Weather Summary Texts
+  // Generate Weather Summary Texts (Build based primarily on AirVisual data)
   const getSummaryInfo = () => {
     if (!weatherData) return null;
 
-    const nextHour1 = weatherData.hourly[1];
-    const nextHour2 = weatherData.hourly[2];
+    const avCurrent = airVisualFullData?.current;
+
+    const currentTemp = avCurrent ? avCurrent.temperature : weatherData.current.temperature;
+    const feelsLike = avCurrent ? avCurrent.feelsLike : weatherData.current.feelsLike;
+    const humidityVal = avCurrent ? avCurrent.humidity : weatherData.current.humidity;
+    const pressureVal = avCurrent ? avCurrent.pressure : weatherData.current.pressure;
+    const weatherDesc = avCurrent
+      ? getAirVisualWeatherInfo(avCurrent.weatherDesc, language).desc
+      : getWmoWeatherInfo(weatherData.current.weatherCode, weatherData.current.isDay, language).desc;
+
+    // Use AirVisual hourly if available
+    const hourlyForecast = (airVisualFullData?.hourly && airVisualFullData.hourly.length > 0)
+      ? airVisualFullData.hourly
+      : weatherData.hourly;
+
+    const nextHour1 = hourlyForecast[1] || weatherData.hourly[1];
+    const nextHour2 = hourlyForecast[2] || weatherData.hourly[2];
 
     let next2HoursText = "";
     if (nextHour1 && nextHour2) {
       const isRain = nextHour1.pop > 30 || nextHour2.pop > 30;
+      const h1Desc = getWmoWeatherInfo(nextHour1.weatherCode, nextHour1.isDay, language).desc;
       if (isRain) {
-        next2HoursText = `Trong 2 giờ tiếp theo, khả năng có mưa là ${Math.max(
-          nextHour1.pop,
-          nextHour2.pop
-        )}%, dự báo ${nextHour1.weatherDesc}.`;
+        next2HoursText = language === "vi"
+          ? `Trong 2 giờ tiếp theo, khả năng có mưa là ${Math.max(nextHour1.pop, nextHour2.pop)}%, dự báo ${h1Desc.toLowerCase()}.`
+          : `In the next 2 hours, precipitation chance is ${Math.max(nextHour1.pop, nextHour2.pop)}%, forecast ${h1Desc.toLowerCase()}.`;
       } else {
-        next2HoursText = `Trong 2 giờ tiếp theo, thời tiết tiếp tục ${nextHour1.weatherDesc}, nhiệt độ giữ khoảng ${nextHour1.temperature}°C.`;
+        next2HoursText = language === "vi"
+          ? `Trong 2 giờ tiếp theo, thời tiết tiếp tục ${h1Desc.toLowerCase()}, nhiệt độ giữ khoảng ${nextHour1.temperature}°C.`
+          : `In the next 2 hours, weather remains ${h1Desc.toLowerCase()}, temp around ${nextHour1.temperature}°C.`;
       }
     }
 
     let adviceText = "";
-    if (weatherData.current.uvIndex >= 6) {
-      adviceText += `Chỉ số UV ở mức ${weatherData.current.uvIndex} (Khá cao), bạn nên dùng kem chống nắng và đội mũ rộng vành khi ra ngoài. `;
+    if (avCurrent) {
+      const aqiStatusText = getAqiLevelInfo(avCurrent.aqi, language).text;
+      if (avCurrent.aqi > 100) {
+        adviceText += language === "vi"
+          ? `Chất lượng không khí ở mức ${avCurrent.aqi} (${aqiStatusText}), bạn nên đeo khẩu trang chống bụi mịn N95 khi ra ngoài. `
+          : `Air quality is at ${avCurrent.aqi} (${aqiStatusText}), wear an N95 mask outdoors. `;
+      } else {
+        adviceText += language === "vi"
+          ? `Chất lượng không khí ở mức ${avCurrent.aqi} (${aqiStatusText}), rất thích hợp cho các hoạt động ngoài trời. `
+          : `Air quality is at ${avCurrent.aqi} (${aqiStatusText}), great for outdoor activities. `;
+      }
+    } else if (weatherData.current.uvIndex >= 6) {
+      adviceText += language === "vi"
+        ? `Chỉ số UV ở mức ${weatherData.current.uvIndex} (Khá cao), bạn nên dùng kem chống nắng và đội mũ rộng vành khi ra ngoài. `
+        : `UV index is at ${weatherData.current.uvIndex} (High), wear sunscreen and a hat outdoors. `;
     }
+
     if (weatherData.current.rain > 0 || (nextHour1 && nextHour1.pop > 40)) {
-      adviceText += `Khả năng cao có mưa rào, bạn nhớ chuẩn bị sẵn áo mưa hoặc ô dù. `;
-    } else if (weatherData.current.temperature >= 28) {
-      adviceText += `Thời tiết oi nóng, nên chọn trang phục vải mỏng nhẹ thoáng mát và bổ sung đủ nước. `;
+      adviceText += language === "vi"
+        ? `Khả năng cao có mưa rào, bạn nhớ chuẩn bị sẵn áo mưa hoặc ô dù. `
+        : `High chance of rain showers, remember to bring an umbrella or raincoat. `;
+    } else if (currentTemp >= 28) {
+      adviceText += language === "vi"
+        ? `Thời tiết oi nóng (${currentTemp}°C), nên chọn trang phục vải mỏng nhẹ thoáng mát và bổ sung đủ nước. `
+        : `Hot weather (${currentTemp}°C), wear lightweight breathable clothes and stay hydrated. `;
     } else {
-      adviceText += `Thời tiết mát mẻ dễ chịu, rất thích hợp cho các hoạt động ngoài trời. `;
+      adviceText += language === "vi"
+        ? `Thời tiết mát mẻ dễ chịu (${currentTemp}°C), chọn trang phục thoải mái. `
+        : `Pleasant cool weather (${currentTemp}°C), wear comfortable clothes. `;
     }
 
     // Explanations for key metrics
     const uvVal = weatherData.current.uvIndex;
     let uvExplanation = "";
     if (uvVal === 0 || !weatherData.current.isDay) {
-      uvExplanation = `Chỉ số UV bằng 0 (Ban đêm) - Mặt Trời đã lặn, hoàn toàn không có bức xạ cực tím.`;
+      uvExplanation = language === "vi"
+        ? `Chỉ số UV bằng 0 (Ban đêm) - Mặt Trời đã lặn, hoàn toàn không có bức xạ cực tím.`
+        : `UV Index 0 (Nighttime) - Sun has set, zero ultraviolet radiation.`;
     } else if (uvVal <= 2) {
-      uvExplanation = `Chỉ số UV ở mức ${uvVal} (Thấp) - Bức xạ cực tím an toàn, không lo sạm da hay tổn thương mắt khi ra ngoài.`;
+      uvExplanation = language === "vi"
+        ? `Chỉ số UV ở mức ${uvVal} (Thấp) - Bức xạ cực tím an toàn, không lo sạm da hay tổn thương mắt khi ra ngoài.`
+        : `UV Index ${uvVal} (Low) - Safe ultraviolet level, minimal sunburn risk.`;
     } else if (uvVal <= 5) {
-      uvExplanation = `Chỉ số UV ở mức ${uvVal} (Vừa) - Cần chú ý đeo khẩu trang hoặc đội mũ khi di chuyển lâu dưới nắng.`;
+      uvExplanation = language === "vi"
+        ? `Chỉ số UV ở mức ${uvVal} (Vừa) - Cần chú ý đeo khẩu trang hoặc đội mũ khi di chuyển lâu dưới nắng.`
+        : `UV Index ${uvVal} (Moderate) - Wear a hat or mask during prolonged sun exposure.`;
     } else if (uvVal <= 7) {
-      uvExplanation = `Chỉ số UV ở mức ${uvVal} (Cao) - Tia cực tím mạnh, dễ gây cháy nắng và hại mắt. Nên thoa kem chống nắng & đeo kính râm.`;
+      uvExplanation = language === "vi"
+        ? `Chỉ số UV ở mức ${uvVal} (Cao) - Tia cực tím mạnh, dễ gây cháy nắng và hại mắt. Nên thoa kem chống nắng & đeo kính râm.`
+        : `UV Index ${uvVal} (High) - Strong UV rays. Apply sunscreen and wear sunglasses.`;
     } else {
-      uvExplanation = `Chỉ số UV ở mức ${uvVal} (Rất cao / Cực nguy hiểm) - Cực kỳ độc hại cho da. Tránh ra ngoài vào khoảng giữa trưa từ 10h đến 14h.`;
+      uvExplanation = language === "vi"
+        ? `Chỉ số UV ở mức ${uvVal} (Rất cao / Cực nguy hiểm) - Cực kỳ độc hại cho da. Tránh ra ngoài vào khoảng giữa trưa từ 10h đến 14h.`
+        : `UV Index ${uvVal} (Very High/Extreme) - Harmful to skin. Avoid midday sun between 10am and 2pm.`;
     }
 
-    const pressureVal = weatherData.current.pressure;
     let pressureExplanation = "";
     if (pressureVal < 1008) {
-      pressureExplanation = `Áp suất khí quyển ${pressureVal} hPa (Thấp) - Khí quyển nhẹ làm không khí bốc lên cao tích tụ mây đen, báo hiệu dễ có mưa rào hoặc dông. Người nhạy cảm có thể thấy hơi mệt mỏi nhẹ.`;
+      pressureExplanation = language === "vi"
+        ? `Áp suất khí quyển ${pressureVal} hPa (Thấp) - Khí quyển nhẹ làm không khí bốc lên cao tích tụ mây đen, báo hiệu dễ có mưa rào hoặc dông.`
+        : `Atmospheric pressure ${pressureVal} hPa (Low) - Indicates potential rain showers or thunderstorms.`;
     } else if (pressureVal > 1018) {
-      pressureExplanation = `Áp suất khí quyển ${pressureVal} hPa (Cao) - Nén không khí giữ bầu trời tạnh ráo, khô khoắn và bừng sáng.`;
+      pressureExplanation = language === "vi"
+        ? `Áp suất khí quyển ${pressureVal} hPa (Cao) - Nén không khí giữ bầu trời tạnh ráo, khô khoắn và bừng sáng.`
+        : `Atmospheric pressure ${pressureVal} hPa (High) - Clear and bright skies.`;
     } else {
-      pressureExplanation = `Áp suất khí quyển ${pressureVal} hPa (Bình thường) - Khí quyển ổn định, thời tiết dễ chịu.`;
+      pressureExplanation = language === "vi"
+        ? `Áp suất khí quyển ${pressureVal} hPa (Bình thường) - Khí quyển ổn định, thời tiết dễ chịu.`
+        : `Atmospheric pressure ${pressureVal} hPa (Normal) - Stable atmosphere and pleasant weather.`;
     }
 
-    const humidityVal = weatherData.current.humidity;
     let humidityExplanation = "";
     if (humidityVal >= 85) {
-      humidityExplanation = `Độ ẩm không khí ${humidityVal}% (Rất cao) - Mồ hôi khó bay hơi, tạo cảm giác oi rít và dễ đọng sương/mưa rào.`;
+      humidityExplanation = language === "vi"
+        ? `Độ ẩm không khí ${humidityVal}% (Rất cao) - Mồ hôi khó bay hơi, tạo cảm giác oi rít và dễ đọng sương/mưa rào.`
+        : `Humidity ${humidityVal}% (Very High) - Feels humid and sticky.`;
     } else if (humidityVal <= 45) {
-      humidityExplanation = `Độ ẩm không khí ${humidityVal}% (Thấp) - Khí khô, nên bổ sung nhiều nước và dưỡng ẩm da.`;
+      humidityExplanation = language === "vi"
+        ? `Độ ẩm không khí ${humidityVal}% (Thấp) - Khí khô, nên bổ sung nhiều nước và dưỡng ẩm da.`
+        : `Humidity ${humidityVal}% (Low) - Dry air, drink plenty of water and hydrate.`;
     } else {
-      humidityExplanation = `Độ ẩm không khí ${humidityVal}% (Lý tưởng) - Cảm giác không khí thoáng đãng, vô cùng thoải mái.`;
+      humidityExplanation = language === "vi"
+        ? `Độ ẩm không khí ${humidityVal}% (Lý tưởng) - Cảm giác không khí thoáng đãng, vô cùng thoải mái.`
+        : `Humidity ${humidityVal}% (Ideal) - Comfortable and fresh air.`;
     }
 
     return {
       location: weatherData.location.name,
-      currentTemp: weatherData.current.temperature,
-      feelsLike: weatherData.current.feelsLike,
-      humidity: weatherData.current.humidity,
-      weatherDesc: weatherData.current.weatherDesc,
+      currentTemp,
+      feelsLike,
+      humidity: humidityVal,
+      weatherDesc,
       next2HoursText,
       adviceText,
       uvExplanation,
@@ -296,19 +353,15 @@ export function WeatherDashboard() {
 
   const airVisualData = airVisualFullData?.current;
   const hourlyList = (
-    hourlySource === "airvisual"
-      ? airVisualFullData?.hourly
-      : hourlySource === "jma"
-      ? jmaData?.hourly
-      : weatherData?.hourly
+    hourlySource === "openmeteo"
+      ? weatherData?.hourly
+      : airVisualFullData?.hourly
   )?.slice(0, 12) || [];
 
   const dailyList = (
-    dailySource === "airvisual"
-      ? airVisualFullData?.daily
-      : dailySource === "jma"
-      ? jmaData?.daily
-      : weatherData?.daily
+    dailySource === "openmeteo"
+      ? weatherData?.daily
+      : airVisualFullData?.daily
   ) || [];
 
   return (
@@ -323,11 +376,11 @@ export function WeatherDashboard() {
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <h2 className="text-base sm:text-base font-black text-slate-900 dark:text-slate-100 leading-snug break-words">
-                {weatherData?.location.name || "Đang xác định vị trí..."}
+                {weatherData?.location.name || (language === "vi" ? "Đang xác định vị trí..." : "Locating...")}
               </h2>
             </div>
             <p className="text-xs font-semibold text-slate-400">
-              Dự báo thời tiết thời gian thực
+              {language === "vi" ? "Dự báo thời tiết thời gian thực" : "Realtime Weather Forecast"}
             </p>
           </div>
         </div>
@@ -338,7 +391,7 @@ export function WeatherDashboard() {
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 z-10" />
             <Input
               type="text"
-              placeholder="Tìm thành phố (Hà Nội, Đà Nẵng...)"
+              placeholder={language === "vi" ? "Tìm thành phố (Hà Nội, Đà Nẵng...)" : "Search city (Tokyo, New York...)"}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
@@ -392,18 +445,16 @@ export function WeatherDashboard() {
                 weatherData.location.name
               )
             }
-            className="h-11 w-11 sm:h-9 sm:w-9 rounded-xl border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shrink-0"
-            title="Tải lại dữ liệu thời tiết"
+            className="h-11 w-11 sm:h-9 sm:w-9 rounded-xl border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shrink-0 cursor-pointer"
+            title={language === "vi" ? "Tải lại dữ liệu thời tiết" : "Reload weather data"}
           >
             <RefreshCw className={cn("h-5 w-5 sm:h-4 sm:w-4", loading && "animate-spin")} />
           </Button>
         </div>
       </div>
-
-      {/* Preset Cities Quick Select Bar */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1.5 no-scrollbar">
         <span className="text-xs font-black text-slate-400 shrink-0 mr-1">
-          Nhanh:
+          {language === "vi" ? "Nhanh:" : "Quick:"}
         </span>
         {PRESET_CITIES.map((city, idx) => (
           <Button
@@ -411,7 +462,7 @@ export function WeatherDashboard() {
             variant="outline"
             size="sm"
             onClick={() => handleSelectLocation(city)}
-            className="h-8 sm:h-7 text-xs font-black px-3.5 sm:px-3 rounded-full border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 hover:bg-sky-50 dark:hover:bg-slate-800 hover:text-sky-600 dark:hover:text-sky-400 transition-all shrink-0"
+            className="h-8 sm:h-7 text-xs font-black px-3.5 sm:px-3 rounded-full border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 hover:bg-sky-50 dark:hover:bg-slate-800 hover:text-sky-600 dark:hover:text-sky-400 transition-all shrink-0 cursor-pointer"
           >
             {city.name}
           </Button>
@@ -422,7 +473,7 @@ export function WeatherDashboard() {
         <div className="flex flex-col items-center justify-center py-24 gap-3 bg-white/50 dark:bg-slate-900/50 rounded-3xl border border-slate-100 dark:border-slate-800">
           <Spinner className="h-10 w-10 text-sky-500" />
           <p className="text-sm font-black text-slate-400">
-            Đang tải dự báo thời tiết thời gian thực...
+            {language === "vi" ? "Đang tải dự báo thời tiết thời gian thực..." : "Loading realtime weather forecast..."}
           </p>
         </div>
       ) : error ? (
@@ -432,26 +483,91 @@ export function WeatherDashboard() {
             size="sm"
             variant="outline"
             onClick={detectUserLocation}
-            className="text-xs font-bold border-rose-300 text-rose-700 bg-white"
+            className="text-xs font-bold border-rose-300 text-rose-700 bg-white cursor-pointer"
           >
-            Thử lại
+            {language === "vi" ? "Thử lại" : "Retry"}
           </Button>
         </div>
       ) : weatherData && weatherTheme ? (
         <>
-          {/* SECTION 2: COMPARISON OF 3 REAL-TIME WEATHER APIS (OPEN-METEO, AIRVISUAL, JMA JAPAN) */}
+          {/* SECTION 2: COMPARISON OF 2 REAL-TIME WEATHER APIS (AIRVISUAL & OPEN-METEO) */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                <Sparkles className="h-4 w-4 text-sky-500" /> SO SÁNH THỜI TIẾT THỜI GIAN THỰC (3 NGUỒN API DỰ BÁO)
+                <Sparkles className="h-4 w-4 text-sky-500" /> {language === "vi" ? "SO SÁNH THỜI TIẾT THỜI GIAN THỰC (2 NGUỒN API DỰ BÁO)" : "REALTIME WEATHER COMPARISON (2 API SOURCES)"}
               </div>
               <span className="text-[11px] font-extrabold text-slate-400">
-                Đồng bộ cùng vị trí GPS
+                {language === "vi" ? "Đồng bộ cùng vị trí GPS" : "Synced with GPS location"}
               </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {/* CARD 1: OPEN-METEO API */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* CARD 1: AIRVISUAL / IQAIR API (CHÍNH XÁC NHẤT) */}
+              {airVisualData ? (
+                <div className="relative overflow-hidden rounded-3xl text-white p-5 sm:p-6 shadow-xl border border-white/20 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 transition-all duration-700 flex flex-col justify-between min-h-[300px]">
+                  {/* Decorative Background Glow */}
+                  <div className="absolute -top-16 -right-16 w-60 h-60 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none" />
+
+                  <div className="relative z-10 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <Badge className="bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-200 border-emerald-400/30 backdrop-blur text-xs font-black px-3 py-1 rounded-full truncate">
+                        💨 {language === "vi" ? "Nguồn 1: AirVisual / IQAir (Mỹ - Chuẩn xác)" : "Source 1: AirVisual / IQAir (US - Primary)"}
+                      </Badge>
+                      <Badge className={cn("text-xs font-black px-2.5 py-0.5 rounded-full border shadow-xs shrink-0", airVisualData.aqiColor)}>
+                        AQI {airVisualData.aqi} • {getAqiLevelInfo(airVisualData.aqi, language).text}
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-baseline gap-3 pt-1">
+                      <h1 className="text-5xl sm:text-6xl font-black tracking-tight drop-shadow-md text-white">
+                        {airVisualData.temperature}°
+                        <span className="text-3xl font-black text-indigo-200">C</span>
+                      </h1>
+                      <div className="text-4xl drop-shadow-sm">{airVisualData.icon}</div>
+                    </div>
+
+                    <h3 className="text-lg font-black text-white tracking-wide truncate">
+                      {getAirVisualWeatherInfo(airVisualData.weatherDesc, language).desc}
+                    </h3>
+
+                    <p className="text-xs font-extrabold text-indigo-200 flex items-center gap-2 truncate">
+                      <span>{language === "vi" ? `Cảm giác như ${airVisualData.feelsLike}°C` : `Feels like ${airVisualData.feelsLike}°C`}</span>
+                      <span>•</span>
+                      <span>{language === "vi" ? `Độ ẩm ${airVisualData.humidity}%` : `Humidity ${airVisualData.humidity}%`}</span>
+                    </p>
+                  </div>
+
+                  {/* AirVisual Grid of Key Weather Metrics */}
+                  <div className="relative z-10 grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-white/20">
+                    <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2 text-center col-span-2">
+                      <div className="text-[10px] font-black text-indigo-200 truncate">🍃 {language === "vi" ? "Chất Lượng Không Khí US AQI" : "US AQI Air Quality"}</div>
+                      <div className="text-xs sm:text-sm font-black text-emerald-300 truncate">{language === "vi" ? `Chỉ số ${airVisualData.aqi} • ${getAqiLevelInfo(airVisualData.aqi, language).text}` : `Index ${airVisualData.aqi} • ${getAqiLevelInfo(airVisualData.aqi, language).text}`}</div>
+                    </div>
+
+                    <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2 text-center">
+                      <div className="text-[10px] font-black text-indigo-200 truncate">💧 {language === "vi" ? "Độ Ẩm" : "Humidity"}</div>
+                      <div className="text-sm font-black text-white">{airVisualData.humidity}%</div>
+                    </div>
+
+                    <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2 text-center">
+                      <div className="text-[10px] font-black text-indigo-200 truncate">💨 {language === "vi" ? "Tốc Độ Gió" : "Wind Speed"}</div>
+                      <div className="text-sm font-black text-white">{airVisualData.windSpeed} km/h</div>
+                    </div>
+
+                    <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2 text-center">
+                      <div className="text-[10px] font-black text-indigo-200 truncate">⏲️ {language === "vi" ? "Áp Suất" : "Pressure"}</div>
+                      <div className="text-sm font-black text-white">{airVisualData.pressure} hPa</div>
+                    </div>
+
+                    <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2 text-center">
+                      <div className="text-[10px] font-black text-indigo-200 truncate">⏰ {language === "vi" ? "Cập Nhật" : "Updated"}</div>
+                      <div className="text-xs font-bold text-white truncate">{airVisualData.updatedAt}</div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* CARD 2: OPEN-METEO API */}
               <div
                 className={cn(
                   "relative overflow-hidden rounded-3xl text-white p-5 sm:p-6 shadow-xl border border-white/20 transition-all duration-700 flex flex-col justify-between min-h-[300px]",
@@ -510,10 +626,10 @@ export function WeatherDashboard() {
                 <div className="relative z-10 space-y-3">
                   <div className="flex items-center justify-between gap-2">
                     <Badge className="bg-white/25 hover:bg-white/35 text-white border-white/40 backdrop-blur text-xs font-black px-3 py-1 rounded-full truncate">
-                      🌐 Nguồn 1: Open-Meteo (Châu Âu)
+                      🌐 {language === "vi" ? "Nguồn 2: Open-Meteo (Châu Âu)" : "Source 2: Open-Meteo (Europe)"}
                     </Badge>
                     <span className="text-[11px] font-extrabold text-sky-100">
-                      {weatherData.current.isDay ? "☀️ Ban Ngày" : "🌙 Ban Đêm"}
+                      {weatherData.current.isDay ? (language === "vi" ? "☀️ Ban Ngày" : "☀️ Daytime") : (language === "vi" ? "🌙 Ban Đêm" : "🌙 Nighttime")}
                     </span>
                   </div>
 
@@ -523,195 +639,56 @@ export function WeatherDashboard() {
                       <span className="text-3xl font-black text-sky-100">C</span>
                     </h1>
                     <div className="text-4xl drop-shadow-sm">
-                      {getWmoWeatherInfo(weatherData.current.weatherCode, weatherData.current.isDay).icon}
+                      {getWmoWeatherInfo(weatherData.current.weatherCode, weatherData.current.isDay, language).icon}
                     </div>
                   </div>
 
                   <h3 className="text-lg font-black text-white tracking-wide truncate">
-                    {weatherData.current.weatherDesc}
+                    {getWmoWeatherInfo(weatherData.current.weatherCode, weatherData.current.isDay, language).desc}
                   </h3>
 
                   <p className="text-xs font-extrabold text-sky-100 flex items-center gap-2 truncate">
-                    <span>Cảm giác như {weatherData.current.feelsLike}°C</span>
+                    <span>{language === "vi" ? `Cảm giác như ${weatherData.current.feelsLike}°C` : `Feels like ${weatherData.current.feelsLike}°C`}</span>
                     <span>•</span>
-                    <span>Độ ẩm {weatherData.current.humidity}%</span>
+                    <span>{language === "vi" ? `Độ ẩm ${weatherData.current.humidity}%` : `Humidity ${weatherData.current.humidity}%`}</span>
                   </p>
                 </div>
 
                 {/* Open-Meteo Grid of Key Weather Metrics */}
                 <div className="relative z-10 grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-white/20">
                   <div className="bg-white/15 backdrop-blur border border-white/25 rounded-2xl p-2 text-center">
-                    <div className="text-[10px] font-black text-sky-100 truncate">💧 Độ Ẩm</div>
+                    <div className="text-[10px] font-black text-sky-100 truncate">💧 {language === "vi" ? "Độ Ẩm" : "Humidity"}</div>
                     <div className="text-sm font-black text-white">{weatherData.current.humidity}%</div>
                   </div>
 
                   <div className="bg-white/15 backdrop-blur border border-white/25 rounded-2xl p-2 text-center">
-                    <div className="text-[10px] font-black text-sky-100 truncate">💨 Tốc Độ Gió</div>
+                    <div className="text-[10px] font-black text-sky-100 truncate">💨 {language === "vi" ? "Tốc Độ Gió" : "Wind Speed"}</div>
                     <div className="text-sm font-black text-white">{weatherData.current.windSpeed} km/h</div>
                   </div>
 
                   <div className="bg-white/15 backdrop-blur border border-white/25 rounded-2xl p-2 text-center">
-                    <div className="text-[10px] font-black text-sky-100 truncate">☀️ Chỉ Số UV</div>
+                    <div className="text-[10px] font-black text-sky-100 truncate">☀️ {language === "vi" ? "Chỉ Số UV" : "UV Index"}</div>
                     <div className="text-sm font-black text-white">
                       {weatherData.current.uvIndex} ({getUvLevelInfo(weatherData.current.uvIndex).text})
                     </div>
                   </div>
 
                   <div className="bg-white/15 backdrop-blur border border-white/25 rounded-2xl p-2 text-center">
-                    <div className="text-[10px] font-black text-sky-100 truncate">⏲️ Áp Suất</div>
+                    <div className="text-[10px] font-black text-sky-100 truncate">⏲️ {language === "vi" ? "Áp Suất" : "Pressure"}</div>
                     <div className="text-sm font-black text-white">{weatherData.current.pressure} hPa</div>
                   </div>
 
                   <div className="bg-white/15 backdrop-blur border border-white/25 rounded-2xl p-2 text-center">
-                    <div className="text-[10px] font-black text-sky-100 truncate">🌧️ Lượng Mưa</div>
+                    <div className="text-[10px] font-black text-sky-100 truncate">🌧️ {language === "vi" ? "Lượng Mưa" : "Precipitation"}</div>
                     <div className="text-sm font-black text-white">{weatherData.current.rain} mm</div>
                   </div>
 
                   <div className="bg-white/15 backdrop-blur border border-white/25 rounded-2xl p-2 text-center">
-                    <div className="text-[10px] font-black text-sky-100 truncate">🌅 Mọc / Lặn</div>
+                    <div className="text-[10px] font-black text-sky-100 truncate">🌅 {language === "vi" ? "Mọc / Lặn" : "Sunrise/Sunset"}</div>
                     <div className="text-[11px] font-black text-white truncate">{weatherData.current.sunrise} / {weatherData.current.sunset}</div>
                   </div>
                 </div>
               </div>
-
-              {/* CARD 2: AIRVISUAL / IQAIR API */}
-              {airVisualData ? (
-                <div className="relative overflow-hidden rounded-3xl text-white p-5 sm:p-6 shadow-xl border border-white/20 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 transition-all duration-700 flex flex-col justify-between min-h-[300px]">
-                  {/* Decorative Background Glow */}
-                  <div className="absolute -top-16 -right-16 w-60 h-60 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none" />
-
-                  <div className="relative z-10 space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <Badge className="bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-200 border-emerald-400/30 backdrop-blur text-xs font-black px-3 py-1 rounded-full truncate">
-                        💨 Nguồn 2: AirVisual / IQAir (Mỹ)
-                      </Badge>
-                      <Badge className={cn("text-xs font-black px-2.5 py-0.5 rounded-full border shadow-xs shrink-0", airVisualData.aqiColor)}>
-                        AQI {airVisualData.aqi} • {airVisualData.aqiStatus}
-                      </Badge>
-                    </div>
-
-                    <div className="flex items-baseline gap-3 pt-1">
-                      <h1 className="text-5xl sm:text-6xl font-black tracking-tight drop-shadow-md text-white">
-                        {airVisualData.temperature}°
-                        <span className="text-3xl font-black text-indigo-200">C</span>
-                      </h1>
-                      <div className="text-4xl drop-shadow-sm">{airVisualData.icon}</div>
-                    </div>
-
-                    <h3 className="text-lg font-black text-white tracking-wide truncate">
-                      {airVisualData.weatherDesc}
-                    </h3>
-
-                    <p className="text-xs font-extrabold text-indigo-200 flex items-center gap-2 truncate">
-                      <span>Cảm giác như {airVisualData.feelsLike}°C</span>
-                      <span>•</span>
-                      <span>Độ ẩm {airVisualData.humidity}%</span>
-                    </p>
-                  </div>
-
-                  {/* AirVisual Grid of Key Weather Metrics */}
-                  <div className="relative z-10 grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-white/20">
-                    <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2 text-center col-span-2">
-                      <div className="text-[10px] font-black text-indigo-200 truncate">🍃 Chất Lượng Không Khí US AQI</div>
-                      <div className="text-xs sm:text-sm font-black text-emerald-300 truncate">Chỉ số {airVisualData.aqi} • {airVisualData.aqiStatus}</div>
-                    </div>
-
-                    <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2 text-center">
-                      <div className="text-[10px] font-black text-indigo-200 truncate">💧 Độ Ẩm</div>
-                      <div className="text-sm font-black text-white">{airVisualData.humidity}%</div>
-                    </div>
-
-                    <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2 text-center">
-                      <div className="text-[10px] font-black text-indigo-200 truncate">💨 Tốc Độ Gió</div>
-                      <div className="text-sm font-black text-white">{airVisualData.windSpeed} km/h</div>
-                    </div>
-
-                    <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2 text-center">
-                      <div className="text-[10px] font-black text-indigo-200 truncate">⏲️ Áp Suất</div>
-                      <div className="text-sm font-black text-white">{airVisualData.pressure} hPa</div>
-                    </div>
-
-                    <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2 text-center">
-                      <div className="text-[10px] font-black text-indigo-200 truncate">⏰ Cập Nhật</div>
-                      <div className="text-xs font-bold text-white truncate">{airVisualData.updatedAt}</div>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-
-              {/* CARD 3: JMA JAPAN METEOROLOGICAL AGENCY */}
-              {jmaData ? (
-                <div className="relative overflow-hidden rounded-3xl text-white p-5 sm:p-6 shadow-xl border border-white/20 bg-gradient-to-br from-rose-950 via-slate-900 to-amber-950 transition-all duration-700 flex flex-col justify-between min-h-[300px]">
-                  {/* Background Decorative Glow */}
-                  <div className="absolute -top-16 -right-16 w-60 h-60 rounded-full bg-rose-500/20 blur-3xl pointer-events-none" />
-
-                  <div className="relative z-10 space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <Badge className="bg-rose-500/25 hover:bg-rose-500/35 text-rose-200 border-rose-400/30 backdrop-blur text-xs font-black px-3 py-1 rounded-full truncate">
-                        🇯🇵 Nguồn 3: JMA (Nhật Bản - Himawari)
-                      </Badge>
-                      <span className="text-[11px] font-extrabold text-rose-200">
-                        {jmaData.current.isDay ? "☀️ Ban Ngày" : "🌙 Ban Đêm"}
-                      </span>
-                    </div>
-
-                    <div className="flex items-baseline gap-3 pt-1">
-                      <h1 className="text-5xl sm:text-6xl font-black tracking-tight drop-shadow-md text-white">
-                        {jmaData.current.temperature}°
-                        <span className="text-3xl font-black text-rose-200">C</span>
-                      </h1>
-                      <div className="text-4xl drop-shadow-sm">
-                        {getWmoWeatherInfo(jmaData.current.weatherCode, jmaData.current.isDay).icon}
-                      </div>
-                    </div>
-
-                    <h3 className="text-lg font-black text-white tracking-wide truncate">
-                      {jmaData.current.weatherDesc}
-                    </h3>
-
-                    <p className="text-xs font-extrabold text-rose-200 flex items-center gap-2 truncate">
-                      <span>Cảm giác như {jmaData.current.feelsLike}°C</span>
-                      <span>•</span>
-                      <span>Độ ẩm {jmaData.current.humidity}%</span>
-                    </p>
-                  </div>
-
-                  {/* JMA Grid of Key Weather Metrics */}
-                  <div className="relative z-10 grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-white/20">
-                    <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2 text-center">
-                      <div className="text-[10px] font-black text-rose-200 truncate">💧 Độ Ẩm</div>
-                      <div className="text-sm font-black text-white">{jmaData.current.humidity}%</div>
-                    </div>
-
-                    <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2 text-center">
-                      <div className="text-[10px] font-black text-rose-200 truncate">💨 Tốc Độ Gió</div>
-                      <div className="text-sm font-black text-white">{jmaData.current.windSpeed} km/h</div>
-                    </div>
-
-                    <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2 text-center">
-                      <div className="text-[10px] font-black text-rose-200 truncate">☀️ Chỉ Số UV</div>
-                      <div className="text-sm font-black text-white">
-                        {jmaData.current.uvIndex}
-                      </div>
-                    </div>
-
-                    <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2 text-center">
-                      <div className="text-[10px] font-black text-rose-200 truncate">⏲️ Áp Suất</div>
-                      <div className="text-sm font-black text-white">{jmaData.current.pressure} hPa</div>
-                    </div>
-
-                    <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2 text-center">
-                      <div className="text-[10px] font-black text-rose-200 truncate">🌧️ Lượng Mưa</div>
-                      <div className="text-sm font-black text-white">{jmaData.current.rain} mm</div>
-                    </div>
-
-                    <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2 text-center">
-                      <div className="text-[10px] font-black text-rose-200 truncate">🌅 Mọc / Lặn</div>
-                      <div className="text-[11px] font-black text-white truncate">{jmaData.current.sunrise} / {jmaData.current.sunset}</div>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
             </div>
           </div>
 
@@ -720,22 +697,11 @@ export function WeatherDashboard() {
             <CardHeader className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <CardTitle className="text-lg sm:text-base font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
                 <Sparkles className="h-5.5 w-5.5 text-sky-500" />
-                Thời Tiết Trong Ngày (12 Giờ Tới)
+                {language === "vi" ? "Thời Tiết Trong Ngày (12 Giờ Tới)" : "Hourly Forecast (Next 12 Hours)"}
               </CardTitle>
 
-              {/* Source Switcher Tabs: Open-Meteo vs AirVisual vs JMA */}
+              {/* Source Switcher Tabs: AirVisual vs Open-Meteo */}
               <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shrink-0 self-stretch sm:self-auto overflow-x-auto">
-                <button
-                  onClick={() => setHourlySource("openmeteo")}
-                  className={cn(
-                    "flex-1 sm:flex-initial px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap",
-                    hourlySource === "openmeteo"
-                      ? "bg-sky-500 text-white shadow-xs"
-                      : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
-                  )}
-                >
-                  🌐 Open-Meteo (Châu Âu)
-                </button>
                 <button
                   onClick={() => setHourlySource("airvisual")}
                   className={cn(
@@ -745,18 +711,18 @@ export function WeatherDashboard() {
                       : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
                   )}
                 >
-                  💨 AirVisual (Mỹ)
+                  💨 AirVisual ({language === "vi" ? "Mỹ" : "US"})
                 </button>
                 <button
-                  onClick={() => setHourlySource("jma")}
+                  onClick={() => setHourlySource("openmeteo")}
                   className={cn(
                     "flex-1 sm:flex-initial px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap",
-                    hourlySource === "jma"
-                      ? "bg-rose-600 text-white shadow-xs"
+                    hourlySource === "openmeteo"
+                      ? "bg-sky-500 text-white shadow-xs"
                       : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
                   )}
                 >
-                  🇯🇵 JMA (Nhật Bản)
+                  🌐 Open-Meteo ({language === "vi" ? "Châu Âu" : "Europe"})
                 </button>
               </div>
             </CardHeader>
@@ -772,23 +738,23 @@ export function WeatherDashboard() {
                     <div className="w-32 flex flex-col justify-center min-w-0 shrink-0">
                       <div className="flex items-center gap-1.5">
                         <span className="text-base font-black text-slate-900 dark:text-slate-100">
-                          {idx === 0 ? "Bây giờ" : item.time}
+                          {idx === 0 ? (language === "vi" ? "Bây giờ" : "Now") : item.time}
                         </span>
                         {idx === 0 && (
                           <Badge className="bg-sky-500 text-white text-[9px] px-1.5 py-0.5 font-bold rounded-md">
-                            Hiện tại
+                            {language === "vi" ? "Hiện tại" : "Current"}
                           </Badge>
                         )}
                       </div>
                       <span className="text-xs font-bold text-slate-500 dark:text-slate-400 truncate leading-tight mt-0.5">
-                        {item.weatherDesc}
+                        {getWmoWeatherInfo(item.weatherCode, item.isDay, language).desc}
                       </span>
                     </div>
 
                     {/* Icon & Rain Probability */}
                     <div className="flex items-center gap-2 min-w-0 flex-1 justify-center">
                       <span className="text-2xl shrink-0">
-                        {getWmoWeatherInfo(item.weatherCode, item.isDay).icon}
+                        {getWmoWeatherInfo(item.weatherCode, item.isDay, language).icon}
                       </span>
                       {item.pop > 0 ? (
                         <span className="text-xs font-black text-sky-700 dark:text-sky-300 bg-sky-500/15 px-2 py-0.5 rounded-lg shrink-0">
@@ -812,20 +778,20 @@ export function WeatherDashboard() {
                 {hourlyList.map((item, idx) => (
                   <div
                     key={idx}
-                    title={`${item.time}: ${item.weatherDesc} • ${item.temperature}°C`}
+                    title={`${item.time}: ${getWmoWeatherInfo(item.weatherCode, item.isDay, language).desc} • ${item.temperature}°C`}
                     className="flex flex-col items-center justify-between p-2 sm:p-2.5 rounded-2xl bg-slate-50/80 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-800 w-full min-w-0 space-y-1 hover:border-sky-300 dark:hover:border-sky-700 transition-all text-center cursor-help"
                   >
                     <span className="text-[11px] sm:text-xs font-bold text-slate-600 dark:text-slate-300 truncate w-full">
-                      {idx === 0 ? "Bây giờ" : item.time}
+                      {idx === 0 ? (language === "vi" ? "Bây giờ" : "Now") : item.time}
                     </span>
 
                     <span className="text-xl sm:text-2xl py-0.5">
-                      {getWmoWeatherInfo(item.weatherCode, item.isDay).icon}
+                      {getWmoWeatherInfo(item.weatherCode, item.isDay, language).icon}
                     </span>
 
                     {/* Weather Description Text Label */}
                     <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 truncate w-full leading-tight">
-                      {item.weatherDesc}
+                      {getWmoWeatherInfo(item.weatherCode, item.isDay, language).desc}
                     </span>
 
                     <span className="text-sm sm:text-base font-black text-slate-800 dark:text-slate-100 truncate w-full">
@@ -852,22 +818,11 @@ export function WeatherDashboard() {
               <CardHeader className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <CardTitle className="text-lg sm:text-base font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
                   <Sun className="h-5.5 w-5.5 text-amber-500" />
-                  Dự Báo Thời Tiết 1 Tuần Tới (7 Ngày)
+                  {language === "vi" ? "Dự Báo Thời Tiết 1 Tuần Tới (7 Ngày)" : "7-Day Extended Forecast"}
                 </CardTitle>
 
-                {/* Source Switcher Tabs for 7-Day: Open-Meteo vs AirVisual vs JMA */}
+                {/* Source Switcher Tabs for 7-Day: AirVisual vs Open-Meteo */}
                 <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shrink-0 self-stretch sm:self-auto overflow-x-auto">
-                  <button
-                    onClick={() => setDailySource("openmeteo")}
-                    className={cn(
-                      "flex-1 sm:flex-initial px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap",
-                      dailySource === "openmeteo"
-                        ? "bg-sky-500 text-white shadow-xs"
-                        : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
-                    )}
-                  >
-                    🌐 Open-Meteo
-                  </button>
                   <button
                     onClick={() => setDailySource("airvisual")}
                     className={cn(
@@ -880,15 +835,15 @@ export function WeatherDashboard() {
                     💨 AirVisual
                   </button>
                   <button
-                    onClick={() => setDailySource("jma")}
+                    onClick={() => setDailySource("openmeteo")}
                     className={cn(
                       "flex-1 sm:flex-initial px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap",
-                      dailySource === "jma"
-                        ? "bg-rose-600 text-white shadow-xs"
+                      dailySource === "openmeteo"
+                        ? "bg-sky-500 text-white shadow-xs"
                         : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
                     )}
                   >
-                    🇯🇵 JMA Nhật Bản
+                    🌐 Open-Meteo
                   </button>
                 </div>
               </CardHeader>
@@ -903,26 +858,26 @@ export function WeatherDashboard() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="text-base font-black text-slate-900 dark:text-slate-100">
-                            {day.dayName}
+                            {idx === 0 ? (language === "vi" ? "Hôm nay" : "Today") : day.dayName}
                           </span>
                           {idx === 0 && (
                             <Badge className="bg-sky-500 text-white text-[10px] px-1.5 py-0.5 font-bold rounded-md">
-                              Hôm nay
+                              {language === "vi" ? "Hôm nay" : "Today"}
                             </Badge>
                           )}
                         </div>
                         <span className="text-xs font-extrabold text-sky-600 dark:text-sky-400">
-                          {day.popMax > 0 ? `💧 Mưa ${day.popMax}%` : "Trời khô ráo"}
+                          {day.popMax > 0 ? (language === "vi" ? `💧 Mưa ${day.popMax}%` : `💧 Rain ${day.popMax}%`) : (language === "vi" ? "Trời khô ráo" : "Dry")}
                         </span>
                       </div>
 
                       <div className="flex items-center justify-between gap-3 pt-1">
                         <div className="flex items-center gap-2.5 min-w-0">
                           <span className="text-3xl shrink-0">
-                            {getWmoWeatherInfo(day.weatherCode, true).icon}
+                            {getWmoWeatherInfo(day.weatherCode, true, language).icon}
                           </span>
                           <span className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">
-                            {day.weatherDesc}
+                            {getWmoWeatherInfo(day.weatherCode, true, language).desc}
                           </span>
                         </div>
 
@@ -944,10 +899,10 @@ export function WeatherDashboard() {
                     >
                       {/* Day Name */}
                       <div className="w-28 font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
-                        <span>{day.dayName}</span>
+                        <span>{idx === 0 ? (language === "vi" ? "Hôm nay" : "Today") : day.dayName}</span>
                         {idx === 0 && (
                           <Badge className="bg-sky-500 text-white text-[9px] px-1.5 py-0 rounded-md">
-                            Hôm nay
+                            {language === "vi" ? "Hôm nay" : "Today"}
                           </Badge>
                         )}
                       </div>
@@ -955,10 +910,10 @@ export function WeatherDashboard() {
                       {/* Weather Icon & Desc */}
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <span className="text-xl shrink-0">
-                          {getWmoWeatherInfo(day.weatherCode, true).icon}
+                          {getWmoWeatherInfo(day.weatherCode, true, language).icon}
                         </span>
                         <span className="truncate text-slate-600 dark:text-slate-300 font-medium">
-                          {day.weatherDesc}
+                          {getWmoWeatherInfo(day.weatherCode, true, language).desc}
                         </span>
                       </div>
 
@@ -995,21 +950,25 @@ export function WeatherDashboard() {
               <CardHeader className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800">
                 <CardTitle className="text-lg sm:text-base font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
                   <Shirt className="h-5.5 w-5.5 text-indigo-500" />
-                  Lời Khuyên Bỏ Túi
+                  {language === "vi" ? "Lời Khuyên Bỏ Túi (Từ AirVisual)" : "Pocket Tips (By AirVisual)"}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 sm:p-5 space-y-4 flex-1 flex flex-col justify-between">
                 <div className="space-y-3.5">
-                  {/* UV Warning Card */}
-                  <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 space-y-1.5">
-                    <div className="flex items-center gap-2 font-black text-sm text-amber-900 dark:text-amber-300">
-                      <Sun className="h-4.5 w-4.5 text-amber-500" />
-                      <span>Chỉ số UV: {weatherData.current.uvIndex} ({getUvLevelInfo(weatherData.current.uvIndex).text})</span>
+                  {/* Air Quality & UV Warning Card */}
+                  <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 space-y-1.5">
+                    <div className="flex items-center gap-2 font-black text-sm text-emerald-900 dark:text-emerald-300">
+                      <Wind className="h-4.5 w-4.5 text-emerald-500" />
+                      <span>
+                        {airVisualData
+                          ? (language === "vi" ? `AirVisual AQI: ${airVisualData.aqi} (${getAqiLevelInfo(airVisualData.aqi, language).text})` : `AirVisual AQI: ${airVisualData.aqi} (${getAqiLevelInfo(airVisualData.aqi, language).text})`)
+                          : (language === "vi" ? `Chỉ số UV: ${weatherData.current.uvIndex} (${getUvLevelInfo(weatherData.current.uvIndex).text})` : `UV Index: ${weatherData.current.uvIndex} (${getUvLevelInfo(weatherData.current.uvIndex).text})`)}
+                      </span>
                     </div>
                     <p className="text-slate-700 dark:text-slate-200 text-xs font-semibold leading-relaxed">
-                      {weatherData.current.uvIndex >= 6
-                        ? "Cảnh báo chỉ số UV ở mức cao! Nên dùng kem chống nắng, mặc áo dài tay và mang kính râm khi ra ngoài vào giữa trưa."
-                        : "Chỉ số UV ở mức an toàn, thích hợp cho các hoạt động ngoài trời."}
+                      {airVisualData && airVisualData.aqi > 100
+                        ? (language === "vi" ? "Cảnh báo bụi mịn không khí kém! Nên đeo khẩu trang N95 khi di chuyển ngoài trời." : "Air pollution warning! Wear an N95 mask outdoors.")
+                        : (language === "vi" ? "Chất lượng không khí và chỉ số môi trường ở mức tốt, thích hợp cho mọi hoạt động ngoài trời." : "Air quality is good, suitable for all outdoor activities.")}
                     </p>
                   </div>
 
@@ -1017,14 +976,14 @@ export function WeatherDashboard() {
                   <div className="p-4 rounded-2xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-900/50 space-y-1.5">
                     <div className="flex items-center gap-2 font-black text-sm text-sky-900 dark:text-sky-300">
                       <Shirt className="h-4.5 w-4.5 text-sky-500" />
-                      <span>Gợi ý trang phục hôm nay</span>
+                      <span>{language === "vi" ? "Gợi ý trang phục hôm nay" : "Today's Outfit Suggestion"}</span>
                     </div>
                     <p className="text-slate-700 dark:text-slate-200 text-xs font-semibold leading-relaxed">
-                      {weatherData.current.temperature >= 28
-                        ? "Thời tiết khá oi nóng! Nên ưu tiên quần áo chất liệu cotton mỏng nhẹ, thoáng khí và uống nhiều nước."
-                        : weatherData.current.temperature <= 20
-                        ? "Thời tiết se lạnh! Bạn nên mặc áo khoác giữ ấm nhẹ khi ra đường."
-                        : "Thời tiết vô cùng dễ chịu! Thích hợp chọn các trang phục thoải mái."}
+                      {(airVisualData?.temperature ?? weatherData.current.temperature) >= 28
+                        ? (language === "vi" ? "Thời tiết khá oi nóng! Nên ưu tiên quần áo chất liệu cotton mỏng nhẹ, thoáng khí và uống nhiều nước." : "Hot weather! Choose thin, breathable cotton clothing and stay hydrated.")
+                        : (airVisualData?.temperature ?? weatherData.current.temperature) <= 20
+                        ? (language === "vi" ? "Thời tiết se lạnh! Bạn nên mặc áo khoác giữ ấm nhẹ khi ra đường." : "Chilly weather! Wear a light warm jacket when going outside.")
+                        : (language === "vi" ? "Thời tiết vô cùng dễ chịu! Thích hợp chọn các trang phục thoải mái." : "Very pleasant weather! Feel free to wear comfortable casual clothes.")}
                     </p>
                   </div>
 
@@ -1032,18 +991,18 @@ export function WeatherDashboard() {
                   <div className="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/50 space-y-1.5">
                     <div className="flex items-center gap-2 font-black text-sm text-indigo-900 dark:text-indigo-300">
                       <CloudRain className="h-4.5 w-4.5 text-indigo-500" />
-                      <span>Gió & Khả năng mưa</span>
+                      <span>{language === "vi" ? "Gió & Khả năng mưa" : "Wind & Rain Probability"}</span>
                     </div>
                     <p className="text-slate-700 dark:text-slate-200 text-xs font-semibold leading-relaxed">
                       {weatherData.current.rain > 0 || weatherData.hourly[0]?.pop > 40
-                        ? "Khả năng có mưa cao! Nhớ mang theo ô/dù hoặc áo mưa khi đi ra ngoài."
-                        : "Tốc độ gió " + weatherData.current.windSpeed + " km/h, không lo có mưa rào bất chợt."}
+                        ? (language === "vi" ? "Khả năng có mưa cao! Nhớ mang theo ô/dù hoặc áo mưa khi đi ra ngoài." : "High chance of rain! Bring an umbrella or raincoat with you.")
+                        : (language === "vi" ? "Tốc độ gió " + (airVisualData?.windSpeed ?? weatherData.current.windSpeed) + " km/h, không lo có mưa rào bất chợt." : `Wind speed ${airVisualData?.windSpeed ?? weatherData.current.windSpeed} km/h, low chance of sudden rain.`)}
                     </p>
                   </div>
                 </div>
 
                 <div className="p-3 rounded-2xl bg-slate-100 dark:bg-slate-800/80 text-xs font-bold text-slate-500 text-center">
-                  Dữ liệu đồng bộ trực tiếp từ Trạm Khí Tượng Open-Meteo 🌍
+                  {language === "vi" ? "Dữ liệu đồng bộ trực tiếp từ Trạm Khí Tượng AirVisual / IQAir 💨" : "Data synced directly from AirVisual / IQAir Station 💨"}
                 </div>
               </CardContent>
             </Card>
@@ -1061,10 +1020,10 @@ export function WeatherDashboard() {
           <div className="p-5 sm:p-6 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0 flex items-center justify-between gap-3">
             <div>
               <DialogTitle className="text-xl sm:text-2xl font-black flex items-center gap-2 text-slate-900 dark:text-slate-100">
-                <FileText className="h-6 w-6 text-amber-500" /> Tóm Tắt Thời Tiết Nhanh
+                <FileText className="h-6 w-6 text-amber-500" /> {language === "vi" ? "Tóm Tắt Thời Tiết Nhanh" : "Quick Weather Summary"}
               </DialogTitle>
               <DialogDescription className="text-xs sm:text-sm font-bold text-slate-500 dark:text-slate-400 mt-1">
-                Tổng hợp thông tin thời tiết & lời khuyên dành cho bạn.
+                {language === "vi" ? "Tổng hợp thông tin thời tiết & lời khuyên dành cho bạn." : "Weather summary & tips tailored for you."}
               </DialogDescription>
             </div>
 
@@ -1073,10 +1032,10 @@ export function WeatherDashboard() {
                 variant="outline"
                 size="icon"
                 className="h-11 w-11 sm:h-12 sm:w-12 rounded-full border-2 border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300 dark:hover:bg-rose-950/60 dark:hover:text-rose-400 dark:hover:border-rose-800 text-slate-800 dark:text-slate-100 shadow-md shrink-0 cursor-pointer transition-all hover:scale-110"
-                title="Đóng bảng tóm tắt"
+                title={language === "vi" ? "Đóng bảng tóm tắt" : "Close summary panel"}
               >
                 <X className="h-6 w-6 sm:h-7 sm:w-7 font-black" />
-                <span className="sr-only">Đóng</span>
+                <span className="sr-only">{language === "vi" ? "Đóng" : "Close"}</span>
               </Button>
             </DialogClose>
           </div>
@@ -1087,7 +1046,7 @@ export function WeatherDashboard() {
               {/* Location Card */}
               <div className="p-4 rounded-2xl bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 space-y-1">
                 <div className="text-sm font-black text-sky-700 dark:text-sky-300 flex items-center gap-1.5">
-                  <MapPin className="h-4.5 w-4.5" /> Vị trí tra cứu:
+                  <MapPin className="h-4.5 w-4.5" /> {language === "vi" ? "Vị trí tra cứu:" : "Search location:"}
                 </div>
                 <p className="text-xl font-black text-slate-900 dark:text-slate-100 leading-snug">
                   {summary.location}
@@ -1097,21 +1056,21 @@ export function WeatherDashboard() {
               {/* Current Weather Card */}
               <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-2">
                 <div className="text-sm font-black text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                  <Sparkles className="h-4.5 w-4.5 text-amber-500" /> Thời tiết hiện tại:
+                  <Sparkles className="h-4.5 w-4.5 text-amber-500" /> {language === "vi" ? "Thời tiết hiện tại:" : "Current weather:"}
                 </div>
                 <div className="text-2xl font-black text-slate-900 dark:text-slate-100 flex items-center gap-2.5">
                   <span>{summary.weatherDesc}</span>
                   <span className="text-sky-600 dark:text-sky-400 text-3xl font-black">{summary.currentTemp}°C</span>
                 </div>
                 <p className="text-base font-bold text-slate-700 dark:text-slate-200">
-                  Cảm giác như <b className="text-slate-900 dark:text-white font-black">{summary.feelsLike}°C</b> • Độ ẩm <b className="text-slate-900 dark:text-white font-black">{summary.humidity}%</b>
+                  {language === "vi" ? `Cảm giác như ` : `Feels like `}<b className="text-slate-900 dark:text-white font-black">{summary.feelsLike}°C</b> • {language === "vi" ? `Độ ẩm ` : `Humidity `}<b className="text-slate-900 dark:text-white font-black">{summary.humidity}%</b>
                 </p>
               </div>
 
               {/* Next 2 Hours Card */}
               <div className="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 space-y-1.5">
                 <div className="text-sm font-black text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5">
-                  <CloudRain className="h-4.5 w-4.5 text-indigo-500" /> Biến động 2 giờ tới:
+                  <CloudRain className="h-4.5 w-4.5 text-indigo-500" /> {language === "vi" ? "Biến động 2 giờ tới:" : "Next 2 hours forecast:"}
                 </div>
                 <p className="text-base font-extrabold text-slate-900 dark:text-slate-100 leading-relaxed">
                   {summary.next2HoursText}
@@ -1121,20 +1080,20 @@ export function WeatherDashboard() {
               {/* Detailed Metrics Explanation Card */}
               <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 space-y-2.5">
                 <div className="text-sm font-black text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5 border-b border-emerald-200 dark:border-emerald-800/80 pb-2">
-                  <Gauge className="h-4.5 w-4.5 text-emerald-600" /> Giải thích các chỉ số khí tượng (Dễ hiểu):
+                  <Gauge className="h-4.5 w-4.5 text-emerald-600" /> {language === "vi" ? "Giải thích các chỉ số khí tượng (Dễ hiểu):" : "Meteorological indices explanation:"}
                 </div>
 
                 <div className="space-y-2 text-sm font-bold text-slate-800 dark:text-slate-200">
                   <p className="leading-relaxed">
-                    <span className="text-amber-700 dark:text-amber-300 font-black">☀️ Chỉ số UV:</span>{" "}
+                    <span className="text-amber-700 dark:text-amber-300 font-black">☀️ {language === "vi" ? "Chỉ số UV:" : "UV Index:"}</span>{" "}
                     {summary.uvExplanation}
                   </p>
                   <p className="leading-relaxed">
-                    <span className="text-sky-700 dark:text-sky-300 font-black">🎈 Áp suất:</span>{" "}
+                    <span className="text-sky-700 dark:text-sky-300 font-black">🎈 {language === "vi" ? "Áp suất:" : "Pressure:"}</span>{" "}
                     {summary.pressureExplanation}
                   </p>
                   <p className="leading-relaxed">
-                    <span className="text-indigo-700 dark:text-indigo-300 font-black">💧 Độ ẩm:</span>{" "}
+                    <span className="text-indigo-700 dark:text-indigo-300 font-black">💧 {language === "vi" ? "Độ ẩm:" : "Humidity:"}</span>{" "}
                     {summary.humidityExplanation}
                   </p>
                 </div>
@@ -1143,7 +1102,7 @@ export function WeatherDashboard() {
               {/* Advice Card */}
               <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 space-y-1.5">
                 <div className="text-sm font-black text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
-                  <Shirt className="h-4.5 w-4.5 text-amber-500" /> Lời khuyên bỏ túi:
+                  <Shirt className="h-4.5 w-4.5 text-amber-500" /> {language === "vi" ? "Lời khuyên bỏ túi:" : "Pocket Tips:"}
                 </div>
                 <p className="text-base font-extrabold text-slate-900 dark:text-slate-100 leading-relaxed">
                   {summary.adviceText}

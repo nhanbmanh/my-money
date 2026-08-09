@@ -20,6 +20,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
+import { useLanguage } from "@/components/language-provider";
 import {
   generateExcelTemplate,
   parseUploadedExcelFile,
@@ -45,6 +46,7 @@ export function ImportExcelModal({
   secondaryCategories: initialSecondaryCategories = [],
   onImportSuccess,
 }: ImportExcelModalProps) {
+  const { t, language } = useLanguage();
   const [internalOpen, setInternalOpen] = useState(false);
   const isOpen = externalOpen !== undefined ? externalOpen : internalOpen;
 
@@ -177,16 +179,20 @@ export function ImportExcelModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={setOpen}>
-      <DialogContent className="sm:max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl">
+      <DialogContent
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+        className="sm:max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl"
+      >
         <DialogHeader>
           <DialogTitle className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <div className="w-8.5 h-8.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
               <FileSpreadsheet className="h-5 w-5" />
             </div>
-            Import Giao Dịch Từ File Excel
+            {t("import.title")}
           </DialogTitle>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Tải file mẫu Excel (.xlsx), điền dữ liệu giao dịch và tải lên hệ thống để thêm tự động.
+            {t("import.subtitle")}
           </p>
         </DialogHeader>
 
@@ -196,20 +202,20 @@ export function ImportExcelModal({
             <div className="space-y-0.5 min-w-0">
               <h5 className="text-xs font-bold text-sky-900 dark:text-sky-300 flex items-center gap-1.5">
                 <Sparkles className="h-3.5 w-3.5 text-sky-500" />
-                Bước 1: Tải File Mẫu (.xlsx)
+                {t("import.step1Title")}
               </h5>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                File chứa sẵn danh sách Nguồn tiền & Nhãn chính của bạn để dễ mapping.
+                {t("import.step1Desc")}
               </p>
             </div>
             <Button
               variant="outline"
               size="sm"
               onClick={handleDownloadTemplate}
-              className="h-8.5 text-xs font-bold text-sky-700 border-sky-200 bg-white hover:bg-sky-100 dark:bg-slate-900 dark:border-slate-700 dark:text-sky-400 rounded-xl shrink-0 gap-1.5 shadow-2xs"
+              className="h-8.5 text-xs font-bold text-sky-700 border-sky-200 bg-white hover:bg-sky-100 dark:bg-slate-900 dark:border-slate-700 dark:text-sky-400 rounded-xl shrink-0 gap-1.5 shadow-2xs cursor-pointer"
             >
               <Download className="h-3.5 w-3.5" />
-              Tải File Mẫu
+              {t("import.downloadTemplate")}
             </Button>
           </div>
 
@@ -217,7 +223,7 @@ export function ImportExcelModal({
           {!result && (
             <div className="space-y-2.5">
               <label className="text-xs font-bold text-slate-700 dark:text-slate-200 block">
-                Bước 2: Chọn File Excel Đã Nhập Dữ Liệu
+                {t("import.step2Title")}
               </label>
 
               <div className="relative border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-sky-400 dark:hover:border-sky-500 rounded-2xl p-5 text-center transition-all bg-slate-50/40 dark:bg-slate-900/40">
@@ -239,10 +245,10 @@ export function ImportExcelModal({
                   ) : (
                     <>
                       <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                        Kéo thả hoặc bấm để chọn file .xlsx
+                        {t("import.dragDropPrompt")}
                       </p>
                       <p className="text-[11px] text-slate-400">
-                        Hỗ trợ định dạng Excel chuẩn .xlsx, .xls
+                        {t("import.supportedFormat")}
                       </p>
                     </>
                   )}
@@ -266,20 +272,20 @@ export function ImportExcelModal({
                   <CheckCircle2 className="h-5 w-5 text-emerald-500" />
                   <div>
                     <h5 className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                      Kết Quả Import Dữ Liệu
+                      {language === "vi" ? "Kết Quả Import Dữ Liệu" : "Import Result Breakdown"}
                     </h5>
                     <p className="text-[11px] text-slate-500">
-                      Đã xử lý {result.totalRows} dòng dữ liệu
+                      {language === "vi" ? `Đã xử lý ${result.totalRows} dòng dữ liệu` : `Processed ${result.totalRows} rows`}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20">
-                    ✅ Thành công: {result.successCount}
+                    ✅ {language === "vi" ? `Thành công: ${result.successCount}` : `Success: ${result.successCount}`}
                   </span>
                   {result.failedCount > 0 && (
                     <span className="text-xs font-extrabold text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-lg border border-rose-500/20">
-                      ⚠️ Bỏ qua: {result.failedCount}
+                      ⚠️ {language === "vi" ? `Bỏ qua: ${result.failedCount}` : `Skipped: ${result.failedCount}`}
                     </span>
                   )}
                 </div>
@@ -289,7 +295,7 @@ export function ImportExcelModal({
                 <div className="space-y-1.5">
                   <h6 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1">
                     <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-                    Danh sách các dòng bị bỏ qua (Do không mapping được):
+                    {language === "vi" ? "Danh sách các dòng bị bỏ qua (Do không mapping được):" : "List of skipped rows (Unmapped categories):"}
                   </h6>
                   <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
                     {result.failedDetails.map((item, idx) => (
@@ -298,7 +304,7 @@ export function ImportExcelModal({
                         className="text-[11px] p-2 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 flex items-start justify-between gap-2"
                       >
                         <span className="font-bold text-amber-800 dark:text-amber-300 shrink-0">
-                          Dòng {item.rowNumber}:
+                          {language === "vi" ? `Dòng ${item.rowNumber}:` : `Row ${item.rowNumber}:`}
                         </span>
                         <span className="font-semibold text-slate-700 dark:text-slate-300 truncate">
                           "{item.title}"
@@ -316,10 +322,10 @@ export function ImportExcelModal({
                 variant="ghost"
                 size="sm"
                 onClick={handleReset}
-                className="w-full text-xs font-bold text-slate-500 hover:text-slate-800 gap-1.5 pt-2"
+                className="w-full text-xs font-bold text-slate-500 hover:text-slate-800 gap-1.5 pt-2 cursor-pointer"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
-                Import file Excel khác
+                {language === "vi" ? "Import file Excel khác" : "Import another Excel file"}
               </Button>
             </div>
           )}
@@ -331,9 +337,9 @@ export function ImportExcelModal({
             variant="outline"
             size="sm"
             onClick={() => setOpen(false)}
-            className="text-xs rounded-xl"
+            className="text-xs rounded-xl cursor-pointer"
           >
-            Đóng
+            {t("common.close")}
           </Button>
 
           {!result && (
@@ -342,17 +348,17 @@ export function ImportExcelModal({
               size="sm"
               disabled={!file || loading}
               onClick={handleUploadAndImport}
-              className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl gap-1.5 min-w-32"
+              className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl gap-1.5 min-w-32 cursor-pointer"
             >
               {loading ? (
                 <>
                   <Spinner className="h-3.5 w-3.5" />
-                  Đang xử lý...
+                  {t("common.loading")}
                 </>
               ) : (
                 <>
                   <Upload className="h-3.5 w-3.5" />
-                  Tải Lên & Import
+                  {t("import.btnUpload")}
                 </>
               )}
             </Button>

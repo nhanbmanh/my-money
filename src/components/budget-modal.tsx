@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Target, Save, RotateCcw, Tag, Layers } from "lucide-react";
+import { useLanguage } from "@/components/language-provider";
 
 export type Category = { id: string; categoryName: string; budgetLimit?: number | null };
 
@@ -47,6 +48,7 @@ export function BudgetModal({
   secondaryCategories = [],
   onBudgetsUpdated,
 }: BudgetModalProps) {
+  const { t, language } = useLanguage();
   const [budgets, setBudgets] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<"primary" | "secondary">("primary");
   const [saving, setSaving] = useState(false);
@@ -102,20 +104,20 @@ export function BudgetModal({
 
       if (!res.ok) {
         const err = await res.json();
-        console.error("Failed to save budgets to DB:", err);
+        alert(err.error || "Không thể lưu ngân sách");
       } else {
-        // Also save to localStorage as backup/cache
         saveStoredBudgets(toSave);
+        window.dispatchEvent(
+          new CustomEvent("refresh-budget-alerts", { detail: { triggerToast: false } })
+        );
+        onBudgetsUpdated();
+        onOpenChange(false);
       }
     } catch (e) {
       console.error("Error saving budgets:", e);
+      alert("Đã xảy ra lỗi hệ thống khi lưu ngân sách");
     } finally {
       setSaving(false);
-      window.dispatchEvent(
-        new CustomEvent("refresh-budget-alerts", { detail: { triggerToast: false } })
-      );
-      onBudgetsUpdated();
-      onOpenChange(false);
     }
   };
 
@@ -123,11 +125,11 @@ export function BudgetModal({
     setBudgets({});
   };
 
-  const renderCategoryList = (list: Category[], label: string) => {
+  const renderCategoryList = (list: Category[], defaultLabel: string) => {
     if (list.length === 0) {
       return (
         <p className="text-xs text-slate-400 text-center py-6">
-          Chưa có {label.toLowerCase()} nào.
+          {language === "vi" ? `Chưa có ${defaultLabel.toLowerCase()} nào.` : `No ${defaultLabel.toLowerCase()} available.`}
         </p>
       );
     }
@@ -146,7 +148,7 @@ export function BudgetModal({
               <Input
                 type="text"
                 inputMode="numeric"
-                placeholder="Không giới hạn"
+                placeholder={t("budget.unlimited") || (language === "vi" ? "Không giới hạn" : "No limit")}
                 value={budgets[cat.id] || ""}
                 onChange={(e) => handleInputChange(cat.id, e.target.value)}
                 className="h-8.5 text-xs text-right pr-6 font-bold bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-xl"
@@ -163,37 +165,41 @@ export function BudgetModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl">
+      <DialogContent
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+        className="sm:max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl"
+      >
         <DialogHeader>
           <DialogTitle className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center">
               <Target className="h-4.5 w-4.5" />
             </div>
-            Thiết Lập Ngân Sách Hạn Mức (Tháng)
+            {t("budget.title") || (language === "vi" ? "Thiết Lập Ngân Sách Hạn Mức (Tháng)" : "Monthly Budget Limit Settings")}
           </DialogTitle>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Đặt hạn mức chi tiêu tối đa cho Nhãn chính và Nhãn phụ để nhận cảnh báo tự động khi sắp vượt ngưỡng.
+            {t("budget.description") || (language === "vi" ? "Đặt hạn mức chi tiêu tối đa cho Nhãn chính và Nhãn phụ để nhận cảnh báo tự động khi sắp vượt ngưỡng." : "Set maximum monthly spending thresholds for Primary and Secondary categories to receive automated warning alerts.")}
           </p>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as "primary" | "secondary")} className="w-full my-2">
           <TabsList className="grid grid-cols-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl h-10 w-full mb-3">
-            <TabsTrigger value="primary" className="text-xs font-bold gap-1.5 rounded-lg">
+            <TabsTrigger value="primary" className="text-xs font-bold gap-1.5 rounded-lg cursor-pointer">
               <Layers className="h-3.5 w-3.5 text-sky-500" />
-              Nhãn Chính ({categories.length})
+              {t("budget.primaryCategories") || (language === "vi" ? "Nhãn Chính" : "Primary Categories")} ({categories.length})
             </TabsTrigger>
-            <TabsTrigger value="secondary" className="text-xs font-bold gap-1.5 rounded-lg">
+            <TabsTrigger value="secondary" className="text-xs font-bold gap-1.5 rounded-lg cursor-pointer">
               <Tag className="h-3.5 w-3.5 text-purple-500" />
-              Nhãn Phụ ({secondaryCategories.length})
+              {t("budget.secondaryCategories") || (language === "vi" ? "Nhãn Phụ" : "Secondary Categories")} ({secondaryCategories.length})
             </TabsTrigger>
           </TabsList>
 
           <div className="max-h-[50vh] overflow-y-auto pr-1">
             <TabsContent value="primary" className="mt-0">
-              {renderCategoryList(categories, "Nhãn chính")}
+              {renderCategoryList(categories, language === "vi" ? "Nhãn chính" : "Primary category")}
             </TabsContent>
             <TabsContent value="secondary" className="mt-0">
-              {renderCategoryList(secondaryCategories, "Nhãn phụ")}
+              {renderCategoryList(secondaryCategories, language === "vi" ? "Nhãn phụ" : "Secondary category")}
             </TabsContent>
           </div>
         </Tabs>
@@ -204,10 +210,10 @@ export function BudgetModal({
             variant="ghost"
             size="sm"
             onClick={handleClearAll}
-            className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 gap-1.5"
+            className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 gap-1.5 cursor-pointer"
           >
             <RotateCcw className="h-3.5 w-3.5" />
-            Xóa tất cả
+            {t("budget.clearAll") || (language === "vi" ? "Xóa tất cả" : "Clear All")}
           </Button>
 
           <div className="flex items-center gap-2">
@@ -216,19 +222,21 @@ export function BudgetModal({
               variant="outline"
               size="sm"
               onClick={() => onOpenChange(false)}
-              className="text-xs rounded-xl"
+              className="text-xs rounded-xl cursor-pointer"
             >
-              Hủy
+              {t("common.cancel") || (language === "vi" ? "Hủy" : "Cancel")}
             </Button>
             <Button
               type="button"
               size="sm"
               disabled={saving}
               onClick={handleSave}
-              className="text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white rounded-xl gap-1.5"
+              className="text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white rounded-xl gap-1.5 cursor-pointer"
             >
               <Save className="h-3.5 w-3.5" />
-              {saving ? "Đang lưu..." : "Lưu Ngân Sách"}
+              {saving
+                ? (language === "vi" ? "Đang lưu..." : "Saving...")
+                : (t("budget.saveBudgets") || (language === "vi" ? "Lưu Ngân Sách" : "Save Budgets"))}
             </Button>
           </div>
         </DialogFooter>

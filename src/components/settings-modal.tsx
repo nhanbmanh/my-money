@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { getSecondaryCategoryBadgeClass } from "@/lib/utils";
+import { useLanguage } from "@/components/language-provider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -56,6 +57,7 @@ function SettingTabContent({
   onEdit?: (id: string, name: string, type?: number) => Promise<string | null>;
   showType?: boolean;
 }) {
+  const { t, language } = useLanguage();
   const [newName, setNewName] = useState("");
   const [newType, setNewType] = useState("0");
   const [adding, setAdding] = useState(false);
@@ -123,7 +125,7 @@ function SettingTabContent({
       {/* Add Input Bar */}
       <div className="flex flex-col sm:flex-row gap-2 p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 rounded-2xl">
         <Input
-          placeholder={`Nhập tên ${title.toLowerCase()} mới...`}
+          placeholder={language === "vi" ? `Nhập tên ${title.toLowerCase()} mới...` : `Enter new ${title.toLowerCase()} name...`}
           value={newName}
           onChange={(e) => {
             setNewName(e.target.value);
@@ -136,7 +138,7 @@ function SettingTabContent({
         />
         {showType && (
           <div className="flex items-center gap-1.5 shrink-0">
-            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Loại:</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">{language === "vi" ? "Loại:" : "Type:"}</span>
             <Input
               type="number"
               min="0"
@@ -149,10 +151,10 @@ function SettingTabContent({
         <Button
           onClick={handleAdd}
           disabled={adding || !newName.trim()}
-          className="h-10 text-xs font-bold gap-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl shrink-0"
+          className="h-10 text-xs font-bold gap-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl shrink-0 cursor-pointer"
         >
           {adding ? <Spinner /> : <Plus className="h-4 w-4" />}
-          Tạo mới
+          {t("common.add")}
         </Button>
       </div>
       {addError && <p className="text-xs text-rose-500 font-medium px-1">{addError}</p>}
@@ -164,7 +166,7 @@ function SettingTabContent({
         </div>
       ) : items.length === 0 ? (
         <p className="text-xs text-slate-400 italic text-center py-10">
-          Chưa có danh mục nào
+          {language === "vi" ? "Chưa có danh mục nào" : "No items yet"}
         </p>
       ) : (
         <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
@@ -182,7 +184,7 @@ function SettingTabContent({
                     variant="outline"
                     className={`text-[10px] font-bold border-2 ${getSecondaryCategoryBadgeClass(item.type)}`}
                   >
-                    Loại {item.type ?? 0}
+                    {language === "vi" ? `Loại ${item.type ?? 0}` : `Type ${item.type ?? 0}`}
                   </Badge>
                 )}
                 {item.isSystem && (
@@ -190,7 +192,7 @@ function SettingTabContent({
                     variant="outline"
                     className="text-[10px] text-slate-400 border-slate-200"
                   >
-                    Mặc định
+                    {language === "vi" ? "Mặc định" : "Default"}
                   </Badge>
                 )}
               </div>
@@ -206,7 +208,7 @@ function SettingTabContent({
                       setEditingName(item.name);
                       setEditingType(String(item.type ?? 0));
                     }}
-                    className="h-7 w-7 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg"
+                    className="h-7 w-7 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg cursor-pointer"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
@@ -219,7 +221,7 @@ function SettingTabContent({
                     setDeleteError("");
                     setDeleteTarget(item);
                   }}
-                  className="h-7 w-7 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg disabled:opacity-30"
+                  className="h-7 w-7 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg disabled:opacity-30 cursor-pointer"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
@@ -243,15 +245,15 @@ function SettingTabContent({
           <AlertDialogContent className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl">
             <AlertDialogHeader>
               <AlertDialogTitle className="text-base font-bold text-slate-800 dark:text-slate-100">
-                Cập nhật danh mục "{editingTarget?.name}"
+                {language === "vi" ? `Cập nhật danh mục "${editingTarget?.name}"` : `Edit item "${editingTarget?.name}"`}
               </AlertDialogTitle>
               <AlertDialogDescription className="text-xs text-slate-500 dark:text-slate-400">
-                Thay đổi tên hoặc phân loại nhóm cho danh mục này.
+                {language === "vi" ? "Thay đổi tên hoặc phân loại nhóm cho danh mục này." : "Modify item name or classification group."}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="space-y-3 py-2">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Tên danh mục</label>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">{language === "vi" ? "Tên danh mục" : "Item name"}</label>
                 <Input
                   value={editingName}
                   onChange={(e) => setEditingName(e.target.value)}
@@ -260,7 +262,7 @@ function SettingTabContent({
               </div>
               {showType && (
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Phân loại (Type)</label>
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">{language === "vi" ? "Phân loại (Type)" : "Classification Type"}</label>
                   <Input
                     type="number"
                     min="0"
@@ -276,22 +278,23 @@ function SettingTabContent({
             )}
             <AlertDialogFooter className="pt-2">
               <AlertDialogCancel disabled={editing} className="h-9 text-xs rounded-xl dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 dark:border-slate-700">
-                Hủy
+                {t("common.cancel")}
               </AlertDialogCancel>
-              <AlertDialogAction
+              <Button
+                type="button"
                 onClick={handleEdit}
                 disabled={editing}
-                className="h-9 text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white rounded-xl"
+                className="h-9 text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white rounded-xl cursor-pointer"
               >
                 {editing ? (
                   <>
                     <Spinner className="mr-2" />
-                    Đang lưu...
+                    {t("common.loading")}
                   </>
                 ) : (
-                  "Lưu thay đổi"
+                  t("common.save")
                 )}
-              </AlertDialogAction>
+              </Button>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
@@ -310,10 +313,10 @@ function SettingTabContent({
         <AlertDialogContent className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-base font-bold text-slate-800 dark:text-slate-100">
-              Xóa danh mục "{deleteTarget?.name}"?
+              {language === "vi" ? `Xóa danh mục "${deleteTarget?.name}"?` : `Delete item "${deleteTarget?.name}"?`}
             </AlertDialogTitle>
             <AlertDialogDescription className="text-xs text-slate-500 dark:text-slate-400">
-              Hành động này không thể hoàn tác. Các giao dịch đang gắn danh mục này sẽ bị gỡ liên kết.
+              {language === "vi" ? "Hành động này không thể hoàn tác. Các giao dịch đang gắn danh mục này sẽ bị gỡ liên kết." : "This action cannot be undone. Associated transactions will be unlinked."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {deleteError && (
@@ -321,22 +324,23 @@ function SettingTabContent({
           )}
           <AlertDialogFooter className="pt-2">
             <AlertDialogCancel disabled={deleting} className="h-9 text-xs rounded-xl dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 dark:border-slate-700">
-              Hủy
+              {t("common.cancel")}
             </AlertDialogCancel>
-            <AlertDialogAction
+            <Button
+              type="button"
               onClick={handleDelete}
               disabled={deleting}
-              className="h-9 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-xl"
+              className="h-9 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-xl cursor-pointer"
             >
               {deleting ? (
                 <>
                   <Spinner className="mr-2" />
-                  Đang xóa...
+                  {language === "vi" ? "Đang xóa..." : "Deleting..."}
                 </>
               ) : (
-                "Xóa vĩnh viễn"
+                language === "vi" ? "Xóa vĩnh viễn" : "Delete permanently"
               )}
-            </AlertDialogAction>
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -349,6 +353,7 @@ export function SettingsModal({
   onOpenChange,
   onSuccess,
 }: SettingsModalProps) {
+  const { t, language } = useLanguage();
   const [sources, setSources] = useState<Item[]>([]);
   const [categories, setCategories] = useState<Item[]>([]);
   const [secondaryCategories, setSecondaryCategories] = useState<Item[]>([]);
@@ -462,7 +467,11 @@ export function SettingsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl max-h-[85vh] flex flex-col p-0 overflow-hidden bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xl rounded-3xl">
+      <DialogContent
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+        className="sm:max-w-xl max-h-[85vh] flex flex-col p-0 overflow-hidden bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xl rounded-3xl"
+      >
         {/* Fixed Header */}
         <DialogHeader className="p-5 pb-3.5 border-b border-slate-100 dark:border-slate-800 shrink-0 bg-white dark:bg-slate-900 z-10">
           <div className="flex items-center gap-3">
@@ -471,10 +480,10 @@ export function SettingsModal({
             </div>
             <div>
               <DialogTitle className="text-base font-bold text-slate-800 dark:text-slate-100">
-                Cài Đặt Quản Lý
+                {t("settings.title")}
               </DialogTitle>
               <p className="text-xs text-slate-400 font-medium mt-0.5">
-                Quản lý danh sách Nguồn tiền, Nhãn chính & Nhãn phụ
+                {t("settings.subtitle")}
               </p>
             </div>
           </div>
@@ -484,23 +493,23 @@ export function SettingsModal({
         <div className="flex-1 overflow-y-auto p-5">
           <Tabs defaultValue="source">
             <TabsList className="grid grid-cols-3 mb-4 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-              <TabsTrigger value="source" className="text-xs font-bold gap-1.5 rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900">
+              <TabsTrigger value="source" className="text-xs font-bold gap-1.5 rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 cursor-pointer">
                 <Wallet className="h-3.5 w-3.5" />
-                Nguồn tiền
+                {t("settings.tabSources")}
               </TabsTrigger>
-              <TabsTrigger value="category" className="text-xs font-bold gap-1.5 rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900">
+              <TabsTrigger value="category" className="text-xs font-bold gap-1.5 rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 cursor-pointer">
                 <FolderKanban className="h-3.5 w-3.5" />
-                Nhãn chính
+                {t("settings.tabPrimary")}
               </TabsTrigger>
-              <TabsTrigger value="secondary" className="text-xs font-bold gap-1.5 rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900">
+              <TabsTrigger value="secondary" className="text-xs font-bold gap-1.5 rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 cursor-pointer">
                 <Tags className="h-3.5 w-3.5" />
-                Nhãn phụ
+                {t("settings.tabSecondary")}
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="source" className="mt-0">
               <SettingTabContent
-                title="Nguồn tiền"
+                title={t("settings.tabSources")}
                 items={sources}
                 loading={loading}
                 onAdd={makeAdder("/api/source", "sourceName", fetchAll)}
@@ -511,7 +520,7 @@ export function SettingsModal({
 
             <TabsContent value="category" className="mt-0">
               <SettingTabContent
-                title="Nhãn chính"
+                title={t("settings.tabPrimary")}
                 items={categories}
                 loading={loading}
                 onAdd={makeAdder("/api/category", "categoryName", fetchAll)}
@@ -522,7 +531,7 @@ export function SettingsModal({
 
             <TabsContent value="secondary" className="mt-0">
               <SettingTabContent
-                title="Nhãn phụ"
+                title={t("settings.tabSecondary")}
                 items={secondaryCategories}
                 loading={loading}
                 onAdd={makeAdder(
@@ -547,10 +556,10 @@ export function SettingsModal({
           <Button
             type="button"
             variant="outline"
-            className="h-9 px-6 text-xs font-bold rounded-xl border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+            className="h-9 px-6 text-xs font-bold rounded-xl border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
             onClick={() => onOpenChange(false)}
           >
-            Đóng
+            {t("common.close")}
           </Button>
         </div>
       </DialogContent>

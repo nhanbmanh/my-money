@@ -26,8 +26,13 @@ import {
 } from "@/components/ui/popover";
 import { cn, getSecondaryCategoryBadgeClass } from "@/lib/utils";
 import { checkIsIncomplete, getMissingFields } from "@/lib/incomplete-checker";
+import { useLanguage } from "@/components/language-provider";
 
-export type Category = { id: string; categoryName: string; type?: number | null };
+export type Category = {
+  id: string;
+  categoryName: string;
+  type?: number | null;
+};
 export type Source = { id: string; sourceName: string };
 
 export type CashFlowNewsfeedItem = {
@@ -79,6 +84,7 @@ export function CashFlowNewsfeed({
   handleDeleteConfirm,
   onRefreshNeeded,
 }: CashFlowNewsfeedProps) {
+  const { t, language } = useLanguage();
   const [items, setItems] = useState<CashFlowNewsfeedItem[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -182,9 +188,9 @@ export function CashFlowNewsfeed({
     const d = new Date(datetimeStr);
     let dayPrefix = "";
     if (isToday(d)) {
-      dayPrefix = "Hôm nay, ";
+      dayPrefix = language === "vi" ? "Hôm nay, " : "Today, ";
     } else if (isYesterday(d)) {
-      dayPrefix = "Hôm qua, ";
+      dayPrefix = language === "vi" ? "Hôm qua, " : "Yesterday, ";
     }
     return `${dayPrefix}${format(d, "HH:mm - dd/MM/yyyy")}`;
   };
@@ -196,7 +202,8 @@ export function CashFlowNewsfeed({
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
           <Sparkles className="h-4 w-4 text-sky-500" />
           <span>
-            Bản tin giao dịch (<strong>{items.length}</strong> / <strong>{total}</strong>)
+            {t("financial.newsfeedHeader")} (<strong>{items.length}</strong> /{" "}
+            <strong>{total}</strong>)
           </span>
         </div>
 
@@ -209,7 +216,7 @@ export function CashFlowNewsfeed({
             onClick={() => handleDeleteConfirm(selectedIds)}
           >
             <Trash2 className="h-3.5 w-3.5" />
-            Xóa {selectedIds.length} đã chọn
+            {t("financial.btnDeleteSelected", { count: selectedIds.length })}
           </Button>
         )}
       </div>
@@ -222,11 +229,11 @@ export function CashFlowNewsfeed({
         {loading && page === 1 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <Spinner className="h-8 w-8 text-sky-500" />
-            <p className="text-xs text-slate-400">Đang tải bản tin giao dịch...</p>
+            <p className="text-xs text-slate-400">{t("common.loading")}</p>
           </div>
         ) : items.length === 0 ? (
           <div className="text-center py-20 text-slate-400 text-sm bg-white/50 dark:bg-slate-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
-            Không có giao dịch nào phù hợp với bộ lọc hiện tại
+            {t("financial.newsfeedEmpty")}
           </div>
         ) : (
           <div className="flex flex-col space-y-3.5 w-full pb-4">
@@ -234,7 +241,9 @@ export function CashFlowNewsfeed({
               const isIncome = item.cashType === "Income";
               const isSelected = selectedIds.includes(item.id);
               const isIncomplete = checkIsIncomplete(item);
-              const missingFields = isIncomplete ? getMissingFields(item) : [];
+              const missingFields = isIncomplete
+                ? getMissingFields(item, language)
+                : [];
 
               return (
                 <div
@@ -244,10 +253,10 @@ export function CashFlowNewsfeed({
                     isSelected
                       ? "border-sky-500/80 ring-2 ring-sky-500/20 bg-sky-50/40 dark:bg-sky-950/30"
                       : isIncomplete
-                      ? "border-2 border-amber-500 dark:border-amber-400 ring-4 ring-amber-500/20 dark:ring-amber-400/20 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent dark:from-amber-950/40 dark:via-slate-900 dark:to-slate-900 shadow-md shadow-amber-500/10"
-                      : isIncome
-                      ? "border-slate-200/80 dark:border-slate-800 hover:border-emerald-200 dark:hover:border-emerald-900/50"
-                      : "border-slate-200/80 dark:border-slate-800 hover:border-rose-200 dark:hover:border-rose-900/50",
+                        ? "border-2 border-amber-500 dark:border-amber-400 ring-4 ring-amber-500/20 dark:ring-amber-400/20 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent dark:from-amber-950/40 dark:via-slate-900 dark:to-slate-900 shadow-md shadow-amber-500/10"
+                        : isIncome
+                          ? "border-slate-200/80 dark:border-slate-800 hover:border-emerald-200 dark:hover:border-emerald-900/50"
+                          : "border-slate-200/80 dark:border-slate-800 hover:border-rose-200 dark:hover:border-rose-900/50",
                   )}
                 >
                   {/* Warning Callout Banner for Incomplete Transactions */}
@@ -260,14 +269,21 @@ export function CashFlowNewsfeed({
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="bg-slate-950 text-amber-400 text-[10px] font-black px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0 animate-bounce">
                           <AlertTriangle className="h-3 w-3 text-amber-400" />
-                          CẦN BỔ SUNG
+                          {language === "vi"
+                            ? "CẦN BỔ SUNG"
+                            : "ACTION REQUIRED"}
                         </span>
                         <span className="truncate text-slate-950 font-bold">
-                          Thiếu: <strong className="underline decoration-slate-950 font-black">{missingFields.join(", ")}</strong>
+                          {language === "vi" ? "Thiếu:" : "Missing:"}{" "}
+                          <strong className="underline decoration-slate-950 font-black">
+                            {missingFields.join(", ")}
+                          </strong>
                         </span>
                       </div>
                       <span className="text-[11px] bg-slate-950 text-white px-2.5 py-1 rounded-lg font-extrabold flex items-center gap-1 shrink-0 group-hover/banner:scale-105 transition-transform shadow-xs">
-                        Cập nhật ngay ✏️
+                        {language === "vi"
+                          ? "Cập nhật ngay ✏️"
+                          : "Update now ✏️"}
                       </span>
                     </button>
                   )}
@@ -296,7 +312,9 @@ export function CashFlowNewsfeed({
                           </h4>
                           {isIncomplete && (
                             <Badge className="bg-amber-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded-md shadow-xs animate-pulse border-none">
-                              ⚠️ THIẾU THÔNG TIN
+                              {language === "vi"
+                                ? "⚠️ THIẾU THÔNG TIN"
+                                : "⚠️ INCOMPLETE"}
                             </Badge>
                           )}
                         </div>
@@ -319,28 +337,34 @@ export function CashFlowNewsfeed({
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg"
+                            className="h-8 w-8 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg cursor-pointer"
                           >
                             <MoreVertical className="h-4.5 w-4.5" />
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent
                           align="end"
-                          className="w-36 p-1 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800"
+                          className="w-38 p-1 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800"
                         >
                           <button
                             onClick={() => handleEdit(item)}
                             className="w-full flex items-center gap-2 text-xs font-semibold px-2.5 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
                           >
                             <Pencil className="h-3.5 w-3.5 text-sky-500" />
-                            Sửa giao dịch
+                            {t("financial.modalEditTitle")
+                              ? language === "vi"
+                                ? "Sửa giao dịch"
+                                : "Edit"
+                              : language === "vi"
+                                ? "Sửa giao dịch"
+                                : "Edit"}
                           </button>
                           <button
                             onClick={() => handleDeleteConfirm([item.id])}
                             className="w-full flex items-center gap-2 text-xs font-semibold px-2.5 py-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 transition-colors cursor-pointer"
                           >
                             <Trash2 className="h-3.5 w-3.5 text-rose-500" />
-                            Xóa giao dịch
+                            {language === "vi" ? "Xóa giao dịch" : "Delete"}
                           </button>
                         </PopoverContent>
                       </Popover>
@@ -370,7 +394,8 @@ export function CashFlowNewsfeed({
                       className="text-xs font-medium gap-1 bg-slate-50/80 dark:bg-slate-800/80 border-slate-200/80 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-lg py-1 px-2.5"
                     >
                       <Wallet className="h-3.5 w-3.5 text-sky-500" />
-                      {item.source?.sourceName ?? "Tiền mặt"}
+                      {item.source?.sourceName ??
+                        (language === "vi" ? "Tiền mặt" : "Cash")}
                     </Badge>
 
                     {/* Nhãn chính */}
@@ -379,7 +404,8 @@ export function CashFlowNewsfeed({
                       className="text-xs font-medium gap-1 bg-slate-50/80 dark:bg-slate-800/80 border-slate-200/80 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-lg py-1 px-2.5"
                     >
                       <FolderKanban className="h-3.5 w-3.5 text-purple-500" />
-                      {item.primaryCategory?.categoryName ?? "Khác"}
+                      {item.primaryCategory?.categoryName ??
+                        (language === "vi" ? "Khác" : "Other")}
                     </Badge>
 
                     {/* Nhãn phụ */}
@@ -389,7 +415,9 @@ export function CashFlowNewsfeed({
                         variant="outline"
                         className={cn(
                           "text-xs font-normal border py-1 px-2.5 rounded-lg",
-                          getSecondaryCategoryBadgeClass(secondaryCategory.type),
+                          getSecondaryCategoryBadgeClass(
+                            secondaryCategory.type,
+                          ),
                         )}
                       >
                         {secondaryCategory.categoryName}
@@ -407,7 +435,9 @@ export function CashFlowNewsfeed({
                   {item.description && (
                     <div className="bg-sky-50/80 dark:bg-slate-800/80 p-3.5 rounded-xl border-l-4 border-sky-500 text-sm font-medium text-slate-800 dark:text-slate-100 flex items-start gap-2.5 mt-2 shadow-2xs">
                       <FileText className="h-4.5 w-4.5 text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" />
-                      <span className="whitespace-pre-wrap leading-relaxed">{item.description}</span>
+                      <span className="whitespace-pre-wrap leading-relaxed">
+                        {item.description}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -418,13 +448,20 @@ export function CashFlowNewsfeed({
             {loadingMore && (
               <div className="flex items-center justify-center py-4 gap-2 text-xs font-semibold text-sky-600 dark:text-sky-400">
                 <Spinner className="h-4 w-4 text-sky-500" />
-                <span>Đang tải thêm giao dịch...</span>
+                <span>
+                  {language === "vi"
+                    ? "Đang tải thêm giao dịch..."
+                    : "Loading more transactions..."}
+                </span>
               </div>
             )}
 
             {!hasMore && items.length > 0 && (
               <div className="text-center py-4 text-xs font-medium text-slate-400 dark:text-slate-500">
-                🎉 Đã hiển thị tất cả {total} bản tin giao dịch
+                🎉{" "}
+                {language === "vi"
+                  ? `Đã hiển thị tất cả ${total} bản tin giao dịch`
+                  : `Displayed all ${total} transactions`}
               </div>
             )}
           </div>

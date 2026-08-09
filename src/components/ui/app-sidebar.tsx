@@ -27,35 +27,38 @@ import {
   CloudSun,
   Pin,
   Landmark,
+  Globe,
 } from "lucide-react";
 import { useTheme, ThemeMode } from "@/components/theme-provider";
+import { useLanguage } from "@/components/language-provider";
 import { cn } from "@/lib/utils";
-
-const NAV_ITEMS = [
-  {
-    href: "/financial-management",
-    label: "Quản lý tài chính",
-    icon: Wallet,
-    iconColor: "text-sky-600 dark:text-sky-400",
-  },
-  {
-    href: "/wealth-management",
-    label: "Quản lý gia sản",
-    icon: Landmark,
-    iconColor: "text-emerald-600 dark:text-emerald-400",
-  },
-  {
-    href: "/weather",
-    label: "Dự báo thời tiết",
-    icon: CloudSun,
-    iconColor: "text-amber-500",
-  },
-];
 
 export function AppSidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const { mode, theme, setMode } = useTheme();
+  const { language, setLanguage, toggleLanguage, t } = useLanguage();
+
+  const NAV_ITEMS = [
+    {
+      href: "/financial-management",
+      label: t("nav.financialManagement"),
+      icon: Wallet,
+      iconColor: "text-sky-600 dark:text-sky-400",
+    },
+    {
+      href: "/wealth-management",
+      label: t("nav.wealthManagement"),
+      icon: Landmark,
+      iconColor: "text-emerald-600 dark:text-emerald-400",
+    },
+    {
+      href: "/weather",
+      label: t("nav.weather"),
+      icon: CloudSun,
+      iconColor: "text-amber-500",
+    },
+  ];
 
   // Pinned Default Home Route State
   const [pinnedRoute, setPinnedRoute] = useState<string>("/financial-management");
@@ -99,7 +102,7 @@ export function AppSidebar() {
         {/* Navigation Group */}
         <SidebarGroup>
           <SidebarGroupLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-            Điều hướng
+            {t("nav.navigation")}
           </SidebarGroupLabel>
 
           <SidebarMenu>
@@ -142,8 +145,8 @@ export function AppSidebar() {
                         )}
                         title={
                           isPinned
-                            ? "Trang mặc định (Đã ghim)"
-                            : "Ghim làm trang mặc định khi truy cập"
+                            ? (language === "vi" ? "Trang mặc định (Đã ghim)" : "Default Page (Pinned)")
+                            : (language === "vi" ? "Ghim làm trang mặc định khi truy cập" : "Pin as default landing page")
                         }
                       >
                         <Pin
@@ -161,10 +164,62 @@ export function AppSidebar() {
           </SidebarMenu>
         </SidebarGroup>
 
-        {/* Theme Settings Group */}
+        {/* Settings Group: Language & Theme */}
         <SidebarGroup>
+          {/* 
+          // Temporarily hidden language toggle switcher for current release
           <SidebarGroupLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-            Giao diện
+            {t("nav.language")}
+          </SidebarGroupLabel>
+          <div className="px-2 group-data-[collapsible=icon]:px-0 mb-3">
+            <div className="group-data-[collapsible=icon]:hidden grid grid-cols-2 p-1 bg-muted rounded-xl border border-sidebar-border gap-0.5">
+              <button
+                type="button"
+                onClick={() => setLanguage("vi")}
+                className={cn(
+                  "flex items-center justify-center py-1.5 px-1 rounded-lg text-[11px] font-bold transition-all gap-1.5 cursor-pointer",
+                  language === "vi"
+                    ? "bg-background text-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                title="Tiếng Việt"
+              >
+                <span>🇻🇳</span>
+                <span>Tiếng Việt</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setLanguage("en")}
+                className={cn(
+                  "flex items-center justify-center py-1.5 px-1 rounded-lg text-[11px] font-bold transition-all gap-1.5 cursor-pointer",
+                  language === "en"
+                    ? "bg-background text-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                title="English"
+              >
+                <span>🇬🇧</span>
+                <span>English</span>
+              </button>
+            </div>
+
+            <div className="hidden group-data-[collapsible=icon]:flex justify-center">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleLanguage}
+                className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground font-extrabold text-xs cursor-pointer"
+                title={`Language: ${language.toUpperCase()}`}
+              >
+                {language.toUpperCase()}
+              </Button>
+            </div>
+          </div>
+          */}
+
+          <SidebarGroupLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+            {t("nav.themeMode")}
           </SidebarGroupLabel>
           <div className="px-2 group-data-[collapsible=icon]:px-0">
             {/* Expanded mode: Segmented Mode Selector */}
@@ -178,10 +233,10 @@ export function AppSidebar() {
                     ? "bg-background text-foreground shadow-xs"
                     : "text-muted-foreground hover:text-foreground"
                 )}
-                title="Giao diện sáng"
+                title={t("nav.themeLight")}
               >
                 <Sun className="h-3.5 w-3.5 text-amber-500" />
-                <span>Sáng</span>
+                <span>{t("nav.themeLight")}</span>
               </button>
 
               <button
@@ -193,10 +248,10 @@ export function AppSidebar() {
                     ? "bg-background text-foreground shadow-xs"
                     : "text-muted-foreground hover:text-foreground"
                 )}
-                title="Giao diện tối"
+                title={t("nav.themeDark")}
               >
                 <Moon className="h-3.5 w-3.5 text-indigo-400" />
-                <span>Tối</span>
+                <span>{t("nav.themeDark")}</span>
               </button>
 
               <button
@@ -208,10 +263,10 @@ export function AppSidebar() {
                     ? "bg-background text-foreground shadow-xs"
                     : "text-muted-foreground hover:text-foreground"
                 )}
-                title="Tự động theo giờ hệ thống (6h-18h: Sáng, 18h-6h: Tối)"
+                title={t("nav.themeAuto")}
               >
                 <Clock className="h-3.5 w-3.5 text-sky-500" />
-                <span>Tự động</span>
+                <span>{t("nav.themeAuto")}</span>
               </button>
             </div>
 
@@ -250,7 +305,7 @@ export function AppSidebar() {
                 {session?.user?.name}
               </p>
               <p className="truncate text-[11px] text-muted-foreground font-medium">
-                Tài khoản
+                {t("common.account")}
               </p>
             </div>
           </div>
@@ -264,7 +319,8 @@ export function AppSidebar() {
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Đăng xuất"
+            aria-label={t("common.logout")}
+            title={t("common.logout")}
             onClick={() => signOut({ callbackUrl: "/login" })}
             className="group-data-[collapsible=icon]:hidden h-8 w-8 text-muted-foreground hover:text-rose-600"
           >

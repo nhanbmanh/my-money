@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { BarChart3, PieChart as PieIcon, LineChart as LineChartIcon, Tags } from "lucide-react";
+import { useLanguage } from "@/components/language-provider";
 
 export type CashFlowChartFilters = {
   search: string;
@@ -111,6 +112,7 @@ export function DashboardAnalytics({
   filters,
   refreshKey = 0,
 }: DashboardAnalyticsProps) {
+  const { t, language } = useLanguage();
   const [activeTab, setActiveTab] = useState<TabType>("trend");
   const [timeGrouping, setTimeGrouping] = useState<TimeGrouping>("day");
   const [items, setItems] = useState<CashFlowItem[]>([]);
@@ -126,14 +128,14 @@ export function DashboardAnalytics({
         const query = buildQuery(filters);
         const res = await fetch(`/api/cashflow?${query}`);
         if (!res.ok) {
-          setError("Không thể tải dữ liệu biểu đồ");
+          setError(language === "vi" ? "Không thể tải dữ liệu biểu đồ" : "Failed to load chart data");
           setItems([]);
           return;
         }
         const data = await res.json();
         setItems(data.items || []);
-      } catch (err) {
-        setError("Lỗi kết nối khi tải dữ liệu biểu đồ");
+      } catch {
+        setError(language === "vi" ? "Lỗi kết nối khi tải dữ liệu biểu đồ" : "Connection error while loading chart data");
         setItems([]);
       } finally {
         setLoading(false);
@@ -141,7 +143,7 @@ export function DashboardAnalytics({
     };
 
     fetchAllData();
-  }, [filters, refreshKey]);
+  }, [filters, refreshKey, language]);
 
   // Format currency
   const formatVND = (val: number) => {
@@ -338,7 +340,7 @@ export function DashboardAnalytics({
         <div>
           <CardTitle className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-sky-600 dark:text-sky-400" />
-            Biểu Đồ Thống Kê Giao Dịch
+            {language === "vi" ? "Biểu Đồ Thống Kê Giao Dịch" : "Transaction Chart Analytics"}
           </CardTitle>
         </div>
 
@@ -348,56 +350,56 @@ export function DashboardAnalytics({
             variant={activeTab === "trend" ? "default" : "ghost"}
             size="sm"
             onClick={() => setActiveTab("trend")}
-            className={`text-xs h-8 gap-1.5 rounded-lg ${
+            className={`text-xs h-8 gap-1.5 rounded-lg cursor-pointer ${
               activeTab === "trend"
                 ? "bg-sky-600 text-white shadow-xs"
                 : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
             }`}
           >
             <LineChartIcon className="h-3.5 w-3.5" />
-            Xu hướng Thu/Chi
+            {language === "vi" ? "Xu hướng Thu/Chi" : "Income/Expense Trend"}
           </Button>
 
           <Button
             variant={activeTab === "category" ? "default" : "ghost"}
             size="sm"
             onClick={() => setActiveTab("category")}
-            className={`text-xs h-8 gap-1.5 rounded-lg ${
+            className={`text-xs h-8 gap-1.5 rounded-lg cursor-pointer ${
               activeTab === "category"
                 ? "bg-sky-600 text-white shadow-xs"
                 : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
             }`}
           >
             <PieIcon className="h-3.5 w-3.5" />
-            Phân Bổ Nhãn Chính
+            {language === "vi" ? "Phân Bổ Nhãn Chính" : "Primary Categories"}
           </Button>
 
           <Button
             variant={activeTab === "secondaryCategory" ? "default" : "ghost"}
             size="sm"
             onClick={() => setActiveTab("secondaryCategory")}
-            className={`text-xs h-8 gap-1.5 rounded-lg ${
+            className={`text-xs h-8 gap-1.5 rounded-lg cursor-pointer ${
               activeTab === "secondaryCategory"
                 ? "bg-sky-600 text-white shadow-xs"
                 : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
             }`}
           >
             <Tags className="h-3.5 w-3.5" />
-            Theo Nhãn Phụ
+            {language === "vi" ? "Theo Nhãn Phụ" : "Secondary Categories"}
           </Button>
 
           <Button
             variant={activeTab === "source" ? "default" : "ghost"}
             size="sm"
             onClick={() => setActiveTab("source")}
-            className={`text-xs h-8 gap-1.5 rounded-lg ${
+            className={`text-xs h-8 gap-1.5 rounded-lg cursor-pointer ${
               activeTab === "source"
                 ? "bg-sky-600 text-white shadow-xs"
                 : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
             }`}
           >
             <BarChart3 className="h-3.5 w-3.5" />
-            Theo Nguồn Tiền
+            {language === "vi" ? "Theo Nguồn Tiền" : "Payment Sources"}
           </Button>
         </div>
       </CardHeader>
@@ -413,7 +415,7 @@ export function DashboardAnalytics({
           </div>
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-72 text-slate-400 text-sm">
-            <p>Không có dữ liệu phù hợp với bộ lọc hiện tại</p>
+            <p>{language === "vi" ? "Không có dữ liệu phù hợp với bộ lọc hiện tại" : "No data matching active filters"}</p>
           </div>
         ) : (
           <div>
@@ -422,32 +424,32 @@ export function DashboardAnalytics({
               <div className="space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
                   <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Gộp dữ liệu theo thời gian:
+                    {language === "vi" ? "Gộp dữ liệu theo thời gian:" : "Group data by:"}
                   </span>
                   <div className="flex items-center gap-1.5">
                     <Button
                       variant={timeGrouping === "day" ? "default" : "outline"}
                       size="sm"
                       onClick={() => setTimeGrouping("day")}
-                      className={`text-xs h-7 px-3 rounded-md ${
+                      className={`text-xs h-7 px-3 rounded-md cursor-pointer ${
                         timeGrouping === "day"
                           ? "bg-slate-800 dark:bg-slate-100 text-white dark:text-slate-900 font-bold"
                           : "text-slate-600 dark:text-slate-300"
                       }`}
                     >
-                      Theo Ngày
+                      {language === "vi" ? "Theo Ngày" : "By Day"}
                     </Button>
                     <Button
                       variant={timeGrouping === "month" ? "default" : "outline"}
                       size="sm"
                       onClick={() => setTimeGrouping("month")}
-                      className={`text-xs h-7 px-3 rounded-md ${
+                      className={`text-xs h-7 px-3 rounded-md cursor-pointer ${
                         timeGrouping === "month"
                           ? "bg-slate-800 dark:bg-slate-100 text-white dark:text-slate-900 font-bold"
                           : "text-slate-600 dark:text-slate-300"
                       }`}
                     >
-                      Theo Tháng
+                      {language === "vi" ? "Theo Tháng" : "By Month"}
                     </Button>
                   </div>
                 </div>
@@ -485,7 +487,7 @@ export function DashboardAnalytics({
                       <Line
                         type="monotone"
                         dataKey="income"
-                        name="Thu nhập"
+                        name={language === "vi" ? "Thu nhập" : "Income"}
                         stroke="#10b981"
                         strokeWidth={2.5}
                         dot={{ r: 3, fill: "#10b981" }}
@@ -493,7 +495,7 @@ export function DashboardAnalytics({
                       <Line
                         type="monotone"
                         dataKey="expense"
-                        name="Chi tiêu"
+                        name={language === "vi" ? "Chi tiêu" : "Expenses"}
                         stroke="#f43f5e"
                         strokeWidth={2.5}
                         dot={{ r: 3, fill: "#f43f5e" }}
@@ -510,11 +512,11 @@ export function DashboardAnalytics({
                 {/* 1. INCOME PIE CHART */}
                 <div className="p-4 rounded-2xl border border-emerald-100 dark:border-emerald-900/40 bg-emerald-50/30 dark:bg-emerald-950/20">
                   <h4 className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider mb-3 text-center">
-                    💰 Cơ cấu Thu nhập theo Nhãn chính
+                    💰 {language === "vi" ? "Cơ cấu Thu nhập theo Nhãn chính" : "Income Breakdown by Primary Category"}
                   </h4>
                   {incomeCategoryData.length === 0 ? (
                     <div className="flex h-56 items-center justify-center text-slate-400 text-xs">
-                      Không có dữ liệu Thu nhập
+                      {language === "vi" ? "Không có dữ liệu Thu nhập" : "No Income data"}
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 items-center gap-2">
@@ -539,7 +541,7 @@ export function DashboardAnalytics({
                               ))}
                             </Pie>
                             <Tooltip
-                              formatter={(val: number) => [formatVND(val), "Số tiền"]}
+                              formatter={(val: number) => [formatVND(val), language === "vi" ? "Số tiền" : "Amount"]}
                               contentStyle={{ borderRadius: "12px", borderColor: "#e2e8f0" }}
                             />
                           </PieChart>
@@ -582,11 +584,11 @@ export function DashboardAnalytics({
                 {/* 2. EXPENSE PIE CHART */}
                 <div className="p-4 rounded-2xl border border-rose-100 dark:border-rose-900/40 bg-rose-50/30 dark:bg-rose-950/20">
                   <h4 className="text-xs font-bold text-rose-700 dark:text-rose-400 uppercase tracking-wider mb-3 text-center">
-                    💸 Cơ cấu Chi tiêu theo Nhãn chính
+                    💸 {language === "vi" ? "Cơ cấu Chi tiêu theo Nhãn chính" : "Expense Breakdown by Primary Category"}
                   </h4>
                   {expenseCategoryData.length === 0 ? (
                     <div className="flex h-56 items-center justify-center text-slate-400 text-xs">
-                      Không có dữ liệu Chi tiêu
+                      {language === "vi" ? "Không có dữ liệu Chi tiêu" : "No Expense data"}
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 items-center gap-2">
@@ -611,7 +613,7 @@ export function DashboardAnalytics({
                               ))}
                             </Pie>
                             <Tooltip
-                              formatter={(val: number) => [formatVND(val), "Số tiền"]}
+                              formatter={(val: number) => [formatVND(val), language === "vi" ? "Số tiền" : "Amount"]}
                               contentStyle={{ borderRadius: "12px", borderColor: "#e2e8f0" }}
                             />
                           </PieChart>
@@ -657,7 +659,7 @@ export function DashboardAnalytics({
             {activeTab === "source" && (
               <div>
                 <div className="mb-3 text-xs text-slate-500 dark:text-slate-400 font-medium">
-                  Thống kê Dòng tiền Thu nhập & Chi tiêu theo từng Nguồn tiền
+                  {language === "vi" ? "Thống kê Dòng tiền Thu nhập & Chi tiêu theo từng Nguồn tiền" : "Income & Expense cashflow breakdown by Payment Source"}
                 </div>
                 <div className="h-80 w-full">
                   <ResponsiveContainer width="100%" height="100%">
@@ -685,8 +687,8 @@ export function DashboardAnalytics({
                         contentStyle={{ borderRadius: "12px", borderColor: "#e2e8f0" }}
                       />
                       <Legend verticalAlign="top" height={36} />
-                      <Bar dataKey="income" name="Thu nhập" fill="#10b981" radius={[6, 6, 0, 0]} />
-                      <Bar dataKey="expense" name="Chi tiêu" fill="#ef4444" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="income" name={language === "vi" ? "Thu nhập" : "Income"} fill="#10b981" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="expense" name={language === "vi" ? "Chi tiêu" : "Expenses"} fill="#ef4444" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -697,11 +699,11 @@ export function DashboardAnalytics({
             {activeTab === "secondaryCategory" && (
               <div className="space-y-6">
                 <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                  Biểu đồ Phân bổ Nhãn Phụ được phân nhóm tự động theo từng Loại (Type 0, Type 1, Type 2,...)
+                  {language === "vi" ? "Biểu đồ Phân bổ Nhãn Phụ được phân nhóm tự động theo từng Loại (Type 0, Type 1, Type 2,...)" : "Secondary category breakdown automatically grouped by Type (Type 0, Type 1, Type 2,...)"}
                 </div>
                 {secondaryCategoryByType.length === 0 ? (
                   <div className="flex h-56 items-center justify-center text-slate-400 text-xs">
-                    Không có dữ liệu Nhãn phụ trong khoảng thời gian này
+                    {language === "vi" ? "Không có dữ liệu Nhãn phụ trong khoảng thời gian này" : "No secondary category data in this time range"}
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -716,10 +718,10 @@ export function DashboardAnalytics({
                         >
                           <h4 className="text-xs font-bold text-sky-800 dark:text-sky-400 uppercase tracking-wider mb-1 text-center flex items-center justify-center gap-1.5">
                             <Tags className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
-                            Biểu đồ Nhãn phụ (Type {group.type})
+                            {language === "vi" ? `Biểu đồ Nhãn phụ (Type ${group.type})` : `Secondary Category Chart (Type ${group.type})`}
                           </h4>
                           <p className="text-[11px] text-slate-500 dark:text-slate-400 text-center mb-3">
-                            Tổng phát sinh:{" "}
+                            {language === "vi" ? "Tổng phát sinh: " : "Total Amount: "}
                             <span className="font-bold text-slate-700 dark:text-slate-200">
                               {formatVND(group.totalGroupValue)}
                             </span>
@@ -747,7 +749,7 @@ export function DashboardAnalytics({
                                     ))}
                                   </Pie>
                                   <Tooltip
-                                    formatter={(val: number) => [formatVND(val), "Số tiền"]}
+                                    formatter={(val: number) => [formatVND(val), language === "vi" ? "Số tiền" : "Amount"]}
                                     contentStyle={{ borderRadius: "12px", borderColor: "#e2e8f0" }}
                                   />
                                 </PieChart>

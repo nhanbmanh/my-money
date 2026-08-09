@@ -27,6 +27,11 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/components/language-provider";
+import {
+  ASSET_CATEGORY_TYPES,
+  getCategoryConfig,
+} from "@/lib/asset-category-types";
 
 interface OverviewProps {
   summary: any;
@@ -51,6 +56,7 @@ export function OverviewBalanceSheet({
   liabilities,
   snapshots = []
 }: OverviewProps) {
+  const { t, language } = useLanguage();
   const [timeframe, setTimeframe] = useState<"DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY">("DAILY");
 
   // Format currency helper
@@ -223,7 +229,7 @@ export function OverviewBalanceSheet({
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-sky-700 dark:text-sky-400">
-                Giá Trị Gia Sản Ròng
+                {t("wealth.totalNetWorth")}
               </span>
               <span className="p-2 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400">
                 <ShieldCheck className="h-5 w-5" />
@@ -245,7 +251,7 @@ export function OverviewBalanceSheet({
                 {isPositive ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
                 {dailyChangePercent.toFixed(1)}%
               </span>
-              <span className="text-muted-foreground font-medium">so với kỳ trước</span>
+              <span className="text-muted-foreground font-medium">{language === "vi" ? "so với kỳ trước" : "vs previous period"}</span>
             </div>
           </CardContent>
         </Card>
@@ -255,7 +261,7 @@ export function OverviewBalanceSheet({
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Tổng Tài Sản
+                {t("wealth.totalAssets")}
               </span>
               <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                 <Building2 className="h-5 w-5" />
@@ -267,7 +273,7 @@ export function OverviewBalanceSheet({
               {formatVND(summary.totalAssets)}
             </div>
             <p className="mt-2 text-xs text-muted-foreground font-medium">
-              Gồm <strong>{macroCategories.length}</strong> danh mục tài sản vĩ mô
+              {language === "vi" ? "Gồm " : "Includes "}<strong>5</strong>{language === "vi" ? " loại danh mục tài sản" : " asset category types"}
             </p>
           </CardContent>
         </Card>
@@ -277,7 +283,7 @@ export function OverviewBalanceSheet({
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Tổng Nợ Phải Trả
+                {t("wealth.totalLiabilities")}
               </span>
               <span className="p-2 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400">
                 <CreditCard className="h-5 w-5" />
@@ -289,7 +295,7 @@ export function OverviewBalanceSheet({
               {formatVND(summary.totalLiabilities)}
             </div>
             <p className="mt-2 text-xs text-muted-foreground font-medium">
-              Tỷ lệ nợ / tài sản: <strong>{summary.totalAssets > 0 ? ((summary.totalLiabilities / summary.totalAssets) * 100).toFixed(1) : 0}%</strong>
+              {t("wealth.debtToAssetRatio")}: <strong>{summary.totalAssets > 0 ? ((summary.totalLiabilities / summary.totalAssets) * 100).toFixed(1) : 0}%</strong>
             </p>
           </CardContent>
         </Card>
@@ -299,7 +305,7 @@ export function OverviewBalanceSheet({
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Tài Sản Thanh Khoản
+                {t("wealth.liquidAssets")}
               </span>
               <span className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
                 <Wallet className="h-5 w-5" />
@@ -311,7 +317,7 @@ export function OverviewBalanceSheet({
               {formatVND(summary.totalInvestableAssets)}
             </div>
             <p className="mt-2 text-xs text-muted-foreground font-medium">
-              Chiếm <strong>{summary.totalAssets > 0 ? ((summary.totalInvestableAssets / summary.totalAssets) * 100).toFixed(1) : 0}%</strong> tổng tài sản
+              {language === "vi" ? "Chiếm " : "Accounts for "}<strong>{summary.totalAssets > 0 ? ((summary.totalInvestableAssets / summary.totalAssets) * 100).toFixed(1) : 0}%</strong>{language === "vi" ? " tổng tài sản" : " of total assets"}
             </p>
           </CardContent>
         </Card>
@@ -384,25 +390,33 @@ export function OverviewBalanceSheet({
         </CardContent>
       </Card>
 
-      {/* Asset Allocation Breakdown by Macro Category & Liabilities */}
+      {/* Asset Allocation Breakdown by 5 Category Types & Liabilities */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Macro Category Bar Chart */}
+        {/* Category Types Bar Chart */}
         <Card className="lg:col-span-2 border-slate-200 dark:border-slate-800 shadow-md">
           <CardHeader>
             <CardTitle className="text-base font-bold flex items-center gap-2">
               <PieIcon className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-              <span>Phân Bổ Giá Trị Theo 6 Cấp Danh Mục</span>
+              <span>Phân Bổ Giá Trị Theo 5 Loại Danh Mục</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {breakdownByMacro.map((cat: any) => {
+                const catCfg = getCategoryConfig(cat.type !== undefined ? cat.type : 0);
                 const percent = summary.totalAssets > 0 ? (cat.value / summary.totalAssets) * 100 : 0;
                 return (
-                  <div key={cat.code} className="space-y-1.5">
+                  <div key={cat.type ?? cat.code} className="space-y-1.5">
                     <div className="flex items-center justify-between text-xs font-bold">
-                      <span className="text-slate-800 dark:text-slate-200">{cat.name}</span>
-                      <span className="text-slate-600 dark:text-slate-400">
+                      <span className="text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded-lg text-[10px] border ${catCfg.badgeBg}`}>
+                          {catCfg.type}. {catCfg.shortName}
+                        </span>
+                        <span className="text-slate-600 dark:text-slate-400 font-medium text-[11px] hidden sm:inline">
+                          ({catCfg.name})
+                        </span>
+                      </span>
+                      <span className="text-slate-700 dark:text-slate-300 font-extrabold">
                         {formatVND(cat.value)} ({percent.toFixed(1)}%)
                       </span>
                     </div>

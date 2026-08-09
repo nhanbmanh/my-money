@@ -8,11 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { Landmark, Lock, Mail, Eye, EyeOff, ShieldCheck, Sparkles, ArrowRight, AlertCircle } from "lucide-react";
-
+import { useLanguage } from "@/components/language-provider";
 import { PageKeyGuard } from "@/components/page-key-guard";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { t, language } = useLanguage();
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
@@ -24,18 +25,18 @@ export default function LoginPage() {
 
     const emailTrimmed = form.email.trim();
     if (!emailTrimmed) {
-      setError("Vui lòng nhập địa chỉ email.");
+      setError(language === "vi" ? "Vui lòng nhập địa chỉ email." : "Please enter your email address.");
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(emailTrimmed)) {
-      setError("Địa chỉ email không hợp lệ. Vui lòng nhập đúng định dạng (ví dụ: name@example.com).");
+      setError(language === "vi" ? "Địa chỉ email không hợp lệ (ví dụ: name@example.com)." : "Invalid email format (e.g. name@example.com).");
       return;
     }
 
     if (!form.password) {
-      setError("Vui lòng nhập mật khẩu.");
+      setError(language === "vi" ? "Vui lòng nhập mật khẩu." : "Please enter your password.");
       return;
     }
 
@@ -51,9 +52,9 @@ export default function LoginPage() {
 
     if (res?.error) {
       if (res?.error === "EMAIL_NOT_VERIFIED") {
-        setError("Email chưa được xác thực. Vui lòng kiểm tra hộp thư để nhận mã OTP.");
+        setError(language === "vi" ? "Email chưa được xác thực. Vui lòng kiểm tra hộp thư để nhận mã OTP." : "Email not verified. Please check your inbox for OTP.");
       } else {
-        setError("Email hoặc mật khẩu không đúng. Vui lòng thử lại.");
+        setError(language === "vi" ? "Email hoặc mật khẩu không đúng. Vui lòng thử lại." : "Invalid email or password. Please try again.");
       }
       return;
     }
@@ -94,7 +95,7 @@ export default function LoginPage() {
                   Note my life
                 </p>
                 <p className="text-xs text-slate-400 mt-1.5 font-medium italic">
-                  “Ghi chép từng dòng tiền, an tâm quản trị gia sản cuộc sống”
+                  {language === "vi" ? "“Ghi chép từng dòng tiền, an tâm quản trị gia sản cuộc sống”" : "“Track your cashflows, manage your wealth with peace of mind”"}
                 </p>
               </div>
             </div>
@@ -105,7 +106,7 @@ export default function LoginPage() {
               {/* Email Input */}
               <div className="space-y-1.5">
                 <Label htmlFor="email" className="text-xs font-bold text-slate-300">
-                  Email
+                  {t("auth.emailLabel")}
                 </Label>
                 <div className="relative">
                   <Mail className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
@@ -125,7 +126,7 @@ export default function LoginPage() {
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password" className="text-xs font-bold text-slate-300">
-                    Mật khẩu
+                    {t("auth.passwordLabel")}
                   </Label>
                 </div>
                 <div className="relative">
@@ -166,11 +167,11 @@ export default function LoginPage() {
                 {loading ? (
                   <>
                     <Spinner className="h-4 w-4" />
-                    <span>Đang đăng nhập...</span>
+                    <span>{t("common.loading")}</span>
                   </>
                 ) : (
                   <>
-                    <span>Đăng nhập</span>
+                    <span>{t("auth.btnLogin")}</span>
                     <ArrowRight className="h-4 w-4" />
                   </>
                 )}
@@ -179,12 +180,12 @@ export default function LoginPage() {
               {/* Switch to Register link */}
               <div className="pt-2 text-center border-t border-slate-800/80">
                 <p className="text-xs text-slate-400">
-                  Chưa có tài khoản?{" "}
+                  {t("auth.noAccount")}{" "}
                   <a
                     href="/register"
                     className="font-bold text-sky-400 hover:text-sky-300 underline underline-offset-4 transition-colors"
                   >
-                    Đăng ký ngay
+                    {t("auth.btnRegister")}
                   </a>
                 </p>
               </div>
@@ -194,7 +195,7 @@ export default function LoginPage() {
             <div className="flex items-center justify-center gap-4 text-[11px] text-slate-400 font-semibold pt-1">
               <div className="flex items-center gap-1">
                 <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-                <span>Bảo mật 256-bit</span>
+                <span>256-bit SSL Security</span>
               </div>
               <span>•</span>
               <div>Realtime Valuation</div>

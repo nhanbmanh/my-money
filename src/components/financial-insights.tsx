@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/popover";
 import { getStoredBudgets } from "./budget-modal";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/components/language-provider";
 
 import { ImportExcelModal } from "@/components/import-excel-modal";
 import { exportCashflowToExcel } from "@/lib/excel-import-utils";
@@ -87,6 +88,7 @@ export function FinancialInsights({
   budgetsUpdatedKey = 0,
   onMutationNeeded,
 }: FinancialInsightsProps) {
+  const { t, language } = useLanguage();
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [storedBudgets, setStoredBudgets] = useState<Record<string, number>>({});
   const [selectedDetail, setSelectedDetail] = useState<{
@@ -129,13 +131,13 @@ export function FinancialInsights({
       const data = await res.json();
 
       if (!res.ok) {
-        setEmailMessage({ type: "error", text: data.error || "Không thể gửi email báo cáo" });
+        setEmailMessage({ type: "error", text: data.error || (language === "vi" ? "Không thể gửi email báo cáo" : "Failed to send report email") });
       } else {
         setEmailMessage({ type: "success", text: data.message });
         setTimeout(() => setEmailMessage(null), 6000);
       }
     } catch {
-      setEmailMessage({ type: "error", text: "Lỗi kết nối khi gửi email báo cáo" });
+      setEmailMessage({ type: "error", text: language === "vi" ? "Lỗi kết nối khi gửi email báo cáo" : "Connection error while sending report email" });
     } finally {
       setSendingEmail(false);
     }
@@ -153,11 +155,18 @@ export function FinancialInsights({
       const d = subMonths(now, i);
       list.push({
         value: format(d, "yyyy-MM"),
-        label: i === 0 ? `Tháng này (${format(d, "MM/yyyy")})` : `Tháng ${format(d, "MM/yyyy")}`,
+        label:
+          i === 0
+            ? language === "vi"
+              ? `Tháng này (${format(d, "MM/yyyy")})`
+              : `This Month (${format(d, "MM/yyyy")})`
+            : language === "vi"
+            ? `Tháng ${format(d, "MM/yyyy")}`
+            : `Month ${format(d, "MM/yyyy")}`,
       });
     }
     return list;
-  }, []);
+  }, [language]);
 
   // Fetch full month items if scope is "month"
   useEffect(() => {
@@ -376,35 +385,35 @@ export function FinancialInsights({
   const healthStatus = useMemo(() => {
     if (netSavings < 0) {
       return {
-        label: "Thâm Hụt Chi Tiêu",
+        label: language === "vi" ? "Thâm Hụt Chi Tiêu" : "Spending Deficit",
         badgeBg: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
         icon: AlertTriangle,
-        desc: "Tổng chi tiêu đang vượt tổng thu nhập. Cần rà soát và cắt giảm ngay!",
+        desc: language === "vi" ? "Tổng chi tiêu đang vượt tổng thu nhập. Cần rà soát và cắt giảm ngay!" : "Total expenses exceed total income. Review and cut back immediately!",
       };
     }
     if (savingsRate >= 40) {
       return {
-        label: "Sức Khỏe Xuất Sắc",
+        label: language === "vi" ? "Sức Khỏe Xuất Sắc" : "Excellent Health",
         badgeBg: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
         icon: ShieldCheck,
-        desc: `Tích lũy đạt ${savingsRate.toFixed(1)}% thu nhập. Quản lý tài chính cực kỳ vững vàng!`,
+        desc: language === "vi" ? `Tích lũy đạt ${savingsRate.toFixed(1)}% thu nhập. Quản lý tài chính cực kỳ vững vàng!` : `Savings reached ${savingsRate.toFixed(1)}% of income. Robust financial management!`,
       };
     }
     if (savingsRate >= 20) {
       return {
-        label: "Sức Khỏe Tốt",
+        label: language === "vi" ? "Sức Khỏe Tốt" : "Good Health",
         badgeBg: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20",
         icon: Zap,
-        desc: `Tích lũy đạt ${savingsRate.toFixed(1)}% thu nhập. Tiếp tục duy trì phong độ này!`,
+        desc: language === "vi" ? `Tích lũy đạt ${savingsRate.toFixed(1)}% thu nhập. Tiếp tục duy trì phong độ này!` : `Savings reached ${savingsRate.toFixed(1)}% of income. Keep up the great work!`,
       };
     }
     return {
-      label: "Cần Cải Thiện",
+      label: language === "vi" ? "Cần Cải Thiện" : "Needs Improvement",
       badgeBg: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
       icon: AlertTriangle,
-      desc: `Tỷ lệ tiết kiệm ở mức ${savingsRate.toFixed(1)}%. Hãy gia tăng khoản tích lũy!`,
+      desc: language === "vi" ? `Tỷ lệ tiết kiệm ở mức ${savingsRate.toFixed(1)}%. Hãy gia tăng khoản tích lũy!` : `Savings rate is at ${savingsRate.toFixed(1)}%. Aim to boost your savings!`,
     };
-  }, [netSavings, savingsRate]);
+  }, [netSavings, savingsRate, language]);
 
   const HealthIcon = healthStatus.icon;
 
@@ -415,11 +424,11 @@ export function FinancialInsights({
         <CardHeader className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between gap-3">
           <CardTitle className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-sky-500" />
-            Báo Cáo Phân Tích & Điểm Cần Lưu Ý
+            {language === "vi" ? "Báo Cáo Phân Tích & Điểm Cần Lưu Ý" : "Analytics & Key Insights"}
           </CardTitle>
           <Popover>
             <PopoverTrigger asChild>
-              <button className="focus:outline-none shrink-0" title="Bấm để xem chi tiết đánh giá">
+              <button className="focus:outline-none shrink-0 cursor-pointer" title={language === "vi" ? "Bấm để xem chi tiết đánh giá" : "Click for detailed evaluation"}>
                 <Badge
                   variant="outline"
                   className={cn(
@@ -453,7 +462,7 @@ export function FinancialInsights({
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-sky-500" />
               <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                Phạm vi tính toán báo cáo & ngân sách:
+                {language === "vi" ? "Phạm vi tính toán báo cáo & ngân sách:" : "Report & Budget scope:"}
               </span>
             </div>
 
@@ -479,7 +488,7 @@ export function FinancialInsights({
                     </SelectItem>
                   ))}
                   <SelectItem value="filter" className="text-xs font-semibold text-sky-600 dark:text-sky-400 cursor-pointer">
-                    🔍 Theo bộ lọc thanh bên trái
+                    🔍 {language === "vi" ? "Theo bộ lọc thanh bên trái" : "By left sidebar filters"}
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -499,8 +508,8 @@ export function FinancialInsights({
                 <div
                   onClick={() =>
                     setSelectedDetail({
-                      title: "Chi tiết Dòng Tiền Tích Lũy (Thu nhập vs Chi tiêu)",
-                      subtitle: `Tổng thu: ${formatVND(totalIncome)} | Tổng chi: ${formatVND(totalExpense)}`,
+                      title: language === "vi" ? "Chi tiết Dòng Tiền Tích Lũy (Thu nhập vs Chi tiêu)" : "Accumulated Cashflow Details (Income vs Expense)",
+                      subtitle: language === "vi" ? `Tổng thu: ${formatVND(totalIncome)} | Tổng chi: ${formatVND(totalExpense)}` : `Total Income: ${formatVND(totalIncome)} | Total Expense: ${formatVND(totalExpense)}`,
                       items: activeItems,
                     })
                   }
@@ -525,7 +534,7 @@ export function FinancialInsights({
                       ) : (
                         <TrendingDown className="h-4 w-4 text-rose-500" />
                       )}
-                      Tỷ Lệ Tích Lũy
+                      {language === "vi" ? "Tỷ Lệ Tích Lũy" : "Savings Rate"}
                     </span>
                     <span>{savingsRate.toFixed(1)}%</span>
                   </div>
@@ -540,9 +549,9 @@ export function FinancialInsights({
                     {formatVND(netSavings)}
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-0.5">
-                    <span>{isPositive ? "Dòng tiền còn dư" : "Thâm hụt dòng tiền"}</span>
+                    <span>{isPositive ? (language === "vi" ? "Dòng tiền còn dư" : "Net Surplus") : (language === "vi" ? "Thâm hụt dòng tiền" : "Net Deficit")}</span>
                     <span className="text-sky-600 dark:text-sky-400 font-semibold group-hover:underline flex items-center gap-0.5">
-                      Xem {activeItems.length} giao dịch <ChevronRight className="h-3 w-3" />
+                      {language === "vi" ? `Xem ${activeItems.length} giao dịch` : `View ${activeItems.length} transactions`} <ChevronRight className="h-3 w-3" />
                     </span>
                   </div>
                 </div>
@@ -554,8 +563,8 @@ export function FinancialInsights({
               onClick={() => {
                 if (top3Spikes.length > 0) {
                   setSelectedDetail({
-                    title: "Chi Tiết Top 3 Giao Dịch Chi Tiêu Cao Nhất",
-                    subtitle: "3 khoản chi có giá trị lớn nhất trong khoảng thời gian này",
+                    title: language === "vi" ? "Chi Tiết Top 3 Giao Dịch Chi Tiêu Cao Nhất" : "Top 3 Highest Expenses Breakdown",
+                    subtitle: language === "vi" ? "3 khoản chi có giá trị lớn nhất trong khoảng thời gian này" : "3 largest expenses in this period",
                     items: top3Spikes,
                   });
                 }
@@ -567,17 +576,17 @@ export function FinancialInsights({
               <div className="flex items-center justify-between text-xs font-bold text-rose-800 dark:text-rose-300">
                 <span className="flex items-center gap-1.5">
                   <AlertTriangle className="h-4 w-4 text-rose-500" />
-                  Top 3 Chi Cao Nhất
+                  {language === "vi" ? "Top 3 Chi Cao Nhất" : "Top 3 Expenses"}
                 </span>
                 {top3Spikes.length > 0 && (
                   <span className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold group-hover:underline flex items-center gap-0.5">
-                    Xem chi tiết <ChevronRight className="h-3 w-3" />
+                    {language === "vi" ? "Xem chi tiết" : "View details"} <ChevronRight className="h-3 w-3" />
                   </span>
                 )}
               </div>
               {top3Spikes.length === 0 ? (
                 <div className="text-xs text-slate-500 dark:text-slate-400 font-medium py-1">
-                  Không có khoản chi nào.
+                  {language === "vi" ? "Không có khoản chi nào." : "No expenses."}
                 </div>
               ) : (
                 <div className="space-y-1 pt-0.5">
@@ -605,16 +614,16 @@ export function FinancialInsights({
               <div className="flex items-center justify-between text-xs font-bold text-amber-800 dark:text-amber-300">
                 <span className="flex items-center gap-1.5">
                   <PieIcon className="h-4 w-4 text-amber-500" />
-                  Top Ngốn Tiền
+                  {language === "vi" ? "Top Ngốn Tiền" : "Top Expense Categories"}
                 </span>
                 {allCategoriesExpenseSorted.length > 0 && (
                   <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 group-hover:underline flex items-center gap-0.5">
-                    Xem tất cả ({allCategoriesExpenseSorted.length}) <ChevronRight className="h-3 w-3" />
+                    {language === "vi" ? `Xem tất cả (${allCategoriesExpenseSorted.length})` : `View all (${allCategoriesExpenseSorted.length})`} <ChevronRight className="h-3 w-3" />
                   </span>
                 )}
               </div>
               {top3ExpenseCategories.length === 0 ? (
-                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium py-1">Chưa có chi tiêu.</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium py-1">{language === "vi" ? "Chưa có chi tiêu." : "No expenses."}</div>
               ) : (
                 <div className="space-y-1 pt-0.5">
                   {top3ExpenseCategories.map((cat) => (
@@ -635,8 +644,8 @@ export function FinancialInsights({
               onClick={() => {
                 if (top3Incomes.length > 0) {
                   setSelectedDetail({
-                    title: "Chi Tiết Top 3 Giao Dịch Thu Nhập Cao Nhất",
-                    subtitle: "3 khoản thu có giá trị lớn nhất trong khoảng thời gian này",
+                    title: language === "vi" ? "Chi Tiết Top 3 Giao Dịch Thu Nhập Cao Nhất" : "Top 3 Highest Incomes Breakdown",
+                    subtitle: language === "vi" ? "3 khoản thu có giá trị lớn nhất trong khoảng thời gian này" : "3 largest incomes in this period",
                     items: top3Incomes,
                   });
                 }
@@ -648,17 +657,17 @@ export function FinancialInsights({
               <div className="flex items-center justify-between text-xs font-bold text-blue-800 dark:text-blue-300">
                 <span className="flex items-center gap-1.5">
                   <TrendingUp className="h-4 w-4 text-blue-500" />
-                  Top 3 Thu Cao Nhất
+                  {language === "vi" ? "Top 3 Thu Cao Nhất" : "Top 3 Incomes"}
                 </span>
                 {top3Incomes.length > 0 && (
                   <span className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold group-hover:underline flex items-center gap-0.5">
-                    Xem chi tiết <ChevronRight className="h-3 w-3" />
+                    {language === "vi" ? "Xem chi tiết" : "View details"} <ChevronRight className="h-3 w-3" />
                   </span>
                 )}
               </div>
               {top3Incomes.length === 0 ? (
                 <div className="text-xs text-slate-500 dark:text-slate-400 font-medium py-1">
-                  Không có khoản thu nào.
+                  {language === "vi" ? "Không có khoản thu nào." : "No incomes."}
                 </div>
               ) : (
                 <div className="space-y-1 pt-0.5">
@@ -680,7 +689,7 @@ export function FinancialInsights({
         <CardHeader className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between gap-3">
           <CardTitle className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <Target className="h-5 w-5 text-sky-600 dark:text-sky-400" />
-            Theo Dõi Ngân Sách Hạn Mức Danh Mục
+            {language === "vi" ? "Theo Dõi Ngân Sách Hạn Mức Danh Mục" : "Category Budget Limits Tracker"}
           </CardTitle>
           <div className="flex flex-wrap items-center gap-2">
             {isPastMonth && (
@@ -689,18 +698,18 @@ export function FinancialInsights({
                 size="sm"
                 disabled={sendingEmail}
                 onClick={handleSendPastMonthEmail}
-                className="text-xs font-bold gap-1.5 h-8 px-3 rounded-xl border-purple-200 text-purple-700 bg-purple-50 hover:bg-purple-100 dark:bg-slate-800 dark:border-slate-700 dark:text-purple-400 shadow-2xs transition-all"
-                title={`Gửi báo cáo Tháng ${selectedMonth} kèm file Excel tới email của bạn`}
+                className="text-xs font-bold gap-1.5 h-8 px-3 rounded-xl border-purple-200 text-purple-700 bg-purple-50 hover:bg-purple-100 dark:bg-slate-800 dark:border-slate-700 dark:text-purple-400 shadow-2xs transition-all cursor-pointer"
+                title={language === "vi" ? `Gửi báo cáo Tháng ${selectedMonth} kèm file Excel tới email của bạn` : `Send Month ${selectedMonth} report with Excel file to your email`}
               >
                 {sendingEmail ? (
                   <>
                     <Spinner className="h-3.5 w-3.5" />
-                    Đang gửi mail...
+                    {language === "vi" ? "Đang gửi mail..." : "Sending email..."}
                   </>
                 ) : (
                   <>
                     <Mail className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-                    Gửi Báo Cáo Qua Mail
+                    {language === "vi" ? "Gửi Báo Cáo Qua Mail" : "Send Report via Email"}
                   </>
                 )}
               </Button>
@@ -720,8 +729,8 @@ export function FinancialInsights({
                   scopeTag
                 );
               }}
-              className="text-xs font-bold gap-1.5 h-8 px-3 rounded-xl border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 dark:bg-slate-800 dark:border-slate-700 dark:text-blue-400 shadow-2xs"
-              title="Xuất toàn bộ giao dịch đang hiển thị theo phạm vi ra file Excel"
+              className="text-xs font-bold gap-1.5 h-8 px-3 rounded-xl border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 dark:bg-slate-800 dark:border-slate-700 dark:text-blue-400 shadow-2xs cursor-pointer"
+              title={language === "vi" ? "Xuất toàn bộ giao dịch đang hiển thị theo phạm vi ra file Excel" : "Export all displayed transactions in scope to Excel"}
             >
               <Download className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
               Export Excel ({activeItems.length})
@@ -730,10 +739,10 @@ export function FinancialInsights({
               variant="outline"
               size="sm"
               onClick={onOpenBudgetModal}
-              className="text-xs font-bold gap-1.5 h-8 px-3 rounded-xl border-sky-200 dark:border-slate-700 hover:bg-sky-50 dark:hover:bg-slate-800"
+              className="text-xs font-bold gap-1.5 h-8 px-3 rounded-xl border-sky-200 dark:border-slate-700 hover:bg-sky-50 dark:hover:bg-slate-800 cursor-pointer"
             >
               <Settings2 className="h-3.5 w-3.5 text-sky-500" />
-              Thiết Lập Ngân Sách
+              {t("budget.saveBudgets") || (language === "vi" ? "Thiết Lập Ngân Sách" : "Budget Settings")}
             </Button>
           </div>
         </CardHeader>
@@ -746,19 +755,19 @@ export function FinancialInsights({
               </div>
               <div className="space-y-1">
                 <h5 className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                  Chưa cài đặt ngân sách hạn mức nào
+                  {language === "vi" ? "Chưa cài đặt ngân sách hạn mức nào" : "No budget limits configured"}
                 </h5>
                 <p className="text-xs text-slate-400 max-w-sm">
-                  Bấm nút &quot;Thiết lập ngân sách&quot; để cài đặt hạn mức chi tiêu cho từng danh mục và nhận cảnh báo khi vượt ngưỡng.
+                  {language === "vi" ? "Bấm nút \"Thiết lập ngân sách\" để cài đặt hạn mức chi tiêu cho từng danh mục và nhận cảnh báo khi vượt ngưỡng." : "Click \"Budget Settings\" to configure spending limits per category and receive threshold alerts."}
                 </p>
               </div>
               <Button
                 variant="default"
                 size="sm"
                 onClick={onOpenBudgetModal}
-                className="text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white rounded-xl gap-1.5"
+                className="text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white rounded-xl gap-1.5 cursor-pointer"
               >
-                Cài đặt ngay
+                {language === "vi" ? "Cài đặt ngay" : "Configure Now"}
               </Button>
             </div>
           ) : (
@@ -793,7 +802,7 @@ export function FinancialInsights({
                               : "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/30",
                           )}
                         >
-                          {item.isSecondary ? "Nhãn phụ" : "Nhãn chính"}
+                          {item.isSecondary ? (language === "vi" ? "Nhãn phụ" : "Secondary") : (language === "vi" ? "Nhãn chính" : "Primary")}
                         </Badge>
                       </div>
                       <div className="flex items-center gap-1.5">
@@ -808,19 +817,19 @@ export function FinancialInsights({
                               : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
                           )}
                         >
-                          {isOver ? "🔴 VƯỢT HẠN MỨC" : isWarning ? "🟡 CHẠM NGƯỠNG" : "🟢 AN TOÀN"}
+                          {isOver ? (language === "vi" ? "🔴 VƯỢT HẠN MỨC" : "🔴 OVER BUDGET") : isWarning ? (language === "vi" ? "🟡 CHẠM NGƯỠNG" : "🟡 NEAR LIMIT") : (language === "vi" ? "🟢 AN TOÀN" : "🟢 SAFE")}
                         </Badge>
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() =>
                             setSelectedDetail({
-                              title: `Chi tiết chi tiêu danh mục: ${item.category.categoryName}`,
-                              subtitle: `Đã chi ${formatVND(item.spent)} / Hạn mức ${formatVND(item.budgetLimit)} (${item.percent.toFixed(1)}%)`,
+                              title: language === "vi" ? `Chi tiết chi tiêu danh mục: ${item.category.categoryName}` : `Category Spending Details: ${item.category.categoryName}`,
+                              subtitle: language === "vi" ? `Đã chi ${formatVND(item.spent)} / Hạn mức ${formatVND(item.budgetLimit)} (${item.percent.toFixed(1)}%)` : `Spent ${formatVND(item.spent)} / Limit ${formatVND(item.budgetLimit)} (${item.percent.toFixed(1)}%)`,
                               items: item.catItems,
                             })
                           }
-                          className="h-6 text-[11px] px-2 font-bold text-sky-600 hover:text-sky-700 dark:text-sky-400 rounded-lg gap-1"
+                          className="h-6 text-[11px] px-2 font-bold text-sky-600 hover:text-sky-700 dark:text-sky-400 rounded-lg gap-1 cursor-pointer"
                         >
                           <Eye className="h-3 w-3" />
                           {item.catItems.length}
@@ -830,10 +839,10 @@ export function FinancialInsights({
 
                     <div className="flex items-baseline justify-between text-xs font-bold">
                       <span className="text-slate-600 dark:text-slate-300">
-                        Đã chi: <strong className={isOver ? "text-rose-600 dark:text-rose-400" : isWarning ? "text-amber-600 dark:text-amber-400" : "text-slate-800 dark:text-slate-100"}>{formatVND(item.spent)}</strong>
+                        {language === "vi" ? "Đã chi: " : "Spent: "}<strong className={isOver ? "text-rose-600 dark:text-rose-400" : isWarning ? "text-amber-600 dark:text-amber-400" : "text-slate-800 dark:text-slate-100"}>{formatVND(item.spent)}</strong>
                       </span>
                       <span className="text-slate-400 font-medium">
-                        Hạn mức: {formatVND(item.budgetLimit)} ({item.percent.toFixed(0)}%)
+                        {language === "vi" ? "Hạn mức: " : "Limit: "}{formatVND(item.budgetLimit)} ({item.percent.toFixed(0)}%)
                       </span>
                     </div>
 
@@ -865,10 +874,10 @@ export function FinancialInsights({
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
               <PieIcon className="h-4.5 w-4.5 text-amber-500" />
-              Bảng Xếp Hạng Chi Tiêu Theo Nhãn Chính
+              {language === "vi" ? "Bảng Xếp Hạng Chi Tiêu Theo Nhãn Chính" : "Primary Category Expense Ranking"}
             </DialogTitle>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Toàn bộ {allCategoriesExpenseSorted.length} nhãn chính sắp xếp theo thứ tự số tiền chi từ cao đến thấp.
+              {language === "vi" ? `Toàn bộ ${allCategoriesExpenseSorted.length} nhãn chính sắp xếp theo thứ tự số tiền chi từ cao đến thấp.` : `All ${allCategoriesExpenseSorted.length} primary categories ranked by expense amount.`}
             </p>
           </DialogHeader>
 

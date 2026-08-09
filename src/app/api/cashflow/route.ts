@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
+import { adjustLiquidAssetBalance } from "@/lib/wealth-service";
 
 // GET: fetch cashflows với filter + pagination
 export async function GET(req: Request) {
@@ -164,6 +165,12 @@ export async function POST(req: Request) {
         }),
       ),
     );
+
+    // Synchronize liquid asset balance in Wealth Management
+    for (const item of parsed.data.items) {
+      const delta = item.cashType === "Income" ? item.amountOfMoney : -item.amountOfMoney;
+      await adjustLiquidAssetBalance(session.user.id, delta, item.sourceId);
+    }
 
     return NextResponse.json(results, { status: 201 });
   } catch (err) {

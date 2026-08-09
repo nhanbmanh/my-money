@@ -6,88 +6,107 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { searchMarketTickers, MarketTicker } from "@/lib/market-ticker-service";
+import { MarketTicker } from "@/lib/market-ticker-service";
+import {
+  getCategoryConfig,
+  AssetCategoryType,
+} from "@/lib/asset-category-types";
 import {
   Search,
   CheckCircle2,
-  Building2,
+  Wallet,
   TrendingUp,
-  CreditCard,
+  Building2,
+  Landmark,
+  HandCoins,
   Percent,
   PlusCircle,
-  HelpCircle,
-  AlertCircle
+  AlertTriangle,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ModalProps {
   open: boolean;
   onOpenChange: (val: boolean) => void;
-  defaultFlow?: "MARKET_DRIVEN" | "CUSTOM_ILLIQUID";
-  macroCategories: any[];
-  holdings?: any[];
+  selectedCategoryType?: AssetCategoryType;
   onSuccess: () => void;
 }
 
 export function AssetCreationModal({
   open,
   onOpenChange,
-  defaultFlow = "MARKET_DRIVEN",
-  macroCategories,
-  holdings = [],
-  onSuccess
+  selectedCategoryType = 0,
+  onSuccess,
 }: ModalProps) {
-  const [activeTab, setActiveTab] = useState<"MARKET_DRIVEN" | "CUSTOM_ILLIQUID">(defaultFlow);
-
-  const hasExistingLiquidHolding = holdings.some((h) => h.macroCategory?.code === "LIQUID");
+  const [categoryType, setCategoryType] = useState<AssetCategoryType>(selectedCategoryType);
 
   useEffect(() => {
-    setActiveTab(defaultFlow);
-  }, [defaultFlow, open]);
+    setCategoryType(selectedCategoryType);
+  }, [selectedCategoryType, open]);
 
-  // Flow A State
+  const catConfig = getCategoryConfig(categoryType);
+
+  // Form State
+  const [amount, setAmount] = useState(""); // Shared amount / value input
+  const [assetName, setAssetName] = useState("");
+
+  // Type 1 Growth state
   const [tickerQuery, setTickerQuery] = useState("");
   const [searchResults, setSearchResults] = useState<MarketTicker[]>([]);
   const [selectedTicker, setSelectedTicker] = useState<MarketTicker | null>(null);
-  const [flowAQuantity, setFlowAQuantity] = useState("");
-  const [flowABuyPrice, setFlowABuyPrice] = useState("");
-  const [flowACalcMode, setFlowACalcMode] = useState<"NAV" | "TOTAL">("NAV");
-  const [flowATotalAmount, setFlowATotalAmount] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [buyPrice, setBuyPrice] = useState("");
+  const [calcMode, setCalcMode] = useState<"NAV" | "TOTAL">("NAV");
+  const [totalAmount, setTotalAmount] = useState("");
+  const [searchingTickers, setSearchingTickers] = useState(false);
 
-  // Flow B State
-  const [flowBName, setFlowBName] = useState("");
-  const [flowBMacroCategoryId, setFlowBMacroCategoryId] = useState("");
-  const [flowBEstimatedValue, setFlowBEstimatedValue] = useState("");
-  const [flowBOriginalCost, setFlowBOriginalCost] = useState("");
-  const [flowBValuationMethod, setFlowBValuationMethod] = useState<"MANUAL" | "AUTO_APPRECIATION">("MANUAL");
-  const [flowBAppreciationRate, setFlowBAppreciationRate] = useState("5");
-  const [flowBIsInvestable, setFlowBIsInvestable] = useState(true);
-  const [flowBAssetClass, setFlowBAssetClass] = useState("REAL_ESTATE");
+  // Type 2 Physical state
+  const [valuationMethod, setValuationMethod] = useState<"MANUAL" | "AUTO_APPRECIATION">("MANUAL");
+  const [appreciationRate, setAppreciationRate] = useState("5");
+  const [isInvestable, setIsInvestable] = useState(true);
 
-  // Linked Mortgage/Loan
-  const [hasLinkedLiability, setHasLinkedLiability] = useState(false);
-  const [liabilityName, setLiabilityName] = useState("");
-  const [liabilityDebtAmount, setLiabilityDebtAmount] = useState("");
-  const [liabilityInterestRate, setLiabilityInterestRate] = useState("8.5");
+  // Type 3 & 4 Debt & Lending state
+  const [interestRate, setInterestRate] = useState("8.5");
 
+  // UI state
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const [searchingTickers, setSearchingTickers] = useState(false);
+  // Secondary Notification Modal State for Liquid Asset adjustment
+  const [showLiquidNoticeModal, setShowLiquidNoticeModal] = useState(false);
+  const [liquidNoticeDetails, setLiquidNoticeDetails] = useState<{
+    action: "DEDUCT" | "ADD";
+    amount: number;
+    titleText: string;
+  } | null>(null);
+  const [adjustingLiquid, setAdjustingLiquid] = useState(false);
 
   useEffect(() => {
     setErrorMsg("");
-  }, [activeTab, open]);
+    setAmount("");
+    setAssetName("");
+    setTickerQuery("");
+    setSelectedTicker(null);
+    setQuantity("");
+    setBuyPrice("");
+    setCalcMode("NAV");
+    setTotalAmount("");
+  }, [categoryType, open]);
 
-  const formatNumberWithDots = (val: string) => {
-    if (!val) return "";
+  const formatNumberWithDots = (val: string | number) => {
+    if (!val && val !== 0) return "";
+    if (typeof val === "number") {
+      if (isNaN(val)) return "";
+      return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(Math.round(val));
+    }
     const clean = val.replace(/\D/g, "");
     if (!clean) return "";
-    return new Intl.NumberFormat("vi-VN").format(Number(clean));
+    return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(Number(clean));
   };
 
   const parseRawNumber = (val: string) => {
@@ -102,8 +121,17 @@ export function AssetCreationModal({
     return parseFloat(clean) || 0;
   };
 
-  // Search effect for Flow A
+  const formatVND = (val: number) => {
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+      maximumFractionDigits: 0,
+    }).format(val);
+  };
+
+  // Search tickers for Type 1
   useEffect(() => {
+    if (categoryType !== 1) return;
     let active = true;
     setSearchingTickers(true);
 
@@ -122,548 +150,735 @@ export function AssetCreationModal({
     return () => {
       active = false;
     };
-  }, [tickerQuery, open]);
-
-  useEffect(() => {
-    if (macroCategories.length > 0) {
-      const availableCats = macroCategories
-        .filter((cat) => cat.code !== "STOCKS")
-        .filter((cat) => !(hasExistingLiquidHolding && cat.code === "LIQUID"));
-
-      if (availableCats.length > 0) {
-        setFlowBMacroCategoryId(availableCats[0].id);
-      }
-    }
-  }, [macroCategories, holdings]);
-
-  const formatVND = (val: number) => {
-    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(val);
-  };
+  }, [tickerQuery, categoryType, open]);
 
   const handleSelectTicker = (ticker: MarketTicker) => {
     setSelectedTicker(ticker);
-    setFlowABuyPrice(formatNumberWithDots(ticker.currentPrice.toString()));
+    setAssetName(ticker.name);
+    if (ticker.currentPrice > 0) {
+      setBuyPrice(formatNumberWithDots(ticker.currentPrice));
+    }
   };
 
-  const handleSubmitFlowA = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     setErrorMsg("");
 
-    const qty = parseDecimalQuantity(flowAQuantity);
-    if (!selectedTicker || !flowAQuantity || qty <= 0) {
-      setErrorMsg("Vui lòng chọn tài sản thị trường và nhập số lượng lớn hơn 0.");
-      return;
-    }
+    try {
+      let payload: any = { categoryType };
 
-    let calculatedBuyPrice = parseRawNumber(flowABuyPrice);
-    if (flowACalcMode === "TOTAL") {
-      const totalAmt = parseRawNumber(flowATotalAmount);
-      if (totalAmt <= 0) {
-        setErrorMsg("Vui lòng nhập tổng số tiền mua hợp lệ.");
+      // Type 0: Liquid Asset
+      if (categoryType === 0) {
+        const val = parseRawNumber(amount);
+        if (val <= 0) {
+          setErrorMsg("Vui lòng nhập giá trị tài sản thanh khoản hợp lệ.");
+          setLoading(false);
+          return;
+        }
+        payload.estimatedCurrentValue = val;
+      }
+
+      // Type 1: Growth Asset
+      if (categoryType === 1) {
+        const qtyNum = parseDecimalQuantity(quantity);
+        const ticker = selectedTicker?.symbol || tickerQuery.trim();
+
+        if (!ticker || qtyNum <= 0) {
+          setErrorMsg("Vui lòng nhập ticker và số lượng sở hữu hợp lệ.");
+          setLoading(false);
+          return;
+        }
+
+        let calculatedPrice = parseRawNumber(buyPrice);
+        if (calcMode === "TOTAL") {
+          const totAmt = parseRawNumber(totalAmount);
+          if (totAmt <= 0) {
+            setErrorMsg("Vui lòng nhập tổng số tiền mua hợp lệ.");
+            setLoading(false);
+            return;
+          }
+          calculatedPrice = totAmt / qtyNum;
+        } else {
+          if (calculatedPrice <= 0) {
+            setErrorMsg("Vui lòng nhập giá mua / NAV hợp lệ.");
+            setLoading(false);
+            return;
+          }
+        }
+
+        payload.symbolOrTicker = ticker;
+        payload.assetName = assetName || `Tài sản ${ticker}`;
+        payload.assetClass = selectedTicker?.assetClass || "STOCKS";
+        payload.quantity = qtyNum;
+        payload.buyPrice = calculatedPrice;
+      }
+
+      // Type 2: Physical Asset
+      if (categoryType === 2) {
+        const val = parseRawNumber(amount);
+        if (!assetName.trim() || val <= 0) {
+          setErrorMsg("Vui lòng nhập tên tài sản và giá trị hợp lệ.");
+          setLoading(false);
+          return;
+        }
+        payload.assetName = assetName.trim();
+        payload.estimatedCurrentValue = val;
+        payload.valuationMethod = valuationMethod;
+        payload.appreciationRate = parseRawNumber(appreciationRate);
+        payload.isInvestable = isInvestable;
+      }
+
+      // Type 3: Debt / Mortgage Asset
+      if (categoryType === 3) {
+        const debt = parseRawNumber(amount);
+        if (!assetName.trim() || debt <= 0) {
+          setErrorMsg("Vui lòng nhập tên tài sản và khoản vay hợp lệ.");
+          setLoading(false);
+          return;
+        }
+        payload.assetName = assetName.trim();
+        payload.debtAmount = debt;
+        payload.interestRate = parseFloat(interestRate) || 0;
+      }
+
+      // Type 4: Lending Asset
+      if (categoryType === 4) {
+        const val = parseRawNumber(amount);
+        if (!assetName.trim() || val <= 0) {
+          setErrorMsg("Vui lòng nhập tên tài sản và giá trị cho vay hợp lệ.");
+          setLoading(false);
+          return;
+        }
+        payload.assetName = assetName.trim();
+        payload.estimatedCurrentValue = val;
+        payload.interestRate = parseFloat(interestRate) || 0;
+      }
+
+      const res = await fetch("/api/wealth/assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const resData = await res.json();
+      setLoading(false);
+
+      if (!res.ok) {
+        setErrorMsg(resData.error || "Không thể khởi tạo tài sản.");
         return;
       }
-      calculatedBuyPrice = totalAmt / qty;
-    }
 
-    setLoading(true);
-    try {
-      const res = await fetch("/api/wealth/assets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          flowType: "MARKET_DRIVEN",
-          symbolOrTicker: selectedTicker.symbol,
-          assetName: selectedTicker.name,
-          assetClass: selectedTicker.assetClass,
-          quantity: qty,
-          buyPrice: calculatedBuyPrice
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      // Check if liquid asset notice modal needs to be triggered (for Type 1, 2, 3, 4)
+      const txValue = resData.transactionValue || resData.addedValue || 0;
 
-      onSuccess();
-      onOpenChange(false);
-      resetForms();
+      if (categoryType !== 0 && txValue > 0) {
+        const action: "DEDUCT" | "ADD" = categoryType === 3 ? "ADD" : "DEDUCT";
+        setLiquidNoticeDetails({
+          action,
+          amount: txValue,
+          titleText:
+            action === "ADD"
+              ? `Cộng ${formatVND(txValue)} vào tài sản thanh khoản`
+              : `Trừ ${formatVND(txValue)} vào tài sản thanh khoản`,
+        });
+        setShowLiquidNoticeModal(true);
+      } else {
+        onSuccess();
+        onOpenChange(false);
+      }
     } catch (err: any) {
-      setErrorMsg(err.message || "Lỗi khi khởi tạo tài sản thị trường");
-    } finally {
       setLoading(false);
+      setErrorMsg(err.message || "Lỗi máy chủ.");
     }
   };
 
-  const handleSubmitFlowB = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg("");
+  const handleConfirmLiquidAdjustment = async () => {
+    if (!liquidNoticeDetails) return;
+    setAdjustingLiquid(true);
 
-    if (!flowBName.trim() || !flowBMacroCategoryId || (!flowBOriginalCost && !flowBEstimatedValue)) {
-      setErrorMsg("Vui lòng điền tên tài sản, danh mục và giá vốn ban đầu.");
-      return;
-    }
-
-    setLoading(true);
     try {
-      const res = await fetch("/api/wealth/assets", {
+      await fetch("/api/wealth/liquid-adjust", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          flowType: "CUSTOM_ILLIQUID",
-          assetName: flowBName.trim(),
-          macroCategoryId: flowBMacroCategoryId,
-          assetClass: flowBAssetClass,
-          estimatedValue: parseRawNumber(flowBOriginalCost || flowBEstimatedValue),
-          originalCost: parseRawNumber(flowBOriginalCost || flowBEstimatedValue),
-          valuationMethod: flowBValuationMethod,
-          annualAppreciationRate: Number(flowBAppreciationRate || 0),
-          isInvestable: flowBIsInvestable,
-          hasLinkedLiability,
-          liabilityName: liabilityName || `Vay thế chấp - ${flowBName}`,
-          liabilityDebtAmount: parseRawNumber(liabilityDebtAmount),
-          liabilityInterestRate: Number(liabilityInterestRate)
-        })
+          action: liquidNoticeDetails.action,
+          amount: liquidNoticeDetails.amount,
+        }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-
+    } catch (e) {
+      console.error("Error adjusting liquid asset:", e);
+    } finally {
+      setAdjustingLiquid(false);
+      setShowLiquidNoticeModal(false);
+      setLiquidNoticeDetails(null);
       onSuccess();
       onOpenChange(false);
-      resetForms();
-    } catch (err: any) {
-      setErrorMsg(err.message || "Lỗi khi khởi tạo tài sản đặc thù");
-    } finally {
-      setLoading(false);
     }
   };
 
-  const resetForms = () => {
-    setTickerQuery("");
-    setSelectedTicker(null);
-    setFlowAQuantity("");
-    setFlowABuyPrice("");
-    setFlowACalcMode("NAV");
-    setFlowATotalAmount("");
-    setFlowBName("");
-    setFlowBEstimatedValue("");
-    setFlowBOriginalCost("");
-    setHasLinkedLiability(false);
-    setLiabilityDebtAmount("");
-    setErrorMsg("");
+  const handleSkipLiquidAdjustment = () => {
+    setShowLiquidNoticeModal(false);
+    setLiquidNoticeDetails(null);
+    onSuccess();
+    onOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl p-6 bg-background">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold flex items-center gap-2">
-            <PlusCircle className="h-6 w-6 text-sky-600 dark:text-sky-400" />
-            <span>Khai Báo & Thêm Tài Sản Mới</span>
-          </DialogTitle>
-          <DialogDescription className="text-xs">
-            Hỗ trợ 2 luồng quy trình thiết kế riêng cho Tài sản Niêm Yết Thị Trường và Tài Sản Đặc Thù/Bất Động Sản.
-          </DialogDescription>
-        </DialogHeader>
-
-        {/* Inline Error Alert Banner */}
-        {errorMsg && (
-          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-200 dark:border-rose-900/80 text-rose-700 dark:text-rose-300 text-xs font-semibold flex items-center justify-between gap-2.5 animate-in fade-in slide-in-from-top-1 my-1 shadow-xs">
-            <div className="flex items-center gap-2 min-w-0">
-              <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
-              <span className="truncate">{errorMsg}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setErrorMsg("")}
-              className="text-xs font-extrabold text-rose-600 hover:text-rose-800 shrink-0 px-1 cursor-pointer"
-            >
-              ✕
-            </button>
-          </div>
-        )}
-
-        {/* Tab Switcher */}
-        <div className="grid grid-cols-2 p-1 bg-muted rounded-xl gap-1">
-          <button
-            type="button"
-            onClick={() => setActiveTab("MARKET_DRIVEN")}
-            className={`py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
-              activeTab === "MARKET_DRIVEN"
-                ? "bg-background text-foreground shadow-xs"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <TrendingUp className="h-4 w-4 text-sky-500" />
-            <span>Luồng A: Tài sản Thị trường (Cổ phiếu, Crypto, Vàng)</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("CUSTOM_ILLIQUID")}
-            className={`py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
-              activeTab === "CUSTOM_ILLIQUID"
-                ? "bg-background text-foreground shadow-xs"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Building2 className="h-4 w-4 text-emerald-500" />
-            <span>Luồng B: Tài sản Đặc thù & Bất động sản</span>
-          </button>
-        </div>
-
-        {/* FLOW A FORM */}
-        {activeTab === "MARKET_DRIVEN" && (
-          <form onSubmit={handleSubmitFlowA} className="space-y-4 pt-2">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs font-bold">Tìm kiếm Ticker hoặc Tên Tài sản</Label>
-                <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full shrink-0">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>LIVE MARKET API</span>
-                </span>
+    <>
+      <Dialog open={open && !showLiquidNoticeModal} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-xl max-h-[85vh] flex flex-col p-0 overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl rounded-3xl">
+          <DialogHeader className="p-6 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <DialogTitle className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-2xl bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
+                <PlusCircle className="h-5 w-5" />
               </div>
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Gõ mã Ticker (ví dụ: HPG, BTC, SJC, DCDS, FPT)..."
-                  value={tickerQuery}
-                  onChange={(e) => setTickerQuery(e.target.value)}
-                  className="pl-9 text-xs rounded-xl"
-                />
+              <div>
+                <span>Khai Báo Tài Sản Mới</span>
+                <p className="text-xs font-normal text-slate-500 dark:text-slate-400 mt-0.5">
+                  {catConfig.name}
+                </p>
               </div>
+            </DialogTitle>
+          </DialogHeader>
 
-              {/* Autocomplete Ticker Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-44 overflow-y-auto p-1 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-800">
-                {searchResults.map((ticker) => {
-                  const isSelected = selectedTicker?.symbol === ticker.symbol;
-                  return (
-                    <button
-                      type="button"
-                      key={ticker.symbol}
-                      onClick={() => handleSelectTicker(ticker)}
-                      className={`p-2 rounded-xl text-left border text-xs transition-all flex flex-col justify-between min-h-[72px] cursor-pointer ${
-                        isSelected
-                          ? "border-sky-500 bg-sky-500/10 text-sky-700 dark:text-sky-300 font-bold ring-2 ring-sky-500/20"
-                          : "border-slate-200 dark:border-slate-800 bg-background hover:bg-muted"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <span className="font-extrabold text-sm">{ticker.symbol}</span>
-                        {isSelected && <CheckCircle2 className="h-3.5 w-3.5 text-sky-600 shrink-0" />}
-                      </div>
-                      <div className="truncate text-[10px] text-muted-foreground font-medium w-full">{ticker.name}</div>
-                      <div className="text-[11px] font-bold text-sky-600 dark:text-sky-400 mt-1">
-                        {ticker.currentPrice.toLocaleString()} VND
-                      </div>
-                    </button>
-                  );
-                })}
+          {/* Form Content */}
+          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
+            {errorMsg && (
+              <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-rose-600 dark:text-rose-400 text-xs font-semibold">
+                {errorMsg}
               </div>
-            </div>
+            )}
 
-            {selectedTicker && (
-              <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-200 dark:border-sky-900 flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-1">
-                <div className="min-w-0 truncate">
-                  <span className="font-bold text-sky-700 dark:text-sky-300">Đã chọn: {selectedTicker.symbol}</span>
-                  <span className="text-muted-foreground ml-1.5 truncate">({selectedTicker.name})</span>
+            {/* TYPE 0: TÀI SẢN THANH KHOẢN */}
+            {categoryType === 0 && (
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-sky-50/70 dark:bg-sky-950/30 border border-sky-100 dark:border-sky-900/50 text-xs text-sky-700 dark:text-sky-300 space-y-1">
+                  <div className="font-bold flex items-center gap-2">
+                    <Wallet className="h-4 w-4 text-sky-500" />
+                    Tài sản thanh khoản cố định
+                  </div>
+                  <p>
+                    Tài sản thanh khoản được khởi tạo với tên mặc định <strong>"Tài sản thanh khoản"</strong> và tự động tính vào Danh mục đầu tư. Mỗi lần nhập thêm, số dư mới sẽ tự động cộng dồn vào tài sản hiện có.
+                  </p>
                 </div>
-                <div className="font-extrabold text-sky-600 dark:text-sky-400 shrink-0">
-                  Giá EOD: {selectedTicker.currentPrice.toLocaleString()} VND
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                    Giá trị tài sản bổ sung (VND) <span className="text-rose-500">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={amount}
+                      onChange={(e) => setAmount(formatNumberWithDots(e.target.value))}
+                      className="h-10 text-sm font-bold text-right pr-8 bg-slate-50 dark:bg-slate-800 rounded-xl"
+                      required
+                    />
+                    <span className="absolute right-3 top-2.5 text-xs font-bold text-slate-400">₫</span>
+                  </div>
+                  {amount && (
+                    <p className="text-[11px] font-semibold text-sky-600 dark:text-sky-400 text-right">
+                      {formatVND(parseRawNumber(amount))}
+                    </p>
+                  )}
                 </div>
               </div>
             )}
 
-            {/* Calculation Method Selector */}
-            <div className="space-y-3 pt-2 border-t border-border mt-3">
-              <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  Phương Thức Khai Báo Giá Vốn
-                </Label>
-                <div className="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-900 rounded-xl gap-1 text-[11px] font-bold border border-slate-200 dark:border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFlowACalcMode("NAV");
-                      setFlowATotalAmount("");
-                    }}
-                    className={`py-1 px-2.5 rounded-lg transition-all cursor-pointer ${
-                      flowACalcMode === "NAV"
-                        ? "bg-sky-500 text-white shadow-xs font-extrabold"
-                        : "text-slate-500 dark:text-slate-400 hover:text-foreground"
-                    }`}
-                  >
-                    Nhập Giá / NAV
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFlowACalcMode("TOTAL");
-                      setFlowABuyPrice("");
-                    }}
-                    className={`py-1 px-2.5 rounded-lg transition-all cursor-pointer ${
-                      flowACalcMode === "TOTAL"
-                        ? "bg-sky-500 text-white shadow-xs font-extrabold"
-                        : "text-slate-500 dark:text-slate-400 hover:text-foreground"
-                    }`}
-                  >
-                    Nhập Tổng Tiền Mua
-                  </button>
-                </div>
-              </div>
-
-              {flowACalcMode === "NAV" ? (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-bold block min-h-[16px]">Số Lượng Sở Hữu</Label>
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="Ví dụ: 1000 hoặc 820.5 hoặc 0.05"
-                        value={flowAQuantity}
-                        onChange={(e) => setFlowAQuantity(e.target.value.replace(",", "."))}
-                        className="h-10 text-xs rounded-xl font-bold"
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-bold block min-h-[16px]">Giá Vốn Mua / NAV (VND/Đơn vị)</Label>
-                      <Input
-                        type="text"
-                        placeholder="Tự động điền theo giá thị trường hoặc tự nhập"
-                        value={flowABuyPrice}
-                        onChange={(e) => setFlowABuyPrice(formatNumberWithDots(e.target.value))}
-                        className="h-10 text-xs rounded-xl font-bold text-sky-600 dark:text-sky-400"
-                        required
-                      />
-                    </div>
+            {/* TYPE 1: TÀI SẢN TĂNG TRƯỞNG (Market Driven Flow A) */}
+            {categoryType === 1 && (
+              <div className="space-y-4">
+                {/* Search Ticker */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                      Mã Ticker / Ký hiệu chứng khoán/crypto/CCQ <span className="text-rose-500">*</span>
+                    </Label>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>LIVE MARKET API</span>
+                    </span>
                   </div>
 
-                  {parseDecimalQuantity(flowAQuantity) > 0 && parseRawNumber(flowABuyPrice) > 0 && (
-                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs font-medium flex items-center justify-between">
-                      <span className="text-slate-600 dark:text-slate-400">💡 Tổng số tiền đầu tư tự động tính:</span>
-                      <span className="font-extrabold text-emerald-600 dark:text-emerald-400 text-sm">
-                        {formatVND(parseDecimalQuantity(flowAQuantity) * parseRawNumber(flowABuyPrice))}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-bold block min-h-[16px]">Số Lượng Sở Hữu</Label>
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="Ví dụ: 1000 hoặc 820.5 hoặc 0.05"
-                        value={flowAQuantity}
-                        onChange={(e) => setFlowAQuantity(e.target.value.replace(",", "."))}
-                        className="h-10 text-xs rounded-xl font-bold"
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-bold block min-h-[16px] text-emerald-600 dark:text-emerald-400">
-                        Tổng Số Tiền Mua / Đầu Tư (VND)
-                      </Label>
-                      <Input
-                        type="text"
-                        placeholder="Ví dụ: 25.000.000"
-                        value={flowATotalAmount}
-                        onChange={(e) => setFlowATotalAmount(formatNumberWithDots(e.target.value))}
-                        className="h-10 text-xs rounded-xl font-bold text-emerald-600 dark:text-emerald-400 border-emerald-500/40 focus:border-emerald-500"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  {parseDecimalQuantity(flowAQuantity) > 0 && parseRawNumber(flowATotalAmount) > 0 && (
-                    <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/20 text-xs font-medium flex items-center justify-between">
-                      <span className="text-slate-600 dark:text-slate-400">💡 Giá Vốn / NAV đơn vị tự động tính:</span>
-                      <span className="font-extrabold text-sky-600 dark:text-sky-400 text-sm">
-                        {formatVND(parseRawNumber(flowATotalAmount) / parseDecimalQuantity(flowAQuantity))} / đơn vị
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <Button
-              type="submit"
-              disabled={loading || !selectedTicker}
-              className="w-full h-11 bg-gradient-to-r from-sky-500 via-blue-600 to-emerald-500 hover:from-sky-600 hover:to-emerald-600 text-white font-bold rounded-xl shadow-lg shadow-sky-500/20 transition-all border-0 cursor-pointer mt-4"
-            >
-              {loading ? "Đang ghi nhận..." : "Xác Nhận Thêm Tài Sản Thị Trường"}
-            </Button>
-          </form>
-        )}
-
-        {/* FLOW B FORM */}
-        {activeTab === "CUSTOM_ILLIQUID" && (
-          <form onSubmit={handleSubmitFlowB} className="space-y-4 pt-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-bold">Tên Tài Sản Đặc Thù / Bất Động Sản</Label>
-                <Input
-                  placeholder="Ví dụ: Căn hộ Landmark 81, Xe Mercedes C200, Vốn góp Startup X"
-                  value={flowBName}
-                  onChange={(e) => setFlowBName(e.target.value)}
-                  className="h-10 text-xs rounded-xl"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs font-bold">Cấp Danh Mục Chính</Label>
-                <select
-                  value={flowBMacroCategoryId}
-                  onChange={(e) => setFlowBMacroCategoryId(e.target.value)}
-                  className="w-full h-10 px-3 text-xs bg-background border border-input rounded-xl focus:ring-2 focus:ring-emerald-500 font-semibold"
-                >
-                  {macroCategories
-                    .filter((cat) => cat.code !== "STOCKS")
-                    .filter((cat) => !(hasExistingLiquidHolding && cat.code === "LIQUID"))
-                    .map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs font-bold">Giá Vốn / Giá Trị Ban Đầu (VND)</Label>
-              <Input
-                type="text"
-                placeholder="Ví dụ: 150.000.000"
-                value={flowBOriginalCost || flowBEstimatedValue}
-                onChange={(e) => {
-                  const val = formatNumberWithDots(e.target.value);
-                  setFlowBOriginalCost(val);
-                  setFlowBEstimatedValue(val);
-                }}
-                className="h-10 text-xs rounded-xl font-bold text-emerald-600 dark:text-emerald-400"
-                required
-              />
-            </div>
-
-            {/* Valuation Method */}
-            <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-              <Label className="text-xs font-bold">Phương Pháp Định Giá Hàng Ngày</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setFlowBValuationMethod("MANUAL")}
-                  className={`p-2 rounded-xl text-xs font-bold border transition-all text-left cursor-pointer ${
-                    flowBValuationMethod === "MANUAL"
-                      ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                      : "border-slate-200 dark:border-slate-800 bg-background"
-                  }`}
-                >
-                  <div>Chỉnh Sửa Thủ Công</div>
-                  <div className="text-[10px] font-normal text-muted-foreground">Chỉ cập nhật khi bạn sửa tay</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setFlowBValuationMethod("AUTO_APPRECIATION")}
-                  className={`p-2 rounded-xl text-xs font-bold border transition-all text-left cursor-pointer ${
-                    flowBValuationMethod === "AUTO_APPRECIATION"
-                      ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                      : "border-slate-200 dark:border-slate-800 bg-background"
-                  }`}
-                >
-                  <div>Tự Tăng Giá Theo Năm (%)</div>
-                  <div className="text-[10px] font-normal text-muted-foreground">Tự tính tỷ lệ tăng trưởng EOD</div>
-                </button>
-              </div>
-
-              {flowBValuationMethod === "AUTO_APPRECIATION" && (
-                <div className="mt-2 space-y-1">
-                  <Label className="text-[11px] font-bold">Tỷ Lệ Tăng Trưởng Hàng Năm Dự Kiến (%)</Label>
-                  <Input
-                    type="number"
-                    step="any"
-                    value={flowBAppreciationRate}
-                    onChange={(e) => setFlowBAppreciationRate(e.target.value)}
-                    className="h-9 text-xs rounded-xl"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Toggle Investable & Asset Class */}
-            <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-800">
-              <div>
-                <div className="text-xs font-bold text-slate-800 dark:text-slate-200">Gắn Cờ "Tài Sản Đầu Tư"</div>
-                <div className="text-[11px] text-muted-foreground">Tắt nếu đây là tài sản tiêu dùng cá nhân (xe cộ, đồ sưu tầm) không tính vào danh mục đầu tư</div>
-              </div>
-              <input
-                type="checkbox"
-                checked={flowBIsInvestable}
-                onChange={(e) => setFlowBIsInvestable(e.target.checked)}
-                className="h-5 w-5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-              />
-            </div>
-
-            {/* Optional Linked Mortgage/Loan Creation */}
-            <div className="p-3 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/30 dark:bg-rose-950/20 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CreditCard className="h-4 w-4 text-rose-600 dark:text-rose-400" />
-                  <span className="text-xs font-bold text-rose-700 dark:text-rose-400">
-                    Tạo Khoản Vay Thế Chấp Gắn Kèm
-                  </span>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={hasLinkedLiability}
-                  onChange={(e) => setHasLinkedLiability(e.target.checked)}
-                  className="h-4 w-4 text-rose-600 rounded cursor-pointer"
-                />
-              </div>
-
-              {hasLinkedLiability && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                  <div className="space-y-1">
-                    <Label className="text-[11px] font-bold">Số Dư Khoản Vay Thế Chấp (VND)</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                     <Input
                       type="text"
-                      placeholder="Ví dụ: 3.000.000.000"
-                      value={liabilityDebtAmount}
-                      onChange={(e) => setLiabilityDebtAmount(formatNumberWithDots(e.target.value))}
-                      className="h-9 text-xs rounded-xl font-bold text-rose-600 dark:text-rose-400"
+                      placeholder="Nhập mã (VD: VNM, FPT, BTC, ETH, DCDS, E1VFVN30)..."
+                      value={tickerQuery}
+                      onChange={(e) => {
+                        setTickerQuery(e.target.value);
+                        setSelectedTicker(null);
+                      }}
+                      className="h-10 pl-9 text-xs font-bold uppercase bg-slate-50 dark:bg-slate-800 rounded-xl"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-[11px] font-bold">Lãi Suất Vay (%/năm)</Label>
+
+                  {/* Autocomplete Search Grid */}
+                  {tickerQuery && searchResults.length > 0 && !selectedTicker && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-xl p-1 bg-white dark:bg-slate-900">
+                      {searchResults.map((t) => (
+                        <button
+                          key={t.symbol}
+                          type="button"
+                          onClick={() => handleSelectTicker(t)}
+                          className="p-2 rounded-lg border text-left text-xs hover:bg-sky-50 dark:hover:bg-slate-800 transition-all cursor-pointer flex flex-col justify-between"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-sky-600 dark:text-sky-400">{t.symbol}</span>
+                          </div>
+                          <span className="text-[10px] text-slate-500 truncate">{t.name}</span>
+                          <span className="font-semibold text-[11px] text-slate-700 dark:text-slate-300 mt-1">{formatVND(t.currentPrice)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Selected Ticker Preview */}
+                {selectedTicker && (
+                  <div className="p-3 rounded-2xl bg-sky-50/80 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-900/60 flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-bold text-sky-700 dark:text-sky-300 flex items-center gap-1.5">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                        {selectedTicker.symbol} - {selectedTicker.name}
+                      </div>
+                      <div className="text-[11px] text-slate-500">Giá thị trường: {formatVND(selectedTicker.currentPrice)}</div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedTicker(null)}
+                      className="text-xs text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/50"
+                    >
+                      Đổi mã
+                    </Button>
+                  </div>
+                )}
+
+                {/* Calculation Mode Selector */}
+                <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                      Phương thức khai báo giá vốn
+                    </Label>
+                    <div className="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl gap-1 text-[11px] font-bold">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCalcMode("NAV");
+                          setTotalAmount("");
+                        }}
+                        className={cn(
+                          "py-1 px-2.5 rounded-lg transition-all cursor-pointer",
+                          calcMode === "NAV"
+                            ? "bg-sky-600 text-white font-extrabold shadow-xs"
+                            : "text-slate-500 dark:text-slate-400 hover:text-foreground"
+                        )}
+                      >
+                        Nhập Giá / NAV
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCalcMode("TOTAL");
+                          setBuyPrice("");
+                        }}
+                        className={cn(
+                          "py-1 px-2.5 rounded-lg transition-all cursor-pointer",
+                          calcMode === "TOTAL"
+                            ? "bg-sky-600 text-white font-extrabold shadow-xs"
+                            : "text-slate-500 dark:text-slate-400 hover:text-foreground"
+                        )}
+                      >
+                        Nhập Tổng Tiền Mua
+                      </button>
+                    </div>
+                  </div>
+
+                  {calcMode === "NAV" ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                            Số lượng sở hữu <span className="text-rose-500">*</span>
+                          </Label>
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="VD: 1000 hoặc 0.05"
+                            value={quantity}
+                            onChange={(e) => setQuantity(e.target.value.replace(",", "."))}
+                            className="h-10 text-xs font-bold bg-slate-50 dark:bg-slate-800 rounded-xl"
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                            Giá mua / NAV (VND) <span className="text-rose-500">*</span>
+                          </Label>
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="0"
+                            value={buyPrice}
+                            onChange={(e) => setBuyPrice(formatNumberWithDots(e.target.value))}
+                            className="h-10 text-xs font-bold text-right pr-4 bg-slate-50 dark:bg-slate-800 rounded-xl"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      {parseDecimalQuantity(quantity) > 0 && parseRawNumber(buyPrice) > 0 && (
+                        <div className="p-3 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 flex items-center justify-between text-xs">
+                          <span className="text-slate-600 dark:text-slate-400">💡 Tổng số tiền đầu tư tự động tính:</span>
+                          <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
+                            {formatVND(parseDecimalQuantity(quantity) * parseRawNumber(buyPrice))}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                            Số lượng sở hữu <span className="text-rose-500">*</span>
+                          </Label>
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="VD: 1000 hoặc 0.05"
+                            value={quantity}
+                            onChange={(e) => setQuantity(e.target.value.replace(",", "."))}
+                            className="h-10 text-xs font-bold bg-slate-50 dark:bg-slate-800 rounded-xl"
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                            Tổng số tiền mua (VND) <span className="text-rose-500">*</span>
+                          </Label>
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="VD: 25.000.000"
+                            value={totalAmount}
+                            onChange={(e) => setTotalAmount(formatNumberWithDots(e.target.value))}
+                            className="h-10 text-xs font-bold text-right pr-4 bg-slate-50 dark:bg-slate-800 border-emerald-500/40 rounded-xl"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      {parseDecimalQuantity(quantity) > 0 && parseRawNumber(totalAmount) > 0 && (
+                        <div className="p-3 rounded-xl bg-sky-50/80 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-900/50 flex items-center justify-between text-xs">
+                          <span className="text-slate-600 dark:text-slate-400">💡 Giá mua / NAV tự động tính:</span>
+                          <span className="font-extrabold text-sky-600 dark:text-sky-400">
+                            {formatVND(parseRawNumber(totalAmount) / parseDecimalQuantity(quantity))} / đơn vị
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TYPE 2: TÀI SẢN VẬT CHẤT */}
+            {categoryType === 2 && (
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                    Tên tài sản vật chất <span className="text-rose-500">*</span>
+                  </Label>
+                  <Input
+                    type="text"
+                    placeholder="VD: Căn hộ Vinhomes, Xe Mazda CX-5, Vàng miếng..."
+                    value={assetName}
+                    onChange={(e) => setAssetName(e.target.value)}
+                    className="h-10 text-xs font-bold bg-slate-50 dark:bg-slate-800 rounded-xl"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                    Giá trị tài sản (VND) <span className="text-rose-500">*</span>
+                  </Label>
+                  <div className="relative">
                     <Input
-                      type="number"
-                      step="any"
-                      placeholder="8.5"
-                      value={liabilityInterestRate}
-                      onChange={(e) => setLiabilityInterestRate(e.target.value)}
-                      className="h-9 text-xs rounded-xl"
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={amount}
+                      onChange={(e) => setAmount(formatNumberWithDots(e.target.value))}
+                      className="h-10 text-sm font-bold text-right pr-8 bg-slate-50 dark:bg-slate-800 rounded-xl"
+                      required
                     />
+                    <span className="absolute right-3 top-2.5 text-xs font-bold text-slate-400">₫</span>
+                  </div>
+                  {amount && (
+                    <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 text-right">
+                      {formatVND(parseRawNumber(amount))}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2 pt-1">
+                  <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                    Phương pháp định giá hàng ngày
+                  </Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setValuationMethod("MANUAL")}
+                      className={cn(
+                        "p-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1 transition-all cursor-pointer",
+                        valuationMethod === "MANUAL"
+                          ? "border-sky-500 bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400"
+                          : "border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400"
+                      )}
+                    >
+                      <span>Chỉnh sửa thủ công</span>
+                      <span className="text-[10px] font-normal opacity-80">Cập nhật giá khi cần</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setValuationMethod("AUTO_APPRECIATION")}
+                      className={cn(
+                        "p-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1 transition-all cursor-pointer",
+                        valuationMethod === "AUTO_APPRECIATION"
+                          ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400"
+                          : "border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400"
+                      )}
+                    >
+                      <span>Tự động tăng trưởng (%)</span>
+                      <span className="text-[10px] font-normal opacity-80">Tự cộng % theo năm</span>
+                    </button>
                   </div>
                 </div>
-              )}
-            </div>
 
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full h-11 bg-gradient-to-r from-sky-500 via-blue-600 to-emerald-500 hover:from-sky-600 hover:to-emerald-600 text-white font-bold rounded-xl shadow-lg shadow-sky-500/20 transition-all border-0 cursor-pointer mt-4"
-            >
-              {loading ? "Đang khởi tạo..." : "Xác Nhận Thêm Tài Sản Đặc Thù"}
-            </Button>
+                {valuationMethod === "AUTO_APPRECIATION" && (
+                  <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800">
+                    <Label className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1">
+                      <Percent className="h-3.5 w-3.5 text-emerald-500" />
+                      Tỷ lệ tăng trưởng dự kiến (%/năm)
+                    </Label>
+                    <Input
+                      type="text"
+                      placeholder="5"
+                      value={appreciationRate}
+                      onChange={(e) => setAppreciationRate(e.target.value)}
+                      className="h-9 text-xs font-bold rounded-lg"
+                    />
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 pt-2">
+                  <input
+                    type="checkbox"
+                    id="isInvestablePhysical"
+                    checked={isInvestable}
+                    onChange={(e) => setIsInvestable(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer"
+                  />
+                  <Label htmlFor="isInvestablePhysical" className="text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer">
+                    Gắn cờ "Tài sản đầu tư" (Tính vào danh mục đầu tư)
+                  </Label>
+                </div>
+              </div>
+            )}
+
+            {/* TYPE 3: TÀI SẢN THẾ CHẤP - NỢ */}
+            {categoryType === 3 && (
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                    Tên khoản nợ / Tài sản thế chấp <span className="text-rose-500">*</span>
+                  </Label>
+                  <Input
+                    type="text"
+                    placeholder="VD: Vay mua nhà Shinhan Bank, Vay mua xe VPBank..."
+                    value={assetName}
+                    onChange={(e) => setAssetName(e.target.value)}
+                    className="h-10 text-xs font-bold bg-slate-50 dark:bg-slate-800 rounded-xl"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                    Khoản vay (VND) <span className="text-rose-500">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={amount}
+                      onChange={(e) => setAmount(formatNumberWithDots(e.target.value))}
+                      className="h-10 text-sm font-bold text-right pr-8 bg-slate-50 dark:bg-slate-800 rounded-xl"
+                      required
+                    />
+                    <span className="absolute right-3 top-2.5 text-xs font-bold text-slate-400">₫</span>
+                  </div>
+                  {amount && (
+                    <p className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 text-right">
+                      {formatVND(parseRawNumber(amount))}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                    Lãi suất vay (%/năm)
+                  </Label>
+                  <Input
+                    type="text"
+                    placeholder="8.5"
+                    value={interestRate}
+                    onChange={(e) => setInterestRate(e.target.value)}
+                    className="h-10 text-xs font-bold bg-slate-50 dark:bg-slate-800 rounded-xl"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* TYPE 4: TÀI SẢN CHO VAY */}
+            {categoryType === 4 && (
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                    Tên tài sản cho vay / Tiền gửi <span className="text-rose-500">*</span>
+                  </Label>
+                  <Input
+                    type="text"
+                    placeholder="VD: Cho Anh A vay cá nhân, Tiền gửi tiết kiệm VCB..."
+                    value={assetName}
+                    onChange={(e) => setAssetName(e.target.value)}
+                    className="h-10 text-xs font-bold bg-slate-50 dark:bg-slate-800 rounded-xl"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                    Giá trị cho vay / Tiền gửi (VND) <span className="text-rose-500">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={amount}
+                      onChange={(e) => setAmount(formatNumberWithDots(e.target.value))}
+                      className="h-10 text-sm font-bold text-right pr-8 bg-slate-50 dark:bg-slate-800 rounded-xl"
+                      required
+                    />
+                    <span className="absolute right-3 top-2.5 text-xs font-bold text-slate-400">₫</span>
+                  </div>
+                  {amount && (
+                    <p className="text-[11px] font-semibold text-purple-600 dark:text-purple-400 text-right">
+                      {formatVND(parseRawNumber(amount))}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                    Lãi suất (%/năm)
+                  </Label>
+                  <Input
+                    type="text"
+                    placeholder="6.5"
+                    value={interestRate}
+                    onChange={(e) => setInterestRate(e.target.value)}
+                    className="h-10 text-xs font-bold bg-slate-50 dark:bg-slate-800 rounded-xl"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onOpenChange(false)}
+                className="text-xs rounded-xl"
+              >
+                Hủy
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={loading}
+                className="text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white rounded-xl gap-1.5"
+              >
+                {loading ? "Đang xử lý..." : "Thêm Tài Sản"}
+              </Button>
+            </div>
           </form>
-        )}
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      {/* SECONDARY NOTIFICATION MODAL FOR LIQUID ASSET ADJUSTMENT */}
+      <Dialog open={showLiquidNoticeModal} onOpenChange={setShowLiquidNoticeModal}>
+        <DialogContent className="sm:max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <span>Biến Động Tài Sản Thanh Khoản</span>
+              </div>
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-600 dark:text-slate-300 mt-2 font-medium">
+              Tài sản thanh khoản có biến động mới. Vui lòng lựa chọn hành động thích hợp:
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 my-3">
+            {liquidNoticeDetails && (
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                Lượng tiền biến động:{" "}
+                <span className="font-bold text-sky-600 dark:text-sky-400">
+                  {formatVND(liquidNoticeDetails.amount)}
+                </span>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleSkipLiquidAdjustment}
+                className="w-full text-xs font-semibold text-slate-700 dark:text-slate-300 justify-start h-11 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                1. Tôi sẽ khai báo thu chi sau
+              </Button>
+
+              <Button
+                type="button"
+                disabled={adjustingLiquid}
+                onClick={handleConfirmLiquidAdjustment}
+                className="w-full text-xs font-bold text-white justify-start h-11 rounded-2xl bg-sky-600 hover:bg-sky-700"
+              >
+                2. {liquidNoticeDetails?.titleText}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

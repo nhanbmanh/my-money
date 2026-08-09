@@ -10,11 +10,13 @@ import {
 } from "@/components/ui/input-otp";
 import { Spinner } from "@/components/ui/spinner";
 import { KeyRound, Mail, Sparkles, CheckCircle2, AlertCircle, ArrowLeft, RefreshCw } from "lucide-react";
+import { useLanguage } from "@/components/language-provider";
 
 export function VerifyEmailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get("email") || "";
+  const { t, language } = useLanguage();
 
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
@@ -34,7 +36,7 @@ export function VerifyEmailContent() {
     const data = await res.json();
     setLoading(false);
     if (!res.ok) {
-      setError(data.error || "Mã xác thực không chính xác hoặc đã hết hạn.");
+      setError(data.error || (language === "vi" ? "Mã xác thực không chính xác hoặc đã hết hạn." : "Invalid or expired OTP code."));
       return;
     }
     router.push("/login");
@@ -52,10 +54,10 @@ export function VerifyEmailContent() {
     const data = await res.json();
     setResending(false);
     if (!res.ok) {
-      setError(data.error || "Không thể gửi lại mã OTP. Vui lòng thử lại sau.");
+      setError(data.error || (language === "vi" ? "Không thể gửi lại mã OTP. Vui lòng thử lại sau." : "Failed to resend OTP code. Please try again."));
       return;
     }
-    setInfo("Mã OTP mới đã được gửi tới email của bạn. Vui lòng kiểm tra hộp thư!");
+    setInfo(language === "vi" ? "Mã OTP mới đã được gửi tới email của bạn. Vui lòng kiểm tra hộp thư!" : "New OTP code sent to your email. Please check your inbox!");
   };
 
   return (
@@ -88,11 +90,11 @@ export function VerifyEmailContent() {
                 Note my life
               </p>
               <p className="text-xs text-slate-400 mt-1.5 font-medium italic">
-                “Bảo mật tài khoản — An tâm ghi chép mỗi ngày”
+                {language === "vi" ? "“Bảo mật tài khoản — An tâm ghi chép mỗi ngày”" : "“Account Security — Safe daily tracking”"}
               </p>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 mt-2.5 rounded-full bg-slate-950/80 border border-slate-800 text-sky-400 font-bold text-xs">
                 <Mail className="h-3.5 w-3.5" />
-                <span>{email || "email-cua-ban@example.com"}</span>
+                <span>{email || "your-email@example.com"}</span>
               </div>
             </div>
           </div>
@@ -145,12 +147,12 @@ export function VerifyEmailContent() {
               {loading ? (
                 <>
                   <Spinner className="h-4 w-4" />
-                  <span>Đang xác nhận mã OTP...</span>
+                  <span>{t("common.loading")}</span>
                 </>
               ) : (
                 <>
                   <CheckCircle2 className="h-4 w-4" />
-                  <span>Xác nhận & Hoàn tất</span>
+                  <span>{language === "vi" ? "Xác nhận & Hoàn tất" : "Verify & Complete"}</span>
                 </>
               )}
             </Button>
@@ -162,7 +164,7 @@ export function VerifyEmailContent() {
                 className="inline-flex items-center gap-1 text-slate-400 hover:text-slate-200 transition-colors font-medium"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
-                <span>Quay lại Đăng nhập</span>
+                <span>{t("auth.btnLogin")}</span>
               </a>
 
               <button
@@ -172,7 +174,7 @@ export function VerifyEmailContent() {
                 className="inline-flex items-center gap-1.5 text-purple-400 hover:text-purple-300 font-bold transition-colors disabled:opacity-50 cursor-pointer"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${resending ? "animate-spin" : ""}`} />
-                <span>{resending ? "Đang gửi..." : "Gửi lại mã OTP"}</span>
+                <span>{resending ? (language === "vi" ? "Đang gửi..." : "Sending...") : (language === "vi" ? "Gửi lại mã OTP" : "Resend OTP")}</span>
               </button>
             </div>
 

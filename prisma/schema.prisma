@@ -168,21 +168,22 @@ model Asset {
 }
 
 model Holding {
-  id                 String        @id @default(uuid())
+  id                 String         @id @default(uuid())
   userId             String
-  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  macroCategoryId    String
-  macroCategory      MacroCategory @relation(fields: [macroCategoryId], references: [id])
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryType       Int            @default(0) // 0: Liquid, 1: Growth, 2: Physical, 3: Debt/Mortgage, 4: Lending
+  macroCategoryId    String?
+  macroCategory      MacroCategory? @relation(fields: [macroCategoryId], references: [id], onDelete: SetNull)
   assetId            String
-  asset              Asset         @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  quantity           Float         @default(0)
-  averageCostBasis   Float         @default(0)
-  currentValue       Float         @default(0)
-  investableFlag     Boolean       @default(true)
-  linkedLiabilityId  String?       @unique
-  linkedLiability    Liability?    @relation("HoldingLiabilityLink", fields: [linkedLiabilityId], references: [id])
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  asset              Asset          @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  quantity           Float          @default(0)
+  averageCostBasis   Float          @default(0)
+  currentValue       Float          @default(0)
+  investableFlag     Boolean        @default(true)
+  linkedLiabilityId  String?        @unique
+  linkedLiability    Liability?     @relation("HoldingLiabilityLink", fields: [linkedLiabilityId], references: [id])
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
   liabilitiesAttached Liability[] @relation("AttachedHolding")
 

@@ -16,14 +16,14 @@ export async function GET(req: Request) {
     if (exportType === "HOLDINGS") {
       const holdings = await prisma.holding.findMany({
         where: { userId },
-        include: { macroCategory: true, asset: true }
+        include: { asset: true }
       });
       return NextResponse.json({ success: true, type: "HOLDINGS", data: holdings });
 
     } else if (exportType === "LEDGER") {
       const transactions = await prisma.wealthTransaction.findMany({
         where: { userId },
-        include: { macroCategory: true, asset: true },
+        include: { asset: true },
         orderBy: { date: "desc" }
       });
       return NextResponse.json({ success: true, type: "LEDGER", data: transactions });
@@ -31,7 +31,7 @@ export async function GET(req: Request) {
     } else if (exportType === "FULL_BACKUP") {
       const holdings = await prisma.holding.findMany({
         where: { userId },
-        include: { macroCategory: true, asset: true }
+        include: { asset: true }
       });
       const liabilities = await prisma.liability.findMany({ where: { userId } });
       const transactions = await prisma.wealthTransaction.findMany({ where: { userId } });
@@ -63,13 +63,10 @@ export async function POST(req: Request) {
 
     const userId = session.user.id;
     const body = await req.json();
-    const { mode, items, mapping, fullBackupData } = body;
+    const { mode, items, mapping } = body;
     // mode: "SNAPSHOT_CSV", "LEDGER_CSV", "OCR_SMART", "RESTORE_FULL_BACKUP"
 
     if (mode === "SNAPSHOT_CSV") {
-      const liquidCat = await prisma.macroCategory.findFirst({ where: { code: "LIQUID" } });
-      const stocksCat = await prisma.macroCategory.findFirst({ where: { code: "STOCKS" } });
-
       let createdCount = 0;
 
       for (const item of items) {
@@ -77,7 +74,7 @@ export async function POST(req: Request) {
         const quantity = Number(item.Quantity || item.quantity || 1);
         const costBasis = Number(item.Cost_Basis || item.costBasis || 0);
         const currentValue = Number(item.Current_Value || item.currentValue || costBasis * quantity);
-        const targetMacroId = symbolOrName.length <= 5 ? stocksCat!.id : liquidCat!.id;
+        const categoryType = symbolOrName.length <= 5 ? 1 : 0; // 1: Growth, 0: Liquid Cash
 
         // Find or create asset
         const cleanSymbol = symbolOrName.toUpperCase().slice(0, 12);
@@ -97,7 +94,7 @@ export async function POST(req: Request) {
         await prisma.holding.create({
           data: {
             userId,
-            macroCategoryId: targetMacroId,
+            categoryType,
             assetId: asset.id,
             quantity,
             averageCostBasis: costBasis,
@@ -116,7 +113,6 @@ export async function POST(req: Request) {
       });
 
     } else if (mode === "LEDGER_CSV") {
-      const stocksCat = await prisma.macroCategory.findFirst({ where: { code: "STOCKS" } });
       let importedCount = 0;
 
       for (const row of items) {
@@ -147,7 +143,6 @@ export async function POST(req: Request) {
             userId,
             date: dateVal ? new Date(dateVal) : new Date(),
             transactionType: (typeVal as string).toUpperCase(),
-            macroCategoryId: stocksCat!.id,
             assetId: asset.id,
             quantity,
             price,
@@ -173,7 +168,7 @@ export async function POST(req: Request) {
           await prisma.holding.create({
             data: {
               userId,
-              macroCategoryId: stocksCat!.id,
+              categoryType: 1, // Default Growth / Stock category type
               assetId: asset.id,
               quantity,
               averageCostBasis: price,
@@ -194,7 +189,6 @@ export async function POST(req: Request) {
 
     } else if (mode === "OCR_SMART") {
       const parsedTrades = items || [];
-      const stocksCat = await prisma.macroCategory.findFirst({ where: { code: "STOCKS" } });
       let committedCount = 0;
 
       for (const trade of parsedTrades) {
@@ -210,7 +204,6 @@ export async function POST(req: Request) {
             userId,
             date: trade.date ? new Date(trade.date) : new Date(),
             transactionType: trade.type || "BUY",
-            macroCategoryId: stocksCat!.id,
             assetId: asset.id,
             quantity: Number(trade.quantity),
             price: Number(trade.price),

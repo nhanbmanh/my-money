@@ -11,6 +11,11 @@ import {
   Edit3,
   FileText,
   RefreshCw,
+  Wallet,
+  TrendingUp,
+  Building2,
+  Landmark,
+  HandCoins,
 } from "lucide-react";
 import { AppSidebar } from "@/components/ui/app-sidebar";
 import {
@@ -28,12 +33,16 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ImportExcelModal } from "@/components/import-excel-modal";
+import { useLanguage } from "@/components/language-provider";
+import { ASSET_CATEGORY_TYPES } from "@/lib/asset-category-types";
 
 export function AuthShell({ children }: { children: React.ReactNode }) {
   const { status } = useSession();
   const pathname = usePathname();
+  const { t, language } = useLanguage();
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [wealthMenuOpen, setWealthMenuOpen] = useState(false);
 
   if (status !== "authenticated") {
     return <div className="min-h-screen bg-background">{children}</div>;
@@ -62,16 +71,61 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
             {isWealthPage && (
               <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                 <NotificationsPopover />
-                <Button
-                  onClick={() =>
-                    window.dispatchEvent(new CustomEvent("open-wealth-creation-modal"))
-                  }
-                  className="h-9 px-2.5 sm:px-3.5 text-xs font-bold gap-1.5 bg-gradient-to-r from-sky-500 via-blue-600 to-emerald-500 hover:from-sky-600 hover:to-emerald-600 text-white rounded-xl shadow-lg shadow-sky-500/20 transition-all border-0 cursor-pointer shrink-0"
-                  title="Thêm tài sản mới"
-                >
-                  <PlusCircle className="h-4 w-4 shrink-0" />
-                  <span className="hidden sm:inline">Thêm tài sản</span>
-                </Button>
+
+                <Popover open={wealthMenuOpen} onOpenChange={setWealthMenuOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      className="h-9 px-3 sm:px-3.5 text-xs font-bold gap-1.5 bg-gradient-to-r from-sky-500 via-blue-600 to-emerald-500 hover:from-sky-600 hover:to-emerald-600 text-white rounded-xl shadow-lg shadow-sky-500/20 transition-all border-0 cursor-pointer shrink-0"
+                      title={language === "vi" ? "Thêm tài sản mới" : "Add new asset"}
+                    >
+                      <PlusCircle className="h-4 w-4 shrink-0" />
+                      <span>{language === "vi" ? "Thêm tài sản" : "Add Asset"}</span>
+                      <ChevronDown className="h-3.5 w-3.5 opacity-80" />
+                    </Button>
+                  </PopoverTrigger>
+
+                  <PopoverContent
+                    align="end"
+                    className="w-72 p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl space-y-1 z-[200]"
+                  >
+                    <div className="px-2.5 py-1.5 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800 mb-1">
+                      Chọn Danh Mục Khai Báo
+                    </div>
+                    <div className="space-y-1">
+                      {Object.values(ASSET_CATEGORY_TYPES).map((cat) => (
+                        <button
+                          key={cat.type}
+                          type="button"
+                          onClick={() => {
+                            setWealthMenuOpen(false);
+                            window.dispatchEvent(
+                              new CustomEvent("open-wealth-creation-modal", {
+                                detail: { categoryType: cat.type },
+                              })
+                            );
+                          }}
+                          className="w-full text-left p-2.5 rounded-xl hover:bg-sky-50 dark:hover:bg-slate-800 flex items-start gap-2.5 transition-colors group cursor-pointer"
+                        >
+                          <div className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${cat.badgeBg}`}>
+                            {cat.type === 0 && <Wallet className="h-4 w-4" />}
+                            {cat.type === 1 && <TrendingUp className="h-4 w-4" />}
+                            {cat.type === 2 && <Building2 className="h-4 w-4" />}
+                            {cat.type === 3 && <Landmark className="h-4 w-4" />}
+                            {cat.type === 4 && <HandCoins className="h-4 w-4" />}
+                          </div>
+                          <div className="overflow-hidden">
+                            <div className="text-xs font-bold text-slate-800 dark:text-slate-100 group-hover:text-sky-600 dark:group-hover:text-sky-400">
+                              {cat.type}. {cat.shortName}
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-normal truncate">
+                              {cat.description}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
             )}
 
@@ -83,10 +137,10 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
                   variant="outline"
                   onClick={() => window.dispatchEvent(new CustomEvent("open-weather-summary"))}
                   className="h-9 px-3 text-xs font-bold gap-1.5 border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 hover:bg-amber-50 dark:hover:bg-slate-800 hover:text-amber-600 rounded-xl shadow-xs transition-all cursor-pointer"
-                  title="Xem tóm tắt thời tiết nhanh"
+                  title={language === "vi" ? "Xem tóm tắt thời tiết nhanh" : "Weather summary"}
                 >
                   <FileText className="h-4 w-4 text-amber-500" />
-                  <span className="hidden sm:inline">Tóm tắt thời tiết</span>
+                  <span className="hidden sm:inline">{language === "vi" ? "Tóm tắt thời tiết" : "Weather Summary"}</span>
                 </Button>
 
                 {/* Weather Location Refresh Button */}
@@ -95,10 +149,10 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
                   size="icon"
                   onClick={() => window.dispatchEvent(new CustomEvent("refresh-weather-location"))}
                   className="h-9 w-9 rounded-xl border-slate-200/80 text-slate-600 dark:text-slate-300 hover:bg-sky-50 hover:text-sky-600 dark:hover:bg-slate-800 transition-all cursor-pointer shrink-0"
-                  title="Làm mới thời tiết theo vị trí GPS"
+                  title={language === "vi" ? "Làm mới thời tiết theo vị trí GPS" : "Refresh location GPS weather"}
                 >
                   <RefreshCw className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-                  <span className="sr-only">Làm mới vị trí</span>
+                  <span className="sr-only">{language === "vi" ? "Làm mới vị trí" : "Refresh location"}</span>
                 </Button>
               </div>
             )}
@@ -115,7 +169,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
                     <PopoverTrigger asChild>
                       <Button className="h-9 px-3.5 text-xs font-bold gap-1.5 bg-gradient-to-r from-sky-500 via-blue-600 to-emerald-500 hover:from-sky-600 hover:to-emerald-600 text-white rounded-xl shadow-lg shadow-sky-500/20 transition-all border-0 cursor-pointer">
                         <PlusCircle className="h-4 w-4" />
-                        <span>Khai giao dịch</span>
+                        <span>{t("header.addTransaction")}</span>
                         <ChevronDown className="h-3.5 w-3.5 opacity-80" />
                       </Button>
                     </PopoverTrigger>
@@ -138,10 +192,10 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
                         </div>
                         <div className="space-y-0.5">
                           <div className="text-xs font-bold text-slate-800 dark:text-slate-100 group-hover:text-sky-600 dark:group-hover:text-sky-400">
-                            Khai báo thủ công
+                            {language === "vi" ? "Khai báo thủ công" : "Manual Transaction"}
                           </div>
                           <div className="text-[11px] text-slate-400">
-                            Điền form nhập từng khoản thu/chi
+                            {language === "vi" ? "Điền form nhập từng khoản thu/chi" : "Fill form for individual income/expense"}
                           </div>
                         </div>
                       </button>
@@ -160,10 +214,10 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
                         </div>
                         <div className="space-y-0.5">
                           <div className="text-xs font-bold text-slate-800 dark:text-slate-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
-                            Import từ file Excel
+                            {language === "vi" ? "Import từ file Excel" : "Import from Excel File"}
                           </div>
                           <div className="text-[11px] text-slate-400">
-                            Tải file mẫu & nhập hàng loạt
+                            {language === "vi" ? "Tải file mẫu & nhập hàng loạt" : "Download template & bulk import"}
                           </div>
                         </div>
                       </button>
@@ -177,7 +231,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
                       window.dispatchEvent(new CustomEvent("open-settings-modal"))
                     }
                     className="h-9 w-9 rounded-xl border-slate-200/80 text-slate-600 hover:bg-slate-50 hover:text-sky-600 transition-all cursor-pointer"
-                    title="Cài đặt"
+                    title={t("header.settings")}
                   >
                     <Settings className="h-4 w-4" />
                   </Button>
@@ -192,7 +246,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
                       <Button
                         size="icon"
                         className="h-9 w-9 bg-gradient-to-r from-sky-500 via-blue-600 to-emerald-500 hover:from-sky-600 hover:to-emerald-600 text-white rounded-xl shadow-lg shadow-sky-500/20 border-0 transition-all cursor-pointer"
-                        title="Menu Thao Tác"
+                        title={language === "vi" ? "Menu Thao Tác" : "Actions Menu"}
                       >
                         <PlusCircle className="h-5 w-5" />
                       </Button>
@@ -216,10 +270,10 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
                         </div>
                         <div>
                           <div className="text-xs font-bold text-slate-800 dark:text-slate-100 group-hover:text-sky-600">
-                            Khai báo thủ công
+                            {language === "vi" ? "Khai báo thủ công" : "Manual Transaction"}
                           </div>
                           <div className="text-[11px] text-slate-400">
-                            Điền form nhập từng khoản thu/chi
+                            {language === "vi" ? "Điền form nhập từng khoản thu/chi" : "Fill form for individual income/expense"}
                           </div>
                         </div>
                       </button>
@@ -238,10 +292,10 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
                         </div>
                         <div>
                           <div className="text-xs font-bold text-slate-800 dark:text-slate-100 group-hover:text-emerald-600">
-                            Import từ file Excel
+                            {language === "vi" ? "Import từ file Excel" : "Import from Excel File"}
                           </div>
                           <div className="text-[11px] text-slate-400">
-                            Tải file & nhập hàng loạt
+                            {language === "vi" ? "Tải file & nhập hàng loạt" : "Download template & bulk import"}
                           </div>
                         </div>
                       </button>
@@ -262,10 +316,10 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
                         </div>
                         <div>
                           <div className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                            Cài đặt hệ thống
+                            {t("header.settings")}
                           </div>
                           <div className="text-[11px] text-slate-400">
-                            Giao diện, danh mục, nguồn
+                            {language === "vi" ? "Giao diện, danh mục, nguồn" : "Appearance, categories, sources"}
                           </div>
                         </div>
                       </button>

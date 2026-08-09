@@ -17,12 +17,12 @@ export function checkIsIncomplete(item: CheckableCashFlowItem): boolean {
   return missingSource || missingPrimary || missingSecondary || missingDatetime;
 }
 
-export function getMissingFields(item: CheckableCashFlowItem): string[] {
+export function getMissingFields(item: CheckableCashFlowItem, lang: "vi" | "en" = "vi"): string[] {
   const missing: string[] = [];
-  if (!item.sourceId && !item.source) missing.push("Nguồn tiền");
-  if (!item.primaryCategoryId && !item.primaryCategory) missing.push("Nhãn chính");
+  if (!item.sourceId && !item.source) missing.push(lang === "vi" ? "Nguồn tiền" : "Payment Source");
+  if (!item.primaryCategoryId && !item.primaryCategory) missing.push(lang === "vi" ? "Nhãn chính" : "Primary Category");
   if (!item.secondaryCategories || item.secondaryCategories.length === 0)
-    missing.push("Nhãn phụ");
-  if (!item.datetime) missing.push("Thời gian");
+    missing.push(lang === "vi" ? "Nhãn phụ" : "Secondary Category");
+  if (!item.datetime) missing.push(lang === "vi" ? "Thời gian" : "Datetime");
   return missing;
 }

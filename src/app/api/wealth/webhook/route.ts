@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { adjustLiquidAssetBalance, getOrCreateLiquidHolding } from "@/lib/wealth-service";
 
 export async function POST(req: Request) {
   try {
@@ -30,53 +31,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Số tiền không hợp lệ" }, { status: 400 });
     }
 
-    const liquidCat = await prisma.macroCategory.findFirst({ where: { code: "LIQUID" } });
-    if (!liquidCat) {
-      return NextResponse.json({ error: "Chưa khởi tạo danh mục LIQUID" }, { status: 400 });
-    }
-
     if (eventType === "EXPENSE") {
       // EVENT 1: EXPENSE
-      // Deduct balance from cash holding under LIQUID macro category
-      let cashHolding = await prisma.holding.findFirst({
-        where: { userId, macroCategoryId: liquidCat.id, asset: { assetClass: "CASH" } },
-        include: { asset: true }
-      });
+      // Deduct balance from unified liquid holding (categoryType: 0)
+      await adjustLiquidAssetBalance(userId, -numericAmount);
 
-      if (!cashHolding) {
-        let cashAsset = await prisma.asset.findFirst({ where: { symbolOrTicker: "VND_CASH" } });
-        if (!cashAsset) {
-          cashAsset = await prisma.asset.create({
-            data: { symbolOrTicker: "VND_CASH", assetName: "Tiền mặt VND", isMarketDriven: false, assetClass: "CASH" }
-          });
-        }
-        cashHolding = await prisma.holding.create({
-          data: {
-            userId,
-            macroCategoryId: liquidCat.id,
-            assetId: cashAsset.id,
-            quantity: 50000000,
-            averageCostBasis: 1,
-            currentValue: 50000000
-          },
-          include: { asset: true }
-        });
-      }
-
-      // Deduct balance
-      const newQty = Math.max(0, cashHolding.quantity - numericAmount);
-      await prisma.holding.update({
-        where: { id: cashHolding.id },
-        data: { quantity: newQty, currentValue: newQty }
-      });
+      const liquidHolding = await getOrCreateLiquidHolding(userId);
 
       // Log Wealth Transaction
       await prisma.wealthTransaction.create({
         data: {
           userId,
           transactionType: "EXPENSE",
-          macroCategoryId: liquidCat.id,
-          assetId: cashHolding.assetId,
+          assetId: liquidHolding.assetId,
           quantity: numericAmount,
           price: 1,
           fee: 0,
@@ -108,33 +75,22 @@ export async function POST(req: Request) {
         success: true,
         event: "EXPENSE",
         deductedAmount: numericAmount,
-        targetCategoryName: liquidCat.name,
-        newBalance: newQty,
+        targetCategoryName: "Tài sản thanh khoản (Tiền mặt)",
+        newBalance: liquidHolding.currentValue,
         netWorthImpact: -numericAmount
       });
 
     } else if (eventType === "TRANSFER") {
-      const stocksCat = await prisma.macroCategory.findFirst({ where: { code: "STOCKS" } });
-      
-      // Deduct cash from LIQUID
-      let sourceCash = await prisma.holding.findFirst({
-        where: { userId, macroCategoryId: liquidCat.id, asset: { assetClass: "CASH" } }
-      });
-      if (sourceCash) {
-        const newSourceQty = Math.max(0, sourceCash.quantity - numericAmount);
-        await prisma.holding.update({
-          where: { id: sourceCash.id },
-          data: { quantity: newSourceQty, currentValue: newSourceQty }
-        });
-      }
+      // Deduct cash from LIQUID holding
+      await adjustLiquidAssetBalance(userId, -numericAmount);
+      const liquidHolding = await getOrCreateLiquidHolding(userId);
 
       // Log TRANSFER transaction
       await prisma.wealthTransaction.create({
         data: {
           userId,
           transactionType: "TRANSFER",
-          macroCategoryId: liquidCat.id,
-          assetId: sourceCash?.assetId,
+          assetId: liquidHolding.assetId,
           quantity: numericAmount,
           price: 1,
           currency: "VND",

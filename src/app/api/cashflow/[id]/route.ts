@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { adjustLiquidAssetBalance } from "@/lib/wealth-service";
 
 const updateSchema = z.object({
   title: z.string().min(1),
@@ -93,6 +94,13 @@ export async function PUT(
       },
     );
 
+    // Calculate net delta between old transaction and updated transaction
+    const oldImpact = existing.cashType === "Income" ? existing.amountOfMoney : -existing.amountOfMoney;
+    const newImpact = data.cashType === "Income" ? data.amountOfMoney : -data.amountOfMoney;
+    const delta = newImpact - oldImpact;
+
+    await adjustLiquidAssetBalance(session.user.id, delta, normalizedSourceId || existing.sourceId);
+
     return NextResponse.json(updated);
   } catch (err: unknown) {
     console.error("Failed to update cashflow", err);
@@ -129,5 +137,11 @@ export async function DELETE(
   }
 
   await prisma.cashFlow.delete({ where: { id } });
+
+  // Reverse transaction effect on liquid assets
+  const oldImpact = existing.cashType === "Income" ? existing.amountOfMoney : -existing.amountOfMoney;
+  const delta = -oldImpact;
+  await adjustLiquidAssetBalance(session.user.id, delta, existing.sourceId);
+
   return NextResponse.json({ success: true });
 }

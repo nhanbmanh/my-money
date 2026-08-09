@@ -17,46 +17,84 @@ export async function PUT(req: Request) {
     }
 
     const body = await req.json();
-    const { holdingId, actionType, newPrice, newQuantity, tradeType, tradePrice, tradeQuantity, investableFlag } = body;
+    const {
+      holdingId,
+      actionType,
+      newPrice,
+      newQuantity,
+      tradeType,
+      tradePrice,
+      tradeQuantity,
+      investableFlag,
+    } = body;
 
     const holding = await prisma.holding.findUnique({
       where: { id: holdingId },
-      include: { asset: true, macroCategory: true }
+      include: { asset: true },
     });
 
     if (!holding || holding.userId !== userId) {
-      return NextResponse.json({ error: "Holding không tồn tại hoặc không đủ quyền." }, { status: 404 });
+      return NextResponse.json(
+        { error: "Holding không tồn tại hoặc không đủ quyền." },
+        { status: 404 }
+      );
     }
 
     if (actionType === "REVALUATION") {
       const updatedVal = Number(newPrice);
-      const updatedQty = newQuantity !== undefined ? Number(newQuantity) : holding.quantity;
+      const updatedQty =
+        newQuantity !== undefined ? Number(newQuantity) : holding.quantity;
 
       const updatedHolding = await prisma.holding.update({
         where: { id: holdingId },
         data: {
           quantity: updatedQty,
           averageCostBasis: updatedVal,
-          currentValue: updatedQty * updatedVal
-        }
+          currentValue: updatedQty * updatedVal,
+        },
+        include: { asset: true },
       });
+
+      if (
+        body.valuationMethod !== undefined ||
+        body.appreciationRate !== undefined ||
+        body.interestRate !== undefined
+      ) {
+        const existingMeta = (holding.asset.metadata as Record<string, any>) || {};
+        await prisma.asset.update({
+          where: { id: holding.assetId },
+          data: {
+            metadata: {
+              ...existingMeta,
+              interestRate:
+                body.interestRate !== undefined
+                  ? Number(body.interestRate)
+                  : existingMeta.interestRate || 0,
+              valuationMethod:
+                body.valuationMethod ?? existingMeta.valuationMethod ?? "MANUAL",
+              appreciationRate:
+                body.appreciationRate !== undefined
+                  ? Number(body.appreciationRate)
+                  : existingMeta.appreciationRate || 0,
+            },
+          },
+        });
+      }
 
       await prisma.wealthTransaction.create({
         data: {
           userId,
           transactionType: "REVALUATION",
-          macroCategoryId: holding.macroCategoryId,
           assetId: holding.assetId,
           quantity: updatedQty,
           price: updatedVal,
           costBasis: updatedVal,
           currency: "VND",
-          notes: `Cập nhật lại định giá/giá vốn TB tài sản ${holding.asset.assetName}`
-        }
+          notes: `Cập nhật lại định giá/giá vốn TB tài sản ${holding.asset.assetName}`,
+        },
       });
 
       return NextResponse.json({ success: true, holding: updatedHolding });
-
     } else if (actionType === "TRADE") {
       const qty = Number(tradeQuantity || 1);
       const price = Number(tradePrice || newPrice || 0);
@@ -66,9 +104,25 @@ export async function PUT(req: Request) {
 
       if (tradeType === "BUY") {
         newQty += qty;
-        newCostBasis = newQty > 0 ? (holding.quantity * holding.averageCostBasis + qty * price) / newQty : price;
-      } else if (tradeType === "SELL") {
-        newQty = Math.max(0, holding.quantity - qty);
+        newCostBasis =
+          newQty > 0
+            ? (holding.quantity * holding.averageCostBasis + qty * price) / newQty
+            : price;
+      } else if (
+        tradeType === "SELL" ||
+        tradeType === "REPAY" ||
+        tradeType === "COLLECT"
+      ) {
+        if (
+          holding.categoryType === 3 ||
+          holding.categoryType === 4 ||
+          holding.categoryType === 2
+        ) {
+          newCostBasis = Math.max(0, holding.averageCostBasis - price);
+          newQty = newCostBasis > 0 ? 1 : 0;
+        } else {
+          newQty = Math.max(0, holding.quantity - qty);
+        }
       }
 
       let updatedHolding = null;
@@ -80,89 +134,104 @@ export async function PUT(req: Request) {
           data: {
             quantity: newQty,
             averageCostBasis: newCostBasis,
-            currentValue: newQty * price
-          }
+            currentValue:
+              holding.categoryType === 3 ||
+              holding.categoryType === 4 ||
+              holding.categoryType === 2
+                ? newCostBasis
+                : newQty * price,
+          },
         });
       }
 
-      // CRITICAL REQUIREMENT: When selling an asset, auto-credit proceeds to LIQUID holding
-      if (tradeType === "SELL") {
-        const proceeds = qty * price;
-        const liquidCat = await prisma.macroCategory.findFirst({ where: { code: "LIQUID" } });
+      // Calculate Liquid Asset Impact Details for User Confirmation Prompt
+      let liquidImpact: { action: "DEDUCT" | "ADD"; amount: number; label: string } | null = null;
 
-        if (liquidCat && proceeds > 0) {
-          let liquidHolding = await prisma.holding.findFirst({
-            where: { userId, macroCategoryId: liquidCat.id }
-          });
+      if (holding.categoryType === 3 && (tradeType === "REPAY" || tradeType === "SELL")) {
+        liquidImpact = {
+          action: "DEDUCT",
+          amount: price,
+          label: `Thanh toán trả bớt nợ ${holding.asset.assetName}`,
+        };
+      } else if (tradeType === "BUY") {
+        liquidImpact = {
+          action: "DEDUCT",
+          amount: price * qty,
+          label: `Mua thêm tài sản ${holding.asset.assetName}`,
+        };
+      } else if (
+        tradeType === "SELL" ||
+        tradeType === "COLLECT" ||
+        holding.categoryType === 4
+      ) {
+        const impactVal =
+          holding.categoryType === 4 || holding.categoryType === 2
+            ? price
+            : price * qty;
+        const actLabel =
+          holding.categoryType === 4
+            ? `Thu hồi khoản cho vay / tiền gửi ${holding.asset.assetName}`
+            : holding.categoryType === 2
+            ? `Thanh lý / bán tài sản ${holding.asset.assetName}`
+            : `Bán bớt tài sản ${holding.asset.assetName}`;
 
-          if (liquidHolding) {
-            const updatedTotalValue = (liquidHolding.currentValue || (liquidHolding.quantity * liquidHolding.averageCostBasis)) + proceeds;
-            await prisma.holding.update({
-              where: { id: liquidHolding.id },
-              data: {
-                quantity: 1,
-                averageCostBasis: updatedTotalValue,
-                currentValue: updatedTotalValue
-              }
-            });
-          } else {
-            let cashAsset = await prisma.asset.findFirst({ where: { symbolOrTicker: "VND_CASH" } });
-            if (!cashAsset) {
-              cashAsset = await prisma.asset.create({
-                data: {
-                  symbolOrTicker: "VND_CASH",
-                  assetName: "Tiền mặt / Tiền gửi",
-                  isMarketDriven: false,
-                  assetClass: "CASH"
-                }
-              });
-            }
-
-            await prisma.holding.create({
-              data: {
-                userId,
-                macroCategoryId: liquidCat.id,
-                assetId: cashAsset.id,
-                quantity: 1,
-                averageCostBasis: proceeds,
-                currentValue: proceeds,
-                investableFlag: true
-              }
-            });
-          }
+        if (impactVal > 0) {
+          liquidImpact = {
+            action: "ADD",
+            amount: impactVal,
+            label: actLabel,
+          };
         }
       }
 
-      const pnl = tradeType === "SELL" ? (price - holding.averageCostBasis) * qty : 0;
+      const pnl =
+        tradeType === "SELL" ? (price - holding.averageCostBasis) * qty : 0;
+
+      const noteAction =
+        holding.categoryType === 3
+          ? "TRẢ BỚT NỢ"
+          : holding.categoryType === 4
+          ? "THU HỒI VAY"
+          : tradeType === "BUY"
+          ? "MUA THÊM"
+          : "BÁN BỚT";
 
       await prisma.wealthTransaction.create({
         data: {
           userId,
           transactionType: tradeType,
-          macroCategoryId: holding.macroCategoryId,
           assetId: holding.assetId,
           quantity: qty,
           price,
           costBasis: holding.averageCostBasis,
           currency: "VND",
-          notes: `Giao dịch ${tradeType === "BUY" ? "MUA THÊM" : "BÁN BỚT"} ${holding.asset.assetName} (Giá vốn: ${holding.averageCostBasis.toLocaleString()} VND, Giá bán: ${price.toLocaleString()} VND -> PnL: ${pnl >= 0 ? "+" : ""}${pnl.toLocaleString()} VND)${tradeType === "SELL" ? ` [Tự động cộng +${(qty * price).toLocaleString()} VND vào Tài sản thanh khoản]` : ""}`
-        }
+          notes: `Giao dịch ${noteAction} ${holding.asset.assetName} (Giá trị: ${price.toLocaleString()} VND)`,
+        },
       });
 
-      return NextResponse.json({ success: true, holding: updatedHolding });
-
+      return NextResponse.json({
+        success: true,
+        holding: updatedHolding,
+        liquidImpact,
+      });
     } else if (actionType === "TOGGLE_INVESTABLE") {
       const updatedHolding = await prisma.holding.update({
         where: { id: holdingId },
-        data: { investableFlag: Boolean(investableFlag) }
+        data: { investableFlag: Boolean(investableFlag) },
       });
       return NextResponse.json({ success: true, holding: updatedHolding });
     }
 
-    return NextResponse.json({ error: "ActionType không hợp lệ." }, { status: 400 });
+    return NextResponse.json(
+      { error: "ActionType không hợp lệ." },
+      { status: 400 }
+    );
   } catch (error: any) {
     console.error("Error updating holding:", error);
-    return NextResponse.json({ error: error.message || "Server Error" }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || "Server Error" },
+      { status: 500 }
+    );
   }
 }
 
@@ -184,17 +253,23 @@ export async function DELETE(req: Request) {
     }
 
     const holding = await prisma.holding.findUnique({
-      where: { id: holdingId }
+      where: { id: holdingId },
     });
 
     if (!holding || (userId && holding.userId !== userId)) {
-      return NextResponse.json({ error: "Holding không tìm thấy" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Holding không tìm thấy" },
+        { status: 404 }
+      );
     }
 
     await prisma.holding.delete({ where: { id: holdingId } });
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Server Error" }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || "Server Error" },
+      { status: 500 }
+    );
   }
 }

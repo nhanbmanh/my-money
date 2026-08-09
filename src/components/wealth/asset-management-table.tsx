@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  ChevronDown,
   PlusCircle,
   MinusCircle,
   Search,
@@ -26,7 +27,10 @@ import {
   ExternalLink,
   ArrowUpDown,
   AlertCircle,
-  History
+  History,
+  Wallet,
+  Landmark,
+  HandCoins
 } from "lucide-react";
 import {
   Dialog,
@@ -34,30 +38,33 @@ import {
   DialogHeader,
   DialogTitle
 } from "@/components/ui/dialog";
+import {
+  ASSET_CATEGORY_TYPES,
+  getCategoryConfig,
+  AssetCategoryType
+} from "@/lib/asset-category-types";
 
 interface TableProps {
   holdings?: any[];
   macroCategories?: any[];
   transactions?: any[];
   isLoading?: boolean;
-  onOpenFlowA: () => void;
-  onOpenFlowB: () => void;
-  onOpenImportExport: () => void;
+  onOpenCreationModal: (type: AssetCategoryType) => void;
   onRefreshData: () => void;
 }
 
+import { useLanguage } from "@/components/language-provider";
+
 export function AssetManagementTable({
   holdings = [],
-  macroCategories = [],
   transactions = [],
   isLoading = false,
-  onOpenFlowA,
-  onOpenFlowB,
-  onOpenImportExport,
+  onOpenCreationModal,
   onRefreshData
 }: TableProps) {
+  const { t, language } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedMacroId, setSelectedMacroId] = useState("ALL");
+  const [selectedCategoryTypeFilter, setSelectedCategoryTypeFilter] = useState<string>("ALL");
   const [eodSyncing, setEodSyncing] = useState(false);
 
   // Edit / Revaluation Modal State
@@ -68,7 +75,20 @@ export function AssetManagementTable({
   const [tradeQty, setTradeQty] = useState("");
   const [liquidAdjustMode, setLiquidAdjustMode] = useState<"SET" | "ADD" | "SUB">("SET");
   const [liquidDeltaAmount, setLiquidDeltaAmount] = useState("");
+  const [valuationMethod, setValuationMethod] = useState<"MANUAL" | "AUTO_GROWTH">("MANUAL");
+  const [appreciationRate, setAppreciationRate] = useState<string>("0");
+  const [interestRate, setInterestRate] = useState<string>("0");
   const [savingEdit, setSavingEdit] = useState(false);
+
+  // Liquid Notice Confirmation Modal State
+  const [liquidNoticeDetails, setLiquidNoticeDetails] = useState<{
+    action: "ADD" | "DEDUCT";
+    amount: number;
+    titleText: string;
+  } | null>(null);
+  const [showLiquidNoticeModal, setShowLiquidNoticeModal] = useState(false);
+  const [adjustingLiquid, setAdjustingLiquid] = useState(false);
+
   // Delete / Notification States
   const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<{ id: string; name: string } | null>(null);
   const [deleteTxTarget, setDeleteTxTarget] = useState<{ id: string; name: string } | null>(null);
@@ -85,9 +105,11 @@ export function AssetManagementTable({
       h.asset.symbolOrTicker.toLowerCase().includes(searchQuery.toLowerCase()) ||
       h.asset.assetName.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesMacro = selectedMacroId === "ALL" || h.macroCategoryId === selectedMacroId;
+    const matchesCategoryType =
+      selectedCategoryTypeFilter === "ALL" ||
+      String(h.categoryType) === selectedCategoryTypeFilter;
 
-    return matchesSearch && matchesMacro;
+    return matchesSearch && matchesCategoryType;
   });
 
   const activeHoldings = filteredHoldings.filter((h) => h.quantity > 0);
@@ -95,9 +117,13 @@ export function AssetManagementTable({
 
   const formatNumberWithDots = (val: string | number) => {
     if (!val && val !== 0) return "";
-    const clean = val.toString().replace(/\D/g, "");
+    if (typeof val === "number") {
+      if (isNaN(val)) return "";
+      return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(Math.round(val));
+    }
+    const clean = val.replace(/\D/g, "");
     if (!clean) return "";
-    return new Intl.NumberFormat("vi-VN").format(Number(clean));
+    return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(Number(clean));
   };
 
   const parseRawNumber = (val: string) => {
@@ -109,11 +135,20 @@ export function AssetManagementTable({
   // Open Edit Modal
   const handleOpenEdit = (holding: any) => {
     setEditHolding(holding);
-    setNewValuationPrice(formatNumberWithDots(holding.averageCostBasis));
+    const initialPrice = holding.categoryType === 1
+      ? (holding.currentMarketPrice || holding.averageCostBasis)
+      : holding.averageCostBasis;
+    setNewValuationPrice(formatNumberWithDots(initialPrice));
     setTradeQty(holding.quantity.toString());
     setTradeType("REVALUATION");
     setLiquidAdjustMode("SET");
     setLiquidDeltaAmount("");
+
+    const meta = holding.asset?.metadata as Record<string, any> | undefined;
+    setValuationMethod(meta?.valuationMethod || "MANUAL");
+    setAppreciationRate(meta?.appreciationRate !== undefined ? String(meta.appreciationRate) : "0");
+    setInterestRate(meta?.interestRate !== undefined ? String(meta.interestRate) : "0");
+
     setEditModalOpen(true);
   };
 
@@ -126,7 +161,7 @@ export function AssetManagementTable({
     } else if (newType === "BUY") {
       setNewValuationPrice(formatNumberWithDots(editHolding.currentMarketPrice || editHolding.averageCostBasis));
     } else if (newType === "SELL") {
-      const isStock = editHolding.macroCategory?.code === "STOCKS";
+      const isStock = editHolding.categoryType === 1;
       const sellDefaultPrice = isStock
         ? (editHolding.currentMarketPrice || editHolding.averageCostBasis)
         : editHolding.averageCostBasis;
@@ -142,8 +177,8 @@ export function AssetManagementTable({
     setSavingEdit(true);
     setNotificationBanner(null);
     try {
-      const isCustomSingleUnit = editHolding.macroCategory?.code !== "STOCKS";
-      const isLiquid = editHolding.macroCategory?.code === "LIQUID";
+      const isCustomSingleUnit = editHolding.categoryType !== 1;
+      const isLiquid = editHolding.categoryType === 0;
 
       let parsedPrice = parseRawNumber(newValuationPrice);
 
@@ -165,14 +200,17 @@ export function AssetManagementTable({
               holdingId: editHolding.id,
               actionType: "REVALUATION",
               newPrice: parsedPrice,
-              newQuantity: isLiquid ? 1 : editHolding.quantity
+              newQuantity: isLiquid ? 1 : editHolding.quantity,
+              valuationMethod: editHolding.categoryType === 2 ? valuationMethod : undefined,
+              appreciationRate: editHolding.categoryType === 2 ? Number(appreciationRate) : undefined,
+              interestRate: (editHolding.categoryType === 3 || editHolding.categoryType === 4) ? Number(interestRate) : undefined,
             }
           : {
               holdingId: editHolding.id,
               actionType: "TRADE",
               tradeType,
               tradePrice: parsedPrice,
-              tradeQuantity: parsedQty
+              tradeQuantity: parsedQty,
             };
 
       const res = await fetch("/api/wealth/holdings", {
@@ -185,11 +223,21 @@ export function AssetManagementTable({
       if (!res.ok) throw new Error(data.error);
 
       setEditModalOpen(false);
-      setNotificationBanner({
-        type: "success",
-        text: `Đã cập nhật ${tradeType === "SELL" ? "giao dịch BÁN" : "định giá"} tài sản ${editHolding.asset.assetName} thành công!`
-      });
-      onRefreshData();
+
+      if (data.liquidImpact && data.liquidImpact.amount > 0) {
+        setLiquidNoticeDetails({
+          action: data.liquidImpact.action,
+          amount: data.liquidImpact.amount,
+          titleText: data.liquidImpact.label,
+        });
+        setShowLiquidNoticeModal(true);
+      } else {
+        setNotificationBanner({
+          type: "success",
+          text: `Đã cập nhật giao dịch tài sản ${editHolding.asset.assetName} thành công!`
+        });
+        onRefreshData();
+      }
     } catch (err: any) {
       setNotificationBanner({
         type: "error",
@@ -198,6 +246,43 @@ export function AssetManagementTable({
     } finally {
       setSavingEdit(false);
     }
+  };
+
+  const handleConfirmLiquidAdjustment = async () => {
+    if (!liquidNoticeDetails) return;
+    setAdjustingLiquid(true);
+
+    try {
+      await fetch("/api/wealth/liquid-adjust", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: liquidNoticeDetails.action,
+          amount: liquidNoticeDetails.amount,
+        }),
+      });
+      setNotificationBanner({
+        type: "success",
+        text: `Đã điều chỉnh ${liquidNoticeDetails.action === "ADD" ? "cộng" : "trừ"} ${formatVND(liquidNoticeDetails.amount)} vào Tài sản thanh khoản thành công!`
+      });
+    } catch (e) {
+      console.error("Error adjusting liquid asset:", e);
+    } finally {
+      setAdjustingLiquid(false);
+      setShowLiquidNoticeModal(false);
+      setLiquidNoticeDetails(null);
+      onRefreshData();
+    }
+  };
+
+  const handleSkipLiquidAdjustment = () => {
+    setShowLiquidNoticeModal(false);
+    setLiquidNoticeDetails(null);
+    setNotificationBanner({
+      type: "success",
+      text: `Đã cập nhật giao dịch tài sản thành công!`
+    });
+    onRefreshData();
   };
 
   // Execute delete holding after confirmation modal
@@ -285,14 +370,14 @@ export function AssetManagementTable({
         </div>
       )}
 
-      {/* Search & Filter Toolbar */}
+      {/* Search & Filter & Actions Toolbar */}
       <Card className="border-slate-200 dark:border-slate-800 shadow-sm">
         <CardContent className="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex flex-1 items-center gap-2 w-full">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Tìm kiếm tài sản theo Ticker hoặc Tên..."
+                placeholder={language === "vi" ? "Tìm kiếm tài sản theo Ticker hoặc Tên..." : "Search assets by Ticker or Name..."}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9 h-9 text-xs rounded-xl"
@@ -300,14 +385,14 @@ export function AssetManagementTable({
             </div>
 
             <select
-              value={selectedMacroId}
-              onChange={(e) => setSelectedMacroId(e.target.value)}
+              value={selectedCategoryTypeFilter}
+              onChange={(e) => setSelectedCategoryTypeFilter(e.target.value)}
               className="h-9 px-3 text-xs bg-background border border-input rounded-xl focus:ring-2 focus:ring-sky-500 font-semibold"
             >
-              <option value="ALL">Tất cả Cấp Macro</option>
-              {macroCategories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
+              <option value="ALL">Tất cả Loại Danh Mục (0 - 4)</option>
+              {Object.values(ASSET_CATEGORY_TYPES).map((cat) => (
+                <option key={cat.type} value={String(cat.type)}>
+                  {cat.type}. {cat.shortName}
                 </option>
               ))}
             </select>
@@ -321,14 +406,14 @@ export function AssetManagementTable({
           <Table>
             <TableHeader className="bg-slate-50 dark:bg-slate-900/80">
               <TableRow>
-                <TableHead className="text-xs font-extrabold uppercase">Mã / Tên Tài Sản</TableHead>
-                <TableHead className="text-xs font-extrabold uppercase">Cấp Danh Mục</TableHead>
-                <TableHead className="text-xs font-extrabold uppercase text-right">Số Lượng</TableHead>
-                <TableHead className="text-xs font-extrabold uppercase text-right">Giá Vốn TB</TableHead>
-                <TableHead className="text-xs font-extrabold uppercase text-right">Giá Thị Trường EOD</TableHead>
-                <TableHead className="text-xs font-extrabold uppercase text-right">Tổng Giá Trị Hiện Tại</TableHead>
-                <TableHead className="text-xs font-extrabold uppercase text-center">Trạng Thái</TableHead>
-                <TableHead className="text-xs font-extrabold uppercase text-center">Thao Tác</TableHead>
+                <TableHead className="text-xs font-extrabold uppercase">{t("wealth.tableSymbol")}</TableHead>
+                <TableHead className="text-xs font-extrabold uppercase">{t("wealth.tableMacro")}</TableHead>
+                <TableHead className="text-xs font-extrabold uppercase text-right">{t("wealth.tableQuantity")}</TableHead>
+                <TableHead className="text-xs font-extrabold uppercase text-right">{t("wealth.tableCostBasis")}</TableHead>
+                <TableHead className="text-xs font-extrabold uppercase text-right">{t("wealth.tableCurrentPrice")}</TableHead>
+                <TableHead className="text-xs font-extrabold uppercase text-right">{t("wealth.tableTotalValuation")}</TableHead>
+                <TableHead className="text-xs font-extrabold uppercase text-center">{t("common.status")}</TableHead>
+                <TableHead className="text-xs font-extrabold uppercase text-center">{t("common.actions")}</TableHead>
               </TableRow>
             </TableHeader>
 
@@ -354,6 +439,8 @@ export function AssetManagementTable({
                 </TableRow>
               ) : (
                 activeHoldings.map((h) => {
+                  const catCfg = getCategoryConfig(h.categoryType);
+                  const isGrowth = h.categoryType === 1 || h.asset.isMarketDriven;
                   const pnl = (h.currentMarketPrice - h.averageCostBasis) * h.quantity;
                   const isProfit = pnl >= 0;
 
@@ -361,12 +448,12 @@ export function AssetManagementTable({
                     <TableRow key={h.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/50 transition-colors">
                       <TableCell className="font-bold text-xs">
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 font-extrabold flex items-center justify-center text-xs shrink-0">
-                            {h.asset.symbolOrTicker.slice(0, 3)}
+                          <div className="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 font-extrabold flex items-center justify-center text-xs shrink-0 uppercase">
+                            {h.asset.isMarketDriven ? h.asset.symbolOrTicker.slice(0, 3) : (h.asset.assetName || catCfg.shortName).slice(0, 3)}
                           </div>
                           <div>
                             <div className="text-slate-900 dark:text-slate-100 flex items-center gap-1">
-                              <span>{h.asset.symbolOrTicker}</span>
+                              <span>{h.asset.isMarketDriven ? h.asset.symbolOrTicker : h.asset.assetName}</span>
                               {h.asset.isMarketDriven ? (
                                 <span className="px-1.5 py-0.2 text-[9px] rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400 font-extrabold">
                                   MARKET
@@ -377,15 +464,17 @@ export function AssetManagementTable({
                                 </span>
                               )}
                             </div>
-                            <div className="text-[11px] text-muted-foreground font-normal truncate max-w-[180px]">
-                              {h.asset.assetName}
+                            <div className="text-[11px] text-muted-foreground font-normal truncate max-w-[220px]">
+                              {h.asset.isMarketDriven ? h.asset.assetName : catCfg.name}
                             </div>
                           </div>
                         </div>
                       </TableCell>
 
                       <TableCell className="text-xs">
-                        <div className="font-bold text-sky-700 dark:text-sky-400">{h.macroCategory?.name || "Gia sản"}</div>
+                        <span className={`px-2.5 py-1 rounded-xl text-[10px] font-extrabold border inline-block ${catCfg.badgeBg}`}>
+                          {catCfg.type}. {catCfg.shortName}
+                        </span>
                       </TableCell>
 
                       <TableCell className="text-xs font-bold text-right">
@@ -397,8 +486,8 @@ export function AssetManagementTable({
                       </TableCell>
 
                       <TableCell className="text-xs text-right font-bold">
-                        {h.macroCategory?.code === "STOCKS" ? (
-                          formatVND(h.currentMarketPrice)
+                        {isGrowth ? (
+                          formatVND(h.currentMarketPrice || h.averageCostBasis)
                         ) : (
                           <span className="text-slate-400 font-normal">-</span>
                         )}
@@ -406,9 +495,9 @@ export function AssetManagementTable({
 
                       <TableCell className="text-xs text-right">
                         <div className="font-extrabold text-slate-900 dark:text-slate-100">
-                          {formatVND(h.macroCategory?.code === "STOCKS" ? h.currentValue : h.quantity * h.averageCostBasis)}
+                          {formatVND(isGrowth ? h.currentValue : h.quantity * h.averageCostBasis)}
                         </div>
-                        {h.macroCategory?.code === "STOCKS" && (
+                        {isGrowth && pnl !== 0 && (
                           <div className={`text-[10px] font-bold ${isProfit ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
                             {isProfit ? "+" : ""}{formatVND(pnl)}
                           </div>
@@ -505,19 +594,19 @@ export function AssetManagementTable({
 
                       <TableCell className="font-bold text-xs">
                         <div className="text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                          <span>{tx.asset?.assetName || tx.asset?.symbolOrTicker || "Tài sản"}</span>
+                          <span>{tx.asset?.isMarketDriven ? tx.asset?.symbolOrTicker : (tx.asset?.assetName || tx.asset?.symbolOrTicker || "Tài sản")}</span>
                           <span className="px-1.5 py-0.2 text-[9px] rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 font-extrabold">
                             BÁN
                           </span>
                         </div>
                         <div className="text-[10px] text-muted-foreground font-normal">
-                          {tx.asset?.symbolOrTicker}
+                          {tx.asset?.isMarketDriven ? tx.asset?.assetName : getCategoryConfig(tx.asset?.categoryType ?? 0).name}
                         </div>
                       </TableCell>
 
                       <TableCell className="text-xs">
                         <div className="font-semibold text-sky-700 dark:text-sky-400">
-                          {tx.macroCategory?.name || "Gia sản"}
+                          {getCategoryConfig(tx.asset?.categoryType ?? 0).name}
                         </div>
                       </TableCell>
 
@@ -565,7 +654,11 @@ export function AssetManagementTable({
       {/* Edit / Revaluation Modal */}
       {editHolding && (
         <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
-          <DialogContent className="max-w-md rounded-2xl p-6">
+          <DialogContent
+            onPointerDownOutside={(e) => e.preventDefault()}
+            onInteractOutside={(e) => e.preventDefault()}
+            className="max-w-md rounded-2xl p-6"
+          >
             <DialogHeader>
               <DialogTitle className="text-lg font-bold flex items-center gap-2">
                 <Edit className="h-5 w-5 text-sky-600" />
@@ -574,8 +667,8 @@ export function AssetManagementTable({
             </DialogHeader>
 
             <form onSubmit={handleSubmitEdit} className="space-y-4 pt-2">
-              {/* Dynamic Action Tabs per Macro Category */}
-              {editHolding.macroCategory?.code === "STOCKS" ? (
+              {/* Dynamic Action Tabs per Category Type */}
+              {editHolding.categoryType === 1 ? (
                 <div className="grid grid-cols-3 p-1 bg-muted rounded-xl gap-1 text-xs font-bold">
                   <button
                     type="button"
@@ -605,9 +698,51 @@ export function AssetManagementTable({
                     Bán Bớt
                   </button>
                 </div>
-              ) : editHolding.macroCategory?.code === "LIQUID" ? (
+              ) : editHolding.categoryType === 0 ? (
                 <div className="p-2.5 bg-sky-500/10 border border-sky-500/20 rounded-xl text-xs font-bold text-sky-600 dark:text-sky-400 text-center">
                   Tài Sản Thanh Khoản (Tiền Mặt/Tiền Gửi) — Điều Chỉnh & Định Giá Lại
+                </div>
+              ) : editHolding.categoryType === 3 ? (
+                <div className="grid grid-cols-2 p-1 bg-muted rounded-xl gap-1 text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => handleTradeTypeChange("REVALUATION")}
+                    className={`py-1.5 rounded-lg transition-all cursor-pointer ${
+                      tradeType === "REVALUATION" ? "bg-background text-foreground shadow-xs" : "text-muted-foreground"
+                    }`}
+                  >
+                    Định Giá & Lãi Suất
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleTradeTypeChange("SELL")}
+                    className={`py-1.5 rounded-lg transition-all cursor-pointer ${
+                      tradeType === "SELL" ? "bg-rose-600 text-white shadow-xs" : "text-muted-foreground"
+                    }`}
+                  >
+                    Trả Bớt Nợ
+                  </button>
+                </div>
+              ) : editHolding.categoryType === 4 ? (
+                <div className="grid grid-cols-2 p-1 bg-muted rounded-xl gap-1 text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => handleTradeTypeChange("REVALUATION")}
+                    className={`py-1.5 rounded-lg transition-all cursor-pointer ${
+                      tradeType === "REVALUATION" ? "bg-background text-foreground shadow-xs" : "text-muted-foreground"
+                    }`}
+                  >
+                    Định Giá & Lãi Suất
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleTradeTypeChange("SELL")}
+                    className={`py-1.5 rounded-lg transition-all cursor-pointer ${
+                      tradeType === "SELL" ? "bg-emerald-600 text-white shadow-xs" : "text-muted-foreground"
+                    }`}
+                  >
+                    Thu Hồi Vay
+                  </button>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 p-1 bg-muted rounded-xl gap-1 text-xs font-bold">
@@ -627,13 +762,13 @@ export function AssetManagementTable({
                       tradeType === "SELL" ? "bg-rose-600 text-white shadow-xs" : "text-muted-foreground"
                     }`}
                   >
-                    Bán Bớt
+                    Bán Bớt / Thanh Lý
                   </button>
                 </div>
               )}
 
               {/* Form Input Controls */}
-              {editHolding.macroCategory?.code === "LIQUID" ? (
+              {editHolding.categoryType === 0 ? (
                 <div className="space-y-4">
                   <div className="grid grid-cols-3 p-1 bg-slate-900/60 rounded-xl gap-1 text-xs font-bold border border-slate-800">
                     <button
@@ -767,21 +902,102 @@ export function AssetManagementTable({
                   )}
                 </div>
               ) : tradeType === "REVALUATION" ? (
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold">
-                    Định Giá Hiện Tại Ước Tính
-                  </label>
-                  <Input
-                    type="text"
-                    value={newValuationPrice}
-                    onChange={(e) => setNewValuationPrice(formatNumberWithDots(e.target.value))}
-                    className="h-10 text-xs rounded-xl font-bold"
-                    required
-                  />
+                <div className="space-y-4">
+                  {editHolding.categoryType === 2 && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold">Phương pháp định giá hàng ngày</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setValuationMethod("MANUAL")}
+                          className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                            valuationMethod === "MANUAL"
+                              ? "border-sky-500 bg-sky-500/10 text-sky-700 dark:text-sky-300 font-extrabold shadow-xs"
+                              : "border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-900"
+                          }`}
+                        >
+                          <div className="text-xs font-bold">Chỉnh sửa thủ công</div>
+                          <div className="text-[10px] text-muted-foreground font-normal">Cập nhật giá khi cần</div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setValuationMethod("AUTO_GROWTH")}
+                          className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                            valuationMethod === "AUTO_GROWTH"
+                              ? "border-sky-500 bg-sky-500/10 text-sky-700 dark:text-sky-300 font-extrabold shadow-xs"
+                              : "border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-900"
+                          }`}
+                        >
+                          <div className="text-xs font-bold">Tự động tăng trưởng (%)</div>
+                          <div className="text-[10px] text-muted-foreground font-normal">Tự cộng % theo năm</div>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold">
+                      {editHolding.categoryType === 1
+                        ? "Đơn Giá Khai Báo / NAV Hiện Tại (₫ / 1 đơn vị)"
+                        : editHolding.categoryType === 2
+                        ? "Giá Trị Ước Tính Hiện Tại (VND)"
+                        : editHolding.categoryType === 3
+                        ? "Dư Nợ Hiện Tại Ước Tính (VND)"
+                        : editHolding.categoryType === 4
+                        ? "Dư Cho Vay / Tiền Gửi Hiện Tại (VND)"
+                        : "Định Giá Hiện Tại Ước Tính"}
+                    </label>
+                    <Input
+                      type="text"
+                      value={newValuationPrice}
+                      onChange={(e) => setNewValuationPrice(formatNumberWithDots(e.target.value))}
+                      className="h-10 text-xs rounded-xl font-bold"
+                      required
+                    />
+                    {editHolding.categoryType === 1 && (
+                      <div className="text-[11px] font-semibold text-sky-600 dark:text-sky-400 mt-1">
+                        💡 Đang sở hữu {editHolding.quantity.toLocaleString("vi-VN", { maximumFractionDigits: 6 })} đơn vị → Tổng giá trị ước tính: {formatVND(editHolding.quantity * parseRawNumber(newValuationPrice))}
+                      </div>
+                    )}
+                  </div>
+
+                  {(editHolding.categoryType === 3 || editHolding.categoryType === 4) && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold">
+                        {editHolding.categoryType === 3 ? "Lãi Suất Vay (%/năm)" : "Lãi Suất Cho Vay / Tiền Gửi (%/năm)"}
+                      </label>
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="Ví dụ: 7.5 hoặc 10"
+                        value={interestRate}
+                        onChange={(e) => setInterestRate(e.target.value.replace(",", "."))}
+                        className="h-10 text-xs rounded-xl font-bold"
+                      />
+                    </div>
+                  )}
+
+                  {editHolding.categoryType === 2 && valuationMethod === "AUTO_GROWTH" && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold">Tỷ Lệ Tăng Trưởng Hàng Năm (%/năm)</label>
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="Ví dụ: 5.5 hoặc 10"
+                        value={appreciationRate}
+                        onChange={(e) => setAppreciationRate(e.target.value.replace(",", "."))}
+                        className="h-10 text-xs rounded-xl font-bold"
+                      />
+                      <div className="text-[11px] text-muted-foreground font-medium">
+                        💡 Giá trị tài sản sẽ tự động tăng với tỷ lệ <strong>{appreciationRate || 0}%/năm</strong>.
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {editHolding.macroCategory?.code === "STOCKS" && (
+                  {editHolding.categoryType === 1 && (
                     <div className="space-y-1">
                       <label className="text-xs font-bold">Số Lượng {tradeType === "BUY" ? "Mua Thêm" : "Bán Bớt"}</label>
                       <Input
@@ -796,7 +1012,15 @@ export function AssetManagementTable({
                     </div>
                   )}
                   <div className="space-y-1">
-                    <label className="text-xs font-bold">Giá Khớp Giao Dịch</label>
+                    <label className="text-xs font-bold">
+                      {editHolding.categoryType === 3
+                        ? "Số Tiền Trả Nợ (VND)"
+                        : editHolding.categoryType === 4
+                        ? "Số Tiền Thu Hồi Cho Vay / Tiền Gửi (VND)"
+                        : editHolding.categoryType === 2
+                        ? "Giá Trị Thanh Lý / Bán (VND)"
+                        : "Giá Khớp Giao Dịch"}
+                    </label>
                     <Input
                       type="text"
                       value={newValuationPrice}
@@ -804,9 +1028,29 @@ export function AssetManagementTable({
                       className="h-10 text-xs rounded-xl font-bold"
                       required
                     />
-                    {tradeType === "SELL" && (
+                    {editHolding.categoryType === 3 && (
+                      <div className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 mt-1">
+                        💡 Số tiền trả nợ sẽ được TỰ ĐỘNG TRỪ (-) khỏi Tài sản thanh khoản.
+                      </div>
+                    )}
+                    {editHolding.categoryType === 4 && (
                       <div className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mt-1">
-                        💡 Số tiền bán thu về sẽ được tự động cộng + vào Tài sản thanh khoản.
+                        💡 Số tiền thu hồi sẽ được TỰ ĐỘNG CỘNG (+) vào Tài sản thanh khoản.
+                      </div>
+                    )}
+                    {editHolding.categoryType === 2 && (
+                      <div className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mt-1">
+                        💡 Số tiền bán / thanh lý sẽ được TỰ ĐỘNG CỘNG (+) vào Tài sản thanh khoản.
+                      </div>
+                    )}
+                    {editHolding.categoryType === 1 && tradeType === "SELL" && (
+                      <div className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mt-1">
+                        💡 Số tiền bán thu về sẽ được TỰ ĐỘNG CỘNG (+) vào Tài sản thanh khoản.
+                      </div>
+                    )}
+                    {editHolding.categoryType === 1 && tradeType === "BUY" && (
+                      <div className="text-[11px] font-semibold text-sky-600 dark:text-sky-400 mt-1">
+                        💡 Số tiền mua thêm sẽ được TỰ ĐỘNG TRỪ (-) khỏi Tài sản thanh khoản.
                       </div>
                     )}
                   </div>
@@ -899,6 +1143,61 @@ export function AssetManagementTable({
                   className="h-9 px-4 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-xl cursor-pointer"
                 >
                   {deletingTarget ? "Đang xóa..." : "Xóa Lịch Sử"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Liquid Asset Adjustment Prompt Modal */}
+      {showLiquidNoticeModal && liquidNoticeDetails && (
+        <Dialog open={showLiquidNoticeModal} onOpenChange={(open) => !open && handleSkipLiquidAdjustment()}>
+          <DialogContent className="max-w-md rounded-2xl p-6">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-bold flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                <Wallet className="h-5 w-5" />
+                <span>Tài Sản Thanh Khoản Có Biến Động Mới!</span>
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4 pt-2">
+              <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                Bạn vừa thực hiện <strong>{liquidNoticeDetails.titleText}</strong> với số tiền{" "}
+                <strong className="text-sky-600 dark:text-sky-400">{formatVND(liquidNoticeDetails.amount)}</strong>.
+              </p>
+              <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                Bạn có muốn tự động{" "}
+                <strong className={liquidNoticeDetails.action === "ADD" ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>
+                  {liquidNoticeDetails.action === "ADD" ? "CỘNG (+)" : "TRỪ (-)"}
+                </strong>{" "}
+                số tiền này vào số dư <strong>Tài sản thanh khoản (Tiền mặt)</strong> không?
+              </p>
+
+              <div className="flex flex-col sm:flex-row items-center justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleSkipLiquidAdjustment}
+                  className="w-full sm:w-auto h-9 text-xs font-bold rounded-xl"
+                >
+                  Bỏ qua / Để sau
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleConfirmLiquidAdjustment}
+                  disabled={adjustingLiquid}
+                  className={`w-full sm:w-auto h-9 text-xs font-bold text-white rounded-xl shadow-md cursor-pointer ${
+                    liquidNoticeDetails.action === "ADD"
+                      ? "bg-emerald-600 hover:bg-emerald-700"
+                      : "bg-rose-600 hover:bg-rose-700"
+                  }`}
+                >
+                  {adjustingLiquid
+                    ? "Đang lưu..."
+                    : liquidNoticeDetails.action === "ADD"
+                    ? `Cộng Ngay +${formatVND(liquidNoticeDetails.amount)}`
+                    : `Trừ Ngay -${formatVND(liquidNoticeDetails.amount)}`}
                 </Button>
               </div>
             </div>

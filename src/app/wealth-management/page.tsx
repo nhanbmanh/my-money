@@ -3,24 +3,16 @@
 import { useEffect, useState } from "react";
 import {
   ShieldCheck,
-  TrendingUp,
-  Building2,
   Table as TableIcon,
-  FileSpreadsheet,
-  Webhook,
   RefreshCw,
-  PlusCircle,
-  Landmark,
-  PieChart as PieIcon
+  PieChart as PieIcon,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OverviewBalanceSheet } from "@/components/wealth/overview-balance-sheet";
 import { InvestmentPortfolioView } from "@/components/wealth/investment-portfolio-view";
 import { AssetManagementTable } from "@/components/wealth/asset-management-table";
 import { AssetCreationModal } from "@/components/wealth/asset-creation-modal";
-import { ImportExportMigrationModal } from "@/components/wealth/import-export-migration-modal";
-import { CashflowWebhookSimulator } from "@/components/wealth/cashflow-webhook-simulator";
+import { AssetCategoryType } from "@/lib/asset-category-types";
 
 export default function WealthManagementPage() {
   const [data, setData] = useState<any>(null);
@@ -29,12 +21,11 @@ export default function WealthManagementPage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Tab State
-  const [activeView, setActiveView] = useState<"OVERVIEW" | "PORTFOLIO" | "HOLDINGS" | "MIGRATION" | "WEBHOOK">("OVERVIEW");
+  const [activeView, setActiveView] = useState<"OVERVIEW" | "PORTFOLIO" | "HOLDINGS">("OVERVIEW");
 
   // Modals
   const [creationModalOpen, setCreationModalOpen] = useState(false);
-  const [creationFlow, setCreationFlow] = useState<"MARKET_DRIVEN" | "CUSTOM_ILLIQUID">("MARKET_DRIVEN");
-  const [migrationModalOpen, setMigrationModalOpen] = useState(false);
+  const [selectedCategoryType, setSelectedCategoryType] = useState<AssetCategoryType>(0);
 
   // Fetch wealth data from backend API
   const fetchWealthData = async () => {
@@ -62,14 +53,19 @@ export default function WealthManagementPage() {
     fetchWealthData();
   }, [refreshKey]);
 
+  const handleOpenCreation = (catType: AssetCategoryType = 0) => {
+    setSelectedCategoryType(catType);
+    setCreationModalOpen(true);
+  };
+
   useEffect(() => {
-    const handleOpenCreation = () => {
-      setCreationFlow("MARKET_DRIVEN");
-      setCreationModalOpen(true);
+    const handleOpenCreationEvent = (e: any) => {
+      const catType = e.detail?.categoryType !== undefined ? e.detail.categoryType : 0;
+      handleOpenCreation(catType);
     };
-    window.addEventListener("open-wealth-creation-modal", handleOpenCreation);
+    window.addEventListener("open-wealth-creation-modal", handleOpenCreationEvent);
     return () => {
-      window.removeEventListener("open-wealth-creation-modal", handleOpenCreation);
+      window.removeEventListener("open-wealth-creation-modal", handleOpenCreationEvent);
     };
   }, []);
 
@@ -78,7 +74,10 @@ export default function WealthManagementPage() {
       <div className="w-full space-y-6 animate-pulse py-4">
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, idx) => (
-            <div key={idx} className="h-32 rounded-2xl bg-muted/60 p-5 space-y-3 border border-slate-200/50 dark:border-slate-800/50">
+            <div
+              key={idx}
+              className="h-32 rounded-2xl bg-muted/60 p-5 space-y-3 border border-slate-200/50 dark:border-slate-800/50"
+            >
               <Skeleton className="h-4 w-32 rounded-lg" />
               <Skeleton className="h-8 w-48 rounded-xl bg-sky-500/20" />
               <Skeleton className="h-4 w-24 rounded-lg" />
@@ -101,7 +100,7 @@ export default function WealthManagementPage() {
     totalInvestedCostBasis: 0,
     totalMarketValueInvestments: 0,
     unrealizedPnL: 0,
-    unrealizedPnLPercent: 0
+    unrealizedPnLPercent: 0,
   };
 
   const macroCategories = data?.macroCategories || [];
@@ -111,7 +110,7 @@ export default function WealthManagementPage() {
 
   return (
     <div className="w-full flex-1 flex flex-col space-y-6 pb-12 relative">
-      {/* Top Animated Loading Bar & Glassmorphic Floating Badge */}
+      {/* Top Animated Loading Bar & Floating Badge */}
       {isRefetching && (
         <div className="fixed top-0 left-0 right-0 z-[300] pointer-events-none">
           <div className="h-1 w-full bg-gradient-to-r from-sky-500 via-blue-600 to-emerald-500 animate-pulse" />
@@ -123,116 +122,82 @@ export default function WealthManagementPage() {
       )}
 
       {/* Main Container Content */}
-      <div className={`space-y-6 transition-opacity duration-200 ${isRefetching ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
+      <div
+        className={`space-y-6 transition-opacity duration-200 ${
+          isRefetching ? "opacity-60 pointer-events-none" : "opacity-100"
+        }`}
+      >
         {/* Main View Tabs Bar */}
         <div className="flex items-center gap-1.5 bg-muted/80 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-x-auto">
-        <button
-          onClick={() => setActiveView("OVERVIEW")}
-          className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
-            activeView === "OVERVIEW"
-              ? "bg-background text-foreground shadow-sm ring-1 ring-slate-200 dark:ring-slate-700"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <ShieldCheck className="h-4 w-4 text-sky-500" />
-          <span>Bảng Cân Đối Gia Sản</span>
-        </button>
+          <button
+            onClick={() => setActiveView("OVERVIEW")}
+            className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
+              activeView === "OVERVIEW"
+                ? "bg-background text-foreground shadow-sm ring-1 ring-slate-200 dark:ring-slate-700"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <ShieldCheck className="h-4 w-4 text-sky-500" />
+            <span>Bảng Cân Đối Gia Sản</span>
+          </button>
 
-        <button
-          onClick={() => setActiveView("PORTFOLIO")}
-          className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
-            activeView === "PORTFOLIO"
-              ? "bg-background text-foreground shadow-sm ring-1 ring-slate-200 dark:ring-slate-700"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <PieIcon className="h-4 w-4 text-emerald-500" />
-          <span>Danh Mục Đầu Tư</span>
-        </button>
+          <button
+            onClick={() => setActiveView("PORTFOLIO")}
+            className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
+              activeView === "PORTFOLIO"
+                ? "bg-background text-foreground shadow-sm ring-1 ring-slate-200 dark:ring-slate-700"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <PieIcon className="h-4 w-4 text-emerald-500" />
+            <span>Danh Mục Đầu Tư</span>
+          </button>
 
-        <button
-          onClick={() => setActiveView("HOLDINGS")}
-          className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
-            activeView === "HOLDINGS"
-              ? "bg-background text-foreground shadow-sm ring-1 ring-slate-200 dark:ring-slate-700"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <TableIcon className="h-4 w-4 text-amber-500" />
-          <span>Bảng Số Dư & Quản Lý Tài Sản</span>
-        </button>
+          <button
+            onClick={() => setActiveView("HOLDINGS")}
+            className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
+              activeView === "HOLDINGS"
+                ? "bg-background text-foreground shadow-sm ring-1 ring-slate-200 dark:ring-slate-700"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <TableIcon className="h-4 w-4 text-amber-500" />
+            <span>Bảng Số Dư & Quản Lý Tài Sản</span>
+          </button>
+        </div>
 
-        {/* Tạm thời ẩn Tab Webhook Simulator trên UI để giao diện đạt mức tối giản nhất */}
-        {/* <button
-          onClick={() => setActiveView("WEBHOOK")}
-          className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
-            activeView === "WEBHOOK"
-              ? "bg-background text-foreground shadow-sm ring-1 ring-slate-200 dark:ring-slate-700"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <Webhook className="h-4 w-4 text-rose-500" />
-          <span>Webhook & Sync Chi Tiêu (Engine 1)</span>
-        </button> */}
+        {/* Tab Content Display */}
+        {activeView === "OVERVIEW" && (
+          <OverviewBalanceSheet
+            summary={summary}
+            macroCategories={macroCategories}
+            breakdownByMacro={breakdownByMacro}
+            liabilities={liabilities}
+          />
+        )}
+
+        {activeView === "PORTFOLIO" && (
+          <InvestmentPortfolioView summary={summary} holdings={holdings} />
+        )}
+
+        {activeView === "HOLDINGS" && (
+          <AssetManagementTable
+            holdings={holdings}
+            transactions={data?.transactions || []}
+            isLoading={loading || isRefetching}
+            onOpenCreationModal={(catType) => handleOpenCreation(catType)}
+            onRefreshData={() => setRefreshKey((k) => k + 1)}
+          />
+        )}
       </div>
 
-      {/* Tab Content Display */}
-      {activeView === "OVERVIEW" && (
-        <OverviewBalanceSheet
-          summary={summary}
-          macroCategories={macroCategories}
-          breakdownByMacro={breakdownByMacro}
-          liabilities={liabilities}
-        />
-      )}
-
-      {activeView === "PORTFOLIO" && (
-        <InvestmentPortfolioView summary={summary} holdings={holdings} />
-      )}
-
-      {activeView === "HOLDINGS" && (
-        <AssetManagementTable
-          holdings={holdings}
-          macroCategories={macroCategories}
-          transactions={data?.transactions || []}
-          isLoading={loading || isRefetching}
-          onOpenFlowA={() => {
-            setCreationFlow("MARKET_DRIVEN");
-            setCreationModalOpen(true);
-          }}
-          onOpenFlowB={() => {
-            setCreationFlow("CUSTOM_ILLIQUID");
-            setCreationModalOpen(true);
-          }}
-          onOpenImportExport={() => setMigrationModalOpen(true)}
-          onRefreshData={() => setRefreshKey((k) => k + 1)}
-        />
-      )}
-      </div>
-
-      {/* Tạm thời ẩn View Webhook Simulator trên UI */}
-      {/* {activeView === "WEBHOOK" && (
-        <CashflowWebhookSimulator
-          onSuccess={() => setRefreshKey((k) => k + 1)}
-        />
-      )} */}
-
-      {/* Asset Creation Modal (Flow A & Flow B) */}
+      {/* Asset Creation Modal */}
       <AssetCreationModal
         open={creationModalOpen}
         onOpenChange={setCreationModalOpen}
-        defaultFlow={creationFlow}
-        macroCategories={macroCategories}
-        holdings={holdings}
+        selectedCategoryType={selectedCategoryType}
         onSuccess={() => setRefreshKey((k) => k + 1)}
       />
-
-      {/* Tạm thời ẩn Modal Import / Export Migration trên UI */}
-      {/* <ImportExportMigrationModal
-        open={migrationModalOpen}
-        onOpenChange={setMigrationModalOpen}
-        onSuccess={() => setRefreshKey((k) => k + 1)}
-      /> */}
     </div>
   );
 }

@@ -22,11 +22,12 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
-
+import { useLanguage } from "@/components/language-provider";
 import { PageKeyGuard } from "@/components/page-key-guard";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { t, language } = useLanguage();
   const [form, setForm] = useState({
     email: "",
     password: "",
@@ -43,29 +44,29 @@ export default function RegisterPage() {
     setError("");
 
     if (!form.username.trim()) {
-      setError("Vui lòng nhập tên người dùng.");
+      setError(language === "vi" ? "Vui lòng nhập tên người dùng." : "Please enter your username.");
       return;
     }
 
     const emailTrimmed = form.email.trim();
     if (!emailTrimmed) {
-      setError("Vui lòng nhập địa chỉ email.");
+      setError(language === "vi" ? "Vui lòng nhập địa chỉ email." : "Please enter your email address.");
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(emailTrimmed)) {
-      setError("Địa chỉ email không hợp lệ. Vui lòng nhập đúng định dạng (ví dụ: name@example.com).");
+      setError(language === "vi" ? "Địa chỉ email không hợp lệ (ví dụ: name@example.com)." : "Invalid email format (e.g. name@example.com).");
       return;
     }
 
     if (!form.password) {
-      setError("Vui lòng nhập mật khẩu.");
+      setError(language === "vi" ? "Vui lòng nhập mật khẩu." : "Please enter your password.");
       return;
     }
 
     if (form.password.length < 8) {
-      setError("Mật khẩu phải chứa ít nhất 8 ký tự.");
+      setError(language === "vi" ? "Mật khẩu phải chứa ít nhất 8 ký tự." : "Password must be at least 8 characters.");
       return;
     }
 
@@ -85,7 +86,7 @@ export default function RegisterPage() {
     const data = await res.json();
 
     if (!res.ok) {
-      setError(data.error || "Đăng ký không thành công. Vui lòng kiểm tra lại.");
+      setError(data.error || (language === "vi" ? "Đăng ký không thành công. Vui lòng kiểm tra lại." : "Registration failed. Please check inputs."));
       setLoading(false);
       return;
     }
@@ -125,7 +126,7 @@ export default function RegisterPage() {
                   Note my life
                 </p>
                 <p className="text-xs text-slate-400 mt-1.5 font-medium italic">
-                  “Tích lũy mỗi ngày — Tự do tài chính trong tầm tay”
+                  {language === "vi" ? "“Tích lũy mỗi ngày — Tự do tài chính trong tầm tay”" : "“Accumulate daily — Financial freedom within reach”"}
                 </p>
               </div>
             </div>
@@ -136,14 +137,14 @@ export default function RegisterPage() {
               {/* Username Input */}
               <div className="space-y-1.5">
                 <Label htmlFor="username" className="text-xs font-bold text-slate-300">
-                  Tên người dùng
+                  {t("auth.fullNameLabel")}
                 </Label>
                 <div className="relative">
                   <User className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
                   <Input
                     id="username"
                     type="text"
-                    placeholder="Nguyễn Văn A"
+                    placeholder={language === "vi" ? "Nguyễn Văn A" : "John Doe"}
                     value={form.username}
                     onChange={(e) => setForm({ ...form, username: e.target.value })}
                     className="pl-10 h-11 text-xs bg-slate-950/60 border-slate-800 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-slate-100 rounded-xl placeholder:text-slate-500 font-medium"
@@ -155,7 +156,7 @@ export default function RegisterPage() {
               {/* Email Input */}
               <div className="space-y-1.5">
                 <Label htmlFor="email" className="text-xs font-bold text-slate-300">
-                  Email
+                  {t("auth.emailLabel")}
                 </Label>
                 <div className="relative">
                   <Mail className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
@@ -174,7 +175,7 @@ export default function RegisterPage() {
               {/* Password Input */}
               <div className="space-y-1.5">
                 <Label htmlFor="password" className="text-xs font-bold text-slate-300">
-                  Mật khẩu
+                  {t("auth.passwordLabel")}
                 </Label>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
@@ -200,7 +201,7 @@ export default function RegisterPage() {
               {/* Birthday & Gender Row */}
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-slate-300">Ngày sinh</Label>
+                  <Label className="text-xs font-bold text-slate-300">{language === "vi" ? "Ngày sinh" : "Date of Birth"}</Label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -211,7 +212,7 @@ export default function RegisterPage() {
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4 text-slate-400 shrink-0" />
-                        {bod ? format(bod, "dd/MM/yyyy") : "Chọn ngày"}
+                        {bod ? format(bod, "dd/MM/yyyy") : (language === "vi" ? "Chọn ngày" : "Select date")}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0 bg-slate-900 border-slate-800" align="start">
@@ -229,7 +230,7 @@ export default function RegisterPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="gender" className="text-xs font-bold text-slate-300">Giới tính</Label>
+                  <Label htmlFor="gender" className="text-xs font-bold text-slate-300">{language === "vi" ? "Giới tính" : "Gender"}</Label>
                   <Select
                     value={form.gender || undefined}
                     onValueChange={(value) => setForm({ ...form, gender: value })}
@@ -237,13 +238,13 @@ export default function RegisterPage() {
                     <SelectTrigger id="gender" className="w-full !h-11 text-xs bg-slate-950/60 border-slate-800 text-slate-100 rounded-xl font-medium px-3.5 flex items-center justify-between">
                       <div className="flex items-center gap-2 truncate">
                         <UserCheck className="h-4 w-4 text-slate-400 shrink-0" />
-                        <SelectValue placeholder="Chọn" />
+                        <SelectValue placeholder={t("common.select")} />
                       </div>
                     </SelectTrigger>
                     <SelectContent className="bg-slate-900 border border-slate-800 text-slate-100 shadow-2xl z-[200] p-1 rounded-xl">
-                      <SelectItem value="male" className="cursor-pointer text-slate-100 text-xs py-2 px-3 rounded-lg focus:bg-slate-100 focus:text-slate-950 focus:font-bold hover:bg-slate-100 hover:text-slate-950 transition-colors">Nam</SelectItem>
-                      <SelectItem value="female" className="cursor-pointer text-slate-100 text-xs py-2 px-3 rounded-lg focus:bg-slate-100 focus:text-slate-950 focus:font-bold hover:bg-slate-100 hover:text-slate-950 transition-colors">Nữ</SelectItem>
-                      <SelectItem value="other" className="cursor-pointer text-slate-100 text-xs py-2 px-3 rounded-lg focus:bg-slate-100 focus:text-slate-950 focus:font-bold hover:bg-slate-100 hover:text-slate-950 transition-colors">Khác</SelectItem>
+                      <SelectItem value="male" className="cursor-pointer text-slate-100 text-xs py-2 px-3 rounded-lg focus:bg-slate-100 focus:text-slate-950 focus:font-bold hover:bg-slate-100 hover:text-slate-950 transition-colors">{language === "vi" ? "Nam" : "Male"}</SelectItem>
+                      <SelectItem value="female" className="cursor-pointer text-slate-100 text-xs py-2 px-3 rounded-lg focus:bg-slate-100 focus:text-slate-950 focus:font-bold hover:bg-slate-100 hover:text-slate-950 transition-colors">{language === "vi" ? "Nữ" : "Female"}</SelectItem>
+                      <SelectItem value="other" className="cursor-pointer text-slate-100 text-xs py-2 px-3 rounded-lg focus:bg-slate-100 focus:text-slate-950 focus:font-bold hover:bg-slate-100 hover:text-slate-950 transition-colors">{language === "vi" ? "Khác" : "Other"}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -266,11 +267,11 @@ export default function RegisterPage() {
                 {loading ? (
                   <>
                     <Spinner className="h-4 w-4" />
-                    <span>Đang xử lý đăng ký...</span>
+                    <span>{t("common.loading")}</span>
                   </>
                 ) : (
                   <>
-                    <span>Tiếp tục (Xác nhận OTP)</span>
+                    <span>{language === "vi" ? "Tiếp tục (Xác nhận OTP)" : "Continue (Verify OTP)"}</span>
                     <ArrowRight className="h-4 w-4" />
                   </>
                 )}
@@ -279,12 +280,12 @@ export default function RegisterPage() {
               {/* Switch to Login link */}
               <div className="pt-2 text-center border-t border-slate-800/80">
                 <p className="text-xs text-slate-400">
-                  Đã có tài khoản?{" "}
+                  {t("auth.hasAccount")}{" "}
                   <a
                     href="/login"
                     className="font-bold text-emerald-400 hover:text-emerald-300 underline underline-offset-4 transition-colors"
                   >
-                    Đăng nhập ngay
+                    {t("auth.btnLogin")}
                   </a>
                 </p>
               </div>
