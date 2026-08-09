@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { MarketTicker } from "@/lib/market-ticker-service";
+import { MarketTicker, BASE_POPULAR_TICKERS } from "@/lib/market-ticker-service";
 import {
   getCategoryConfig,
   AssetCategoryType,
@@ -391,13 +391,13 @@ export function AssetCreationModal({
             {/* TYPE 1: TÀI SẢN TĂNG TRƯỞNG (Market Driven Flow A) */}
             {categoryType === 1 && (
               <div className="space-y-4">
-                {/* Search Ticker */}
-                <div className="space-y-1.5">
+                {/* Search Ticker Section */}
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                      Mã Ticker / Ký hiệu chứng khoán/crypto/CCQ <span className="text-rose-500">*</span>
+                      Tìm kiếm Ticker hoặc Tên Tài sản
                     </Label>
-                    <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full shrink-0">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full shrink-0">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                       <span>LIVE MARKET API</span>
                     </span>
@@ -407,35 +407,42 @@ export function AssetCreationModal({
                     <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                     <Input
                       type="text"
-                      placeholder="Nhập mã (VD: VNM, FPT, BTC, ETH, DCDS, E1VFVN30)..."
+                      placeholder="Gõ mã Ticker (ví dụ: HPG, BTC, SJC, DCDS, FPT)..."
                       value={tickerQuery}
                       onChange={(e) => {
                         setTickerQuery(e.target.value);
-                        setSelectedTicker(null);
+                        if (!e.target.value) setSelectedTicker(null);
                       }}
-                      className="h-10 pl-9 text-xs font-bold uppercase bg-slate-50 dark:bg-slate-800 rounded-xl"
+                      className="h-10 pl-9 text-xs font-bold bg-slate-50 dark:bg-slate-800 rounded-xl"
                     />
                   </div>
 
-                  {/* Autocomplete Search Grid */}
-                  {tickerQuery && searchResults.length > 0 && !selectedTicker && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-xl p-1 bg-white dark:bg-slate-900">
-                      {searchResults.map((t) => (
+                  {/* 8 Quick Select Popular Ticker Cards Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-52 overflow-y-auto p-1.5 border border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/60 dark:bg-slate-900/60">
+                    {(searchResults.length > 0 ? searchResults : BASE_POPULAR_TICKERS.slice(0, 8)).map((t) => {
+                      const isSelected = selectedTicker?.symbol === t.symbol;
+                      return (
                         <button
                           key={t.symbol}
                           type="button"
                           onClick={() => handleSelectTicker(t)}
-                          className="p-2 rounded-lg border text-left text-xs hover:bg-sky-50 dark:hover:bg-slate-800 transition-all cursor-pointer flex flex-col justify-between"
+                          className={cn(
+                            "p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between h-[72px]",
+                            isSelected
+                              ? "border-sky-500 bg-sky-500/10 shadow-xs"
+                              : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/80 hover:border-sky-500/50"
+                          )}
                         >
                           <div className="flex items-center justify-between">
-                            <span className="font-bold text-sky-600 dark:text-sky-400">{t.symbol}</span>
+                            <span className="font-black text-xs text-slate-900 dark:text-slate-100">{t.symbol}</span>
+                            {isSelected && <CheckCircle2 className="h-3.5 w-3.5 text-sky-500" />}
                           </div>
-                          <span className="text-[10px] text-slate-500 truncate">{t.name}</span>
-                          <span className="font-semibold text-[11px] text-slate-700 dark:text-slate-300 mt-1">{formatVND(t.currentPrice)}</span>
+                          <span className="text-[10px] text-slate-400 dark:text-slate-400 truncate">{t.name}</span>
+                          <span className="font-extrabold text-[11px] text-sky-500 dark:text-sky-400">{formatVND(t.currentPrice)}</span>
                         </button>
-                      ))}
-                    </div>
-                  )}
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* Selected Ticker Preview */}
@@ -460,11 +467,11 @@ export function AssetCreationModal({
                   </div>
                 )}
 
-                {/* Calculation Mode Selector */}
+                {/* Calculation Mode & Inputs */}
                 <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
                   <div className="flex items-center justify-between">
                     <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                      Phương thức khai báo giá vốn
+                      Phương Thức Khai Báo Giá Vốn
                     </Label>
                     <div className="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl gap-1 text-[11px] font-bold">
                       <button
@@ -474,9 +481,9 @@ export function AssetCreationModal({
                           setTotalAmount("");
                         }}
                         className={cn(
-                          "py-1 px-2.5 rounded-lg transition-all cursor-pointer",
+                          "py-1 px-3 rounded-lg transition-all cursor-pointer text-xs",
                           calcMode === "NAV"
-                            ? "bg-sky-600 text-white font-extrabold shadow-xs"
+                            ? "bg-sky-500 text-white font-extrabold shadow-xs"
                             : "text-slate-500 dark:text-slate-400 hover:text-foreground"
                         )}
                       >
@@ -489,9 +496,9 @@ export function AssetCreationModal({
                           setBuyPrice("");
                         }}
                         className={cn(
-                          "py-1 px-2.5 rounded-lg transition-all cursor-pointer",
+                          "py-1 px-3 rounded-lg transition-all cursor-pointer text-xs",
                           calcMode === "TOTAL"
-                            ? "bg-sky-600 text-white font-extrabold shadow-xs"
+                            ? "bg-sky-500 text-white font-extrabold shadow-xs"
                             : "text-slate-500 dark:text-slate-400 hover:text-foreground"
                         )}
                       >
@@ -500,91 +507,70 @@ export function AssetCreationModal({
                     </div>
                   </div>
 
-                  {calcMode === "NAV" ? (
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                            Số lượng sở hữu <span className="text-rose-500">*</span>
-                          </Label>
-                          <Input
-                            type="text"
-                            inputMode="decimal"
-                            placeholder="VD: 1000 hoặc 0.05"
-                            value={quantity}
-                            onChange={(e) => setQuantity(e.target.value.replace(",", "."))}
-                            className="h-10 text-xs font-bold bg-slate-50 dark:bg-slate-800 rounded-xl"
-                            required
-                          />
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                            Giá mua / NAV (VND) <span className="text-rose-500">*</span>
-                          </Label>
-                          <Input
-                            type="text"
-                            inputMode="numeric"
-                            placeholder="0"
-                            value={buyPrice}
-                            onChange={(e) => setBuyPrice(formatNumberWithDots(e.target.value))}
-                            className="h-10 text-xs font-bold text-right pr-4 bg-slate-50 dark:bg-slate-800 rounded-xl"
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      {parseDecimalQuantity(quantity) > 0 && parseRawNumber(buyPrice) > 0 && (
-                        <div className="p-3 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 flex items-center justify-between text-xs">
-                          <span className="text-slate-600 dark:text-slate-400">💡 Tổng số tiền đầu tư tự động tính:</span>
-                          <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
-                            {formatVND(parseDecimalQuantity(quantity) * parseRawNumber(buyPrice))}
-                          </span>
-                        </div>
-                      )}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                        Số Lượng Sở Hữu
+                      </Label>
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="Ví dụ: 1000 hoặc 820.5 hoặc 0."
+                        value={quantity}
+                        onChange={(e) => setQuantity(e.target.value.replace(",", "."))}
+                        className="h-10 text-xs font-bold bg-slate-50 dark:bg-slate-800 rounded-xl"
+                        required
+                      />
                     </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                            Số lượng sở hữu <span className="text-rose-500">*</span>
-                          </Label>
-                          <Input
-                            type="text"
-                            inputMode="decimal"
-                            placeholder="VD: 1000 hoặc 0.05"
-                            value={quantity}
-                            onChange={(e) => setQuantity(e.target.value.replace(",", "."))}
-                            className="h-10 text-xs font-bold bg-slate-50 dark:bg-slate-800 rounded-xl"
-                            required
-                          />
-                        </div>
 
-                        <div className="space-y-1.5">
-                          <Label className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                            Tổng số tiền mua (VND) <span className="text-rose-500">*</span>
-                          </Label>
-                          <Input
-                            type="text"
-                            inputMode="numeric"
-                            placeholder="VD: 25.000.000"
-                            value={totalAmount}
-                            onChange={(e) => setTotalAmount(formatNumberWithDots(e.target.value))}
-                            className="h-10 text-xs font-bold text-right pr-4 bg-slate-50 dark:bg-slate-800 border-emerald-500/40 rounded-xl"
-                            required
-                          />
-                        </div>
+                    {calcMode === "NAV" ? (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                          Giá Vốn Mua / NAV (VND/Đơn vị)
+                        </Label>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="Tự động điền theo giá thị trường"
+                          value={buyPrice}
+                          onChange={(e) => setBuyPrice(formatNumberWithDots(e.target.value))}
+                          className="h-10 text-xs font-bold bg-slate-50 dark:bg-slate-800 rounded-xl"
+                          required
+                        />
                       </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                          Tổng Số Tiền Mua Ban Đầu (VND)
+                        </Label>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="Ví dụ: 25.000.000"
+                          value={totalAmount}
+                          onChange={(e) => setTotalAmount(formatNumberWithDots(e.target.value))}
+                          className="h-10 text-xs font-bold bg-slate-50 dark:bg-slate-800 rounded-xl"
+                          required
+                        />
+                      </div>
+                    )}
+                  </div>
 
-                      {parseDecimalQuantity(quantity) > 0 && parseRawNumber(totalAmount) > 0 && (
-                        <div className="p-3 rounded-xl bg-sky-50/80 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-900/50 flex items-center justify-between text-xs">
-                          <span className="text-slate-600 dark:text-slate-400">💡 Giá mua / NAV tự động tính:</span>
-                          <span className="font-extrabold text-sky-600 dark:text-sky-400">
-                            {formatVND(parseRawNumber(totalAmount) / parseDecimalQuantity(quantity))} / đơn vị
-                          </span>
-                        </div>
-                      )}
+                  {calcMode === "NAV" && parseDecimalQuantity(quantity) > 0 && parseRawNumber(buyPrice) > 0 && (
+                    <div className="p-3 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 flex items-center justify-between text-xs">
+                      <span className="text-slate-600 dark:text-slate-400">💡 Tổng số tiền đầu tư tự động tính:</span>
+                      <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
+                        {formatVND(parseDecimalQuantity(quantity) * parseRawNumber(buyPrice))}
+                      </span>
+                    </div>
+                  )}
+
+                  {calcMode === "TOTAL" && parseDecimalQuantity(quantity) > 0 && parseRawNumber(totalAmount) > 0 && (
+                    <div className="p-3 rounded-xl bg-sky-50/80 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-900/50 flex items-center justify-between text-xs">
+                      <span className="text-slate-600 dark:text-slate-400">💡 Giá mua / NAV tự động tính:</span>
+                      <span className="font-extrabold text-sky-600 dark:text-sky-400">
+                        {formatVND(parseRawNumber(totalAmount) / parseDecimalQuantity(quantity))} / đơn vị
+                      </span>
                     </div>
                   )}
                 </div>
