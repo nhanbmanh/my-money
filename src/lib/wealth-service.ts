@@ -163,3 +163,50 @@ export async function adjustLiquidAssetBalance(
     console.error("Error in adjustLiquidAssetBalance:", err);
   }
 }
+
+/**
+ * Automatically records or updates today's Asset Snapshot for a user in PostgreSQL.
+ */
+export async function recordDailyAssetSnapshot(
+  userId: string,
+  totals: {
+    totalAssets: number;
+    totalLiabilities: number;
+    netWorth: number;
+    totalInvestableAssets: number;
+    breakdownJson?: any;
+  }
+) {
+  try {
+    const today = new Date();
+    // Normalize date to start of UTC day
+    today.setUTCHours(0, 0, 0, 0);
+
+    await prisma.assetSnapshot.upsert({
+      where: {
+        userId_date: {
+          userId,
+          date: today,
+        },
+      },
+      update: {
+        totalAssetsValue: totals.totalAssets,
+        totalLiabilitiesValue: totals.totalLiabilities,
+        netWorthValue: totals.netWorth,
+        totalLiquidValue: totals.totalInvestableAssets,
+        breakdownJson: totals.breakdownJson || undefined,
+      },
+      create: {
+        userId,
+        date: today,
+        totalAssetsValue: totals.totalAssets,
+        totalLiabilitiesValue: totals.totalLiabilities,
+        netWorthValue: totals.netWorth,
+        totalLiquidValue: totals.totalInvestableAssets,
+        breakdownJson: totals.breakdownJson || undefined,
+      },
+    });
+  } catch (err) {
+    console.error("Error recording daily asset snapshot:", err);
+  }
+}

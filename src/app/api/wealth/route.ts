@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { fetchClosingPriceForSymbol } from "@/lib/market-ticker-service";
 import { ASSET_CATEGORY_TYPES } from "@/lib/asset-category-types";
-import { getOrCreateLiquidHolding } from "@/lib/wealth-service";
+import { getOrCreateLiquidHolding, recordDailyAssetSnapshot } from "@/lib/wealth-service";
 
 export async function GET() {
   try {
@@ -116,6 +116,21 @@ export async function GET() {
 
     const breakdownList = Object.values(breakdownByCategoryType);
 
+    // Auto-record today's Asset Snapshot in PostgreSQL
+    await recordDailyAssetSnapshot(userId, {
+      totalAssets,
+      totalLiabilities,
+      netWorth,
+      totalInvestableAssets,
+      breakdownJson: breakdownList,
+    });
+
+    // Fetch all historical daily snapshots for user
+    const snapshots = await prisma.assetSnapshot.findMany({
+      where: { userId },
+      orderBy: { date: "asc" },
+    });
+
     return NextResponse.json({
       success: true,
       summary: {
@@ -131,6 +146,7 @@ export async function GET() {
       holdings,
       liabilities,
       transactions,
+      snapshots,
       breakdownByCategoryType: breakdownList,
       breakdownByMacro: breakdownList, // Backwards compatibility for breakdown rendering
     });

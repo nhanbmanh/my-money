@@ -32,6 +32,7 @@ model User {
   holdings           Holding[]
   wealthTransactions WealthTransaction[]
   liabilities        Liability[]
+  assetSnapshots     AssetSnapshot[]
 
   @@map("users")
 }
@@ -234,4 +235,22 @@ model Liability {
 
   @@index([userId])
   @@map("liabilities")
+}
+
+model AssetSnapshot {
+  id                    String   @id @default(uuid())
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date                  DateTime @default(now())
+  totalAssetsValue      Float    @default(0)
+  totalLiabilitiesValue Float    @default(0)
+  netWorthValue         Float    @default(0)
+  totalLiquidValue      Float    @default(0)
+  breakdownJson         Json?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("asset_snapshots")
 }

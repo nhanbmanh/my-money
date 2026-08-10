@@ -27,6 +27,7 @@ import {
   Percent,
   PlusCircle,
   AlertTriangle,
+  Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -56,6 +57,8 @@ export function AssetCreationModal({
   const [assetName, setAssetName] = useState("");
 
   // Type 1 Growth state
+  const [growthSubTab, setGrowthSubTab] = useState<"MARKET" | "GOLD">("MARKET");
+  const [selectedUnit, setSelectedUnit] = useState<string>("Chỉ");
   const [tickerQuery, setTickerQuery] = useState("");
   const [searchResults, setSearchResults] = useState<MarketTicker[]>([]);
   const [selectedTicker, setSelectedTicker] = useState<MarketTicker | null>(null);
@@ -96,6 +99,8 @@ export function AssetCreationModal({
     setBuyPrice("");
     setCalcMode("NAV");
     setTotalAmount("");
+    setGrowthSubTab("MARKET");
+    setSelectedUnit("Cổ phiếu");
   }, [categoryType, open]);
 
   const formatNumberWithDots = (val: string | number) => {
@@ -155,8 +160,65 @@ export function AssetCreationModal({
   const handleSelectTicker = (ticker: MarketTicker) => {
     setSelectedTicker(ticker);
     setAssetName(ticker.name);
+    if (ticker.defaultUnit) {
+      setSelectedUnit(ticker.defaultUnit);
+    } else if (ticker.assetClass === "GOLD") {
+      setSelectedUnit("Chỉ");
+    } else if (ticker.assetClass === "CRYPTO") {
+      setSelectedUnit("Coin");
+    } else if (ticker.assetClass === "CCQ") {
+      setSelectedUnit("CCQ");
+    } else {
+      setSelectedUnit("Cổ phiếu");
+    }
     if (ticker.currentPrice > 0) {
       setBuyPrice(formatNumberWithDots(ticker.currentPrice));
+    }
+  };
+
+  // Standard conversion ratios relative to Chỉ (1 Chỉ = 3.75g = 0.1 Lượng)
+  const getUnitFactorInChỉ = (unit: string): number => {
+    switch (unit) {
+      case "Lượng":
+        return 10;
+      case "Chỉ":
+        return 1;
+      case "Ounce":
+        return 8.2942;
+      case "Gram":
+        return 1 / 3.75; // 0.2666667
+      case "Kg":
+        return 1000 / 3.75; // 266.66667
+      default:
+        return 1;
+    }
+  };
+
+  const handleUnitChange = (newUnit: string) => {
+    const oldUnit = selectedUnit;
+    if (oldUnit === newUnit) return;
+
+    setSelectedUnit(newUnit);
+
+    if (growthSubTab === "GOLD") {
+      const oldFactor = getUnitFactorInChỉ(oldUnit);
+      const newFactor = getUnitFactorInChỉ(newUnit);
+      const ratio = oldFactor / newFactor;
+
+      // 1. Convert Unit Price (buyPrice)
+      const rawBuyPrice = parseRawNumber(buyPrice);
+      if (rawBuyPrice > 0) {
+        const newBuyPrice = Math.round(rawBuyPrice / ratio);
+        setBuyPrice(formatNumberWithDots(newBuyPrice));
+      }
+
+      // 2. Convert Quantity (quantity)
+      const rawQty = parseDecimalQuantity(quantity);
+      if (rawQty > 0) {
+        const newQty = rawQty * ratio;
+        const formattedQty = Number(newQty.toFixed(4)).toString();
+        setQuantity(formattedQty);
+      }
     }
   };
 
@@ -209,9 +271,10 @@ export function AssetCreationModal({
 
         payload.symbolOrTicker = ticker;
         payload.assetName = assetName || `Tài sản ${ticker}`;
-        payload.assetClass = selectedTicker?.assetClass || "STOCKS";
+        payload.assetClass = growthSubTab === "GOLD" ? "GOLD" : (selectedTicker?.assetClass || "STOCKS");
         payload.quantity = qtyNum;
         payload.buyPrice = calculatedPrice;
+        payload.unit = selectedUnit || (growthSubTab === "GOLD" ? "Chỉ" : "Cổ phiếu");
       }
 
       // Type 2: Physical Asset
@@ -388,18 +451,68 @@ export function AssetCreationModal({
               </div>
             )}
 
-            {/* TYPE 1: TÀI SẢN TĂNG TRƯỞNG (Market Driven Flow A) */}
+            {/* TYPE 1: TÀI SẢN TĂNG TRƯỞNG (Market Driven Flow A + Gold & Precious Metals) */}
             {categoryType === 1 && (
               <div className="space-y-4">
+                {/* Sub-Tab Selector: Market vs Gold */}
+                <div className="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl gap-1 text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGrowthSubTab("MARKET");
+                      setSelectedTicker(null);
+                      setTickerQuery("");
+                      setSelectedUnit("Cổ phiếu");
+                    }}
+                    className={cn(
+                      "py-1.5 px-3 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5",
+                      growthSubTab === "MARKET"
+                        ? "bg-white dark:bg-slate-700 text-sky-600 dark:text-sky-300 shadow-xs"
+                        : "text-slate-500 hover:text-foreground"
+                    )}
+                  >
+                    <TrendingUp className="h-3.5 w-3.5" />
+                    <span>Chứng Khoán / Crypto / CCQ</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGrowthSubTab("GOLD");
+                      setSelectedTicker(null);
+                      setTickerQuery("GOLD");
+                      setSelectedUnit("Chỉ");
+                    }}
+                    className={cn(
+                      "py-1.5 px-3 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5",
+                      growthSubTab === "GOLD"
+                        ? "bg-amber-500 text-white font-extrabold shadow-xs"
+                        : "text-slate-500 hover:text-foreground"
+                    )}
+                  >
+                    <span>🪙 Vàng & Kim Loại Quý</span>
+                  </button>
+                </div>
+
+                {/* World Rate Note Banner for Gold */}
+                {growthSubTab === "GOLD" && (
+                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-[11px] font-semibold flex items-start gap-2">
+                    <Globe className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                    <div>
+                      <strong>Lưu ý nguồn giá:</strong> Tỷ giá niêm yết & biến động % của Vàng & Kim loại quý được cập nhật realtime theo sàn hàng hóa thế giới (thitruonghanghoa.com & SJC), quy đổi theo tỷ giá USD/VND.
+                    </div>
+                  </div>
+                )}
+
                 {/* Search Ticker Section */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                      Tìm kiếm Ticker hoặc Tên Tài sản
+                      {growthSubTab === "GOLD" ? "Chọn Sản Phẩm Vàng & Kim Loại Quý" : "Tìm kiếm Ticker hoặc Tên Tài sản"}
                     </Label>
                     <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full shrink-0">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      <span>LIVE MARKET API</span>
+                      <span>{growthSubTab === "GOLD" ? "LIVE GOLD FEED" : "LIVE MARKET API"}</span>
                     </span>
                   </div>
 
@@ -407,7 +520,7 @@ export function AssetCreationModal({
                     <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                     <Input
                       type="text"
-                      placeholder="Gõ mã Ticker (ví dụ: HPG, BTC, SJC, DCDS, FPT)..."
+                      placeholder={growthSubTab === "GOLD" ? "Tìm Vàng SJC, PNJ, Doji, Vàng nhẫn 9999, XAU/USD..." : "Gõ mã Ticker (ví dụ: HPG, BTC, SJC, DCDS, FPT)..."}
                       value={tickerQuery}
                       onChange={(e) => {
                         setTickerQuery(e.target.value);
@@ -417,9 +530,12 @@ export function AssetCreationModal({
                     />
                   </div>
 
-                  {/* 8 Quick Select Popular Ticker Cards Grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-52 overflow-y-auto p-1.5 border border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/60 dark:bg-slate-900/60">
-                    {(searchResults.length > 0 ? searchResults : BASE_POPULAR_TICKERS.slice(0, 8)).map((t) => {
+                  {/* Ticker Cards Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-52 overflow-y-auto p-1.5 border border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/60 dark:bg-slate-900/60">
+                    {(searchResults.length > 0
+                      ? (growthSubTab === "GOLD" ? searchResults.filter((t) => t.assetClass === "GOLD") : searchResults)
+                      : BASE_POPULAR_TICKERS.filter((t) => growthSubTab === "GOLD" ? t.assetClass === "GOLD" : t.assetClass !== "GOLD").slice(0, 8)
+                    ).map((t) => {
                       const isSelected = selectedTicker?.symbol === t.symbol;
                       return (
                         <button
@@ -427,9 +543,9 @@ export function AssetCreationModal({
                           type="button"
                           onClick={() => handleSelectTicker(t)}
                           className={cn(
-                            "p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between h-[72px]",
+                            "p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between h-[80px]",
                             isSelected
-                              ? "border-sky-500 bg-sky-500/10 shadow-xs"
+                              ? "border-sky-500 bg-sky-500/10 dark:bg-sky-950/40 shadow-xs"
                               : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/80 hover:border-sky-500/50"
                           )}
                         >
@@ -438,10 +554,54 @@ export function AssetCreationModal({
                             {isSelected && <CheckCircle2 className="h-3.5 w-3.5 text-sky-500" />}
                           </div>
                           <span className="text-[10px] text-slate-400 dark:text-slate-400 truncate">{t.name}</span>
-                          <span className="font-extrabold text-[11px] text-sky-500 dark:text-sky-400">{formatVND(t.currentPrice)}</span>
+                          
+                          <div className="flex items-center justify-between gap-1 mt-0.5">
+                            <span className="font-extrabold text-[11px] text-sky-500 dark:text-sky-400">
+                              {formatVND(t.currentPrice)}
+                            </span>
+                            {t.change24h !== undefined && (
+                              <span
+                                className={cn(
+                                  "text-[9px] font-black px-1.5 py-0.2 rounded-md flex items-center gap-0.5 shrink-0",
+                                  t.change24h >= 0
+                                    ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                                    : "bg-rose-500/15 text-rose-600 dark:text-rose-400"
+                                )}
+                              >
+                                {t.change24h >= 0 ? "+" : ""}{t.change24h.toFixed(2)}%
+                              </span>
+                            )}
+                          </div>
                         </button>
                       );
                     })}
+                  </div>
+                </div>
+
+                {/* Measurement Unit Selector (Đơn Vị Tính) */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                    Đơn Vị Đo Lường Số Lượng
+                  </Label>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {(growthSubTab === "GOLD"
+                      ? ["Chỉ", "Lượng", "Ounce", "Gram", "Kg"]
+                      : ["Cổ phiếu", "Coin", "CCQ", "Đơn vị"]
+                    ).map((u) => (
+                      <button
+                        key={u}
+                        type="button"
+                        onClick={() => handleUnitChange(u)}
+                        className={cn(
+                          "px-3 py-1 text-xs font-bold rounded-lg border transition-all cursor-pointer",
+                          selectedUnit === u
+                            ? "bg-amber-500 text-white border-amber-500 shadow-xs"
+                            : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-amber-400"
+                        )}
+                      >
+                        {u}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
@@ -453,7 +613,28 @@ export function AssetCreationModal({
                         <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                         {selectedTicker.symbol} - {selectedTicker.name}
                       </div>
-                      <div className="text-[11px] text-slate-500">Giá thị trường: {formatVND(selectedTicker.currentPrice)}</div>
+                      <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                        {(() => {
+                          const tickerBaseUnit = selectedTicker.defaultUnit || (selectedTicker.assetClass === "GOLD" ? "Chỉ" : "Cổ phiếu");
+                          const basePriceInChỉ = selectedTicker.currentPrice / getUnitFactorInChỉ(tickerBaseUnit);
+                          const currentUnitMarketPrice = Math.round(basePriceInChỉ * getUnitFactorInChỉ(selectedUnit));
+                          return (
+                            <span>Giá thị trường: <strong>{formatVND(currentUnitMarketPrice)}</strong> / {selectedUnit}</span>
+                          );
+                        })()}
+                        {selectedTicker.change24h !== undefined && (
+                          <span
+                            className={cn(
+                              "text-[10px] font-extrabold px-1.5 py-0.2 rounded-md",
+                              selectedTicker.change24h >= 0
+                                ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                                : "bg-rose-500/15 text-rose-600 dark:text-rose-400"
+                            )}
+                          >
+                            {selectedTicker.change24h >= 0 ? "+" : ""}{selectedTicker.change24h.toFixed(2)}%
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <Button
                       type="button"
@@ -462,7 +643,7 @@ export function AssetCreationModal({
                       onClick={() => setSelectedTicker(null)}
                       className="text-xs text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/50"
                     >
-                      Đổi mã
+                      Đổi sản phẩm
                     </Button>
                   </div>
                 )}
@@ -510,12 +691,12 @@ export function AssetCreationModal({
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                        Số Lượng Sở Hữu
+                        Số Lượng Sở Hữu ({selectedUnit})
                       </Label>
                       <Input
                         type="text"
                         inputMode="decimal"
-                        placeholder="Ví dụ: 1000 hoặc 820.5 hoặc 0."
+                        placeholder={growthSubTab === "GOLD" ? `Ví dụ: 5 ${selectedUnit} hoặc 1.5` : "Ví dụ: 1000 hoặc 820.5 hoặc 0."}
                         value={quantity}
                         onChange={(e) => setQuantity(e.target.value.replace(",", "."))}
                         className="h-10 text-xs font-bold bg-slate-50 dark:bg-slate-800 rounded-xl"
@@ -526,12 +707,12 @@ export function AssetCreationModal({
                     {calcMode === "NAV" ? (
                       <div className="space-y-1.5">
                         <Label className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                          Giá Vốn Mua / NAV (VND/Đơn vị)
+                          Giá Vốn Mua (VND / 1 {selectedUnit})
                         </Label>
                         <Input
                           type="text"
                           inputMode="numeric"
-                          placeholder="Tự động điền theo giá thị trường"
+                          placeholder={growthSubTab === "GOLD" ? "Điền theo giá trên hóa đơn / thực tế" : "Tự động điền theo giá thị trường"}
                           value={buyPrice}
                           onChange={(e) => setBuyPrice(formatNumberWithDots(e.target.value))}
                           className="h-10 text-xs font-bold bg-slate-50 dark:bg-slate-800 rounded-xl"
@@ -546,7 +727,7 @@ export function AssetCreationModal({
                         <Input
                           type="text"
                           inputMode="numeric"
-                          placeholder="Ví dụ: 25.000.000"
+                          placeholder="Ví dụ: 39.000.000"
                           value={totalAmount}
                           onChange={(e) => setTotalAmount(formatNumberWithDots(e.target.value))}
                           className="h-10 text-xs font-bold bg-slate-50 dark:bg-slate-800 rounded-xl"
@@ -558,7 +739,7 @@ export function AssetCreationModal({
 
                   {calcMode === "NAV" && parseDecimalQuantity(quantity) > 0 && parseRawNumber(buyPrice) > 0 && (
                     <div className="p-3 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 flex items-center justify-between text-xs">
-                      <span className="text-slate-600 dark:text-slate-400">💡 Tổng số tiền đầu tư tự động tính:</span>
+                      <span className="text-slate-600 dark:text-slate-400 font-medium">💡 Tổng số tiền đầu tư tự động tính:</span>
                       <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
                         {formatVND(parseDecimalQuantity(quantity) * parseRawNumber(buyPrice))}
                       </span>
@@ -567,9 +748,9 @@ export function AssetCreationModal({
 
                   {calcMode === "TOTAL" && parseDecimalQuantity(quantity) > 0 && parseRawNumber(totalAmount) > 0 && (
                     <div className="p-3 rounded-xl bg-sky-50/80 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-900/50 flex items-center justify-between text-xs">
-                      <span className="text-slate-600 dark:text-slate-400">💡 Giá mua / NAV tự động tính:</span>
+                      <span className="text-slate-600 dark:text-slate-400 font-medium">💡 Giá vốn 1 {selectedUnit} tự động tính:</span>
                       <span className="font-extrabold text-sky-600 dark:text-sky-400">
-                        {formatVND(parseRawNumber(totalAmount) / parseDecimalQuantity(quantity))} / đơn vị
+                        {formatVND(parseRawNumber(totalAmount) / parseDecimalQuantity(quantity))} / {selectedUnit}
                       </span>
                     </div>
                   )}

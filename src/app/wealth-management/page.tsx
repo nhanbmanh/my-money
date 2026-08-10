@@ -173,6 +173,7 @@ export default function WealthManagementPage() {
             macroCategories={macroCategories}
             breakdownByMacro={breakdownByMacro}
             liabilities={liabilities}
+            snapshots={data?.snapshots || []}
           />
         )}
 

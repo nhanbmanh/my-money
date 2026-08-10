@@ -478,7 +478,12 @@ export function AssetManagementTable({
                       </TableCell>
 
                       <TableCell className="text-xs font-bold text-right">
-                        {h.quantity.toLocaleString("vi-VN", { maximumFractionDigits: 6 })}
+                        <span>{h.quantity.toLocaleString("vi-VN", { maximumFractionDigits: 6 })}</span>
+                        {(h.asset?.metadata as Record<string, any>)?.unit && (
+                          <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-md ml-1">
+                            {(h.asset?.metadata as Record<string, any>)?.unit}
+                          </span>
+                        )}
                       </TableCell>
 
                       <TableCell className="text-xs text-right font-medium">

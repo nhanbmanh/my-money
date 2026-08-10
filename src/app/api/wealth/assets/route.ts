@@ -66,6 +66,7 @@ export async function POST(req: Request) {
         quantity,
         buyPrice,
         currency = "VND",
+        unit = "Cổ phiếu",
       } = body;
 
       if (!symbolOrTicker || Number(quantity) <= 0) {
@@ -94,9 +95,23 @@ export async function POST(req: Request) {
             assetClass: assetClass || "STOCKS",
             metadata: {
               currency,
-              liquidityIndex: assetClass === "CRYPTO" ? "T0" : "T2.5",
+              unit,
+              liquidityIndex: assetClass === "CRYPTO" || assetClass === "GOLD" ? "T0" : "T2.5",
               riskProfile:
-                assetClass === "CRYPTO" ? "High Risk" : "Moderate Risk",
+                assetClass === "CRYPTO" ? "High Risk" : assetClass === "GOLD" ? "Low Risk" : "Moderate Risk",
+            },
+          },
+        });
+      } else if (unit && (!asset.metadata || !(asset.metadata as Record<string, any>).unit)) {
+        // Update unit if missing
+        const existingMeta = (asset.metadata as Record<string, any>) || {};
+        asset = await prisma.asset.update({
+          where: { id: asset.id },
+          data: {
+            assetName: assetName || asset.assetName,
+            metadata: {
+              ...existingMeta,
+              unit,
             },
           },
         });
