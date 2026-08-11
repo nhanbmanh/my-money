@@ -20,6 +20,7 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from "@/components/ui/tooltip";
+import { MetricHelpInfo } from "@/components/wealth/metric-help-info";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -40,12 +41,17 @@ import {
   getCategoryConfig,
 } from "@/lib/asset-category-types";
 
+import { NetWorthVarianceModal } from "@/components/wealth/net-worth-variance-modal";
+
 interface OverviewProps {
   summary: any;
   macroCategories: any[];
   breakdownByMacro: any[];
   liabilities: any[];
   snapshots?: any[];
+  holdings?: any[];
+  transactions?: any[];
+  cashFlows?: any[];
 }
 
 function getWeekNumber(d: Date): number {
@@ -61,10 +67,14 @@ export function OverviewBalanceSheet({
   macroCategories,
   breakdownByMacro,
   liabilities,
-  snapshots = []
+  snapshots = [],
+  holdings = [],
+  transactions = [],
+  cashFlows = [],
 }: OverviewProps) {
   const { t, language } = useLanguage();
   const [timeframe, setTimeframe] = useState<"DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY">("DAILY");
+  const [varianceModalOpen, setVarianceModalOpen] = useState(false);
 
   // Format currency helper
   const formatVND = (val: number) => {
@@ -208,14 +218,29 @@ export function OverviewBalanceSheet({
   }, [timeframe, snapshots, summary]);
 
   const previousNetWorth = useMemo(() => {
-    if (chartData && chartData.length >= 2) {
-      const prevVal = chartData[chartData.length - 2]?.["Giá trị gia sản (Ròng)"];
-      if (typeof prevVal === "number" && prevVal > 0) {
-        return prevVal;
+    // 1. If we have real DB daily snapshots (at least 2 snapshots)
+    if (snapshots && snapshots.length >= 2) {
+      const prev = snapshots[snapshots.length - 2];
+      if (prev && typeof prev.netWorthValue === "number" && prev.netWorthValue > 0) {
+        return prev.netWorthValue;
       }
     }
+
+    // 2. If recent cashflows exist, baseline is current netWorth minus net cashflows
+    let netCashFlowDelta = 0;
+    (cashFlows || []).forEach((cf: any) => {
+      const amt = Number(cf.amountOfMoney || 0);
+      if (cf.cashType === "Income") netCashFlowDelta += amt;
+      else netCashFlowDelta -= amt;
+    });
+
+    if (netCashFlowDelta !== 0) {
+      return (summary?.netWorth || 0) - netCashFlowDelta;
+    }
+
+    // 3. Fallback: Baseline equals current netWorth (0 change when no real historical delta exists)
     return summary?.netWorth || 0;
-  }, [chartData, summary]);
+  }, [snapshots, cashFlows, summary]);
 
   const netWorthChangeAmount = (summary?.netWorth || 0) - previousNetWorth;
   const rawChangePercent = previousNetWorth > 0 ? (netWorthChangeAmount / previousNetWorth) * 100 : 0;
@@ -263,27 +288,12 @@ export function OverviewBalanceSheet({
                 <span className="text-xs font-bold uppercase tracking-wider text-sky-700 dark:text-sky-400">
                   {t("wealth.totalNetWorth")}
                 </span>
-                <TooltipProvider>
-                  <Tooltip delayDuration={100}>
-                    <TooltipTrigger asChild>
-                      <button type="button" className="text-sky-500/70 hover:text-sky-500 transition-colors cursor-help">
-                        <Info className="h-3.5 w-3.5" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="w-80 p-3.5 space-y-2 text-xs bg-slate-900 text-slate-100 border border-slate-700 shadow-2xl rounded-2xl">
-                      <div className="font-extrabold text-sky-400 text-xs tracking-wide">
-                        GIÁ TRỊ GIA SẢN RÒNG (Net Worth)
-                      </div>
-                      <p className="text-[11px] text-slate-300 leading-relaxed">
-                        Là tổng giá trị tài sản thực tế bạn sở hữu sau khi đã trừ toàn bộ các khoản nợ phải trả.
-                      </p>
-                      <div className="pt-2 border-t border-slate-800 text-[11px] text-emerald-400 font-mono font-bold flex items-center gap-1.5">
-                        <span>🧮</span>
-                        <span>Gia sản ròng = Tổng Tài Sản - Tổng Nợ</span>
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <MetricHelpInfo
+                  title="GIÁ TRỊ GIA SẢN RÒNG (Net Worth)"
+                  description="Là tổng giá trị tài sản thực tế bạn sở hữu sau khi đã trừ toàn bộ các khoản nợ phải trả."
+                  formula="Gia sản ròng = Tổng Tài Sản - Tổng Nợ"
+                  titleColorClass="text-sky-400"
+                />
               </div>
               <span className="p-2 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400">
                 <ShieldCheck className="h-5 w-5" />
@@ -294,18 +304,32 @@ export function OverviewBalanceSheet({
             <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
               {formatVND(summary.netWorth)}
             </div>
-            <div className="mt-2 flex items-center gap-2 text-xs font-bold">
-              <span
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${
-                  isPositive
-                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                    : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
-                }`}
+            <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-xs font-bold">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span
+                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full ${
+                    isPositive
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                      : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                  }`}
+                >
+                  {isPositive ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+                  <span>{netWorthChangeAmount >= 0 ? "+" : ""}{formatVND(netWorthChangeAmount)}</span>
+                  <span className="opacity-90">({netWorthChangePercent >= 0 ? "+" : ""}{netWorthChangePercent.toFixed(1)}%)</span>
+                </span>
+                <span className="text-muted-foreground font-medium text-[11px]">{compareLabel}</span>
+              </div>
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setVarianceModalOpen(true)}
+                className="h-6 px-2 text-[11px] font-extrabold text-sky-600 dark:text-sky-400 hover:bg-sky-500/10 rounded-lg flex items-center gap-1 cursor-pointer shrink-0"
               >
-                {isPositive ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-                {netWorthChangePercent >= 0 ? "+" : ""}{netWorthChangePercent.toFixed(1)}%
-              </span>
-              <span className="text-muted-foreground font-medium">{compareLabel}</span>
+                <span>Xem chi tiết</span>
+                <ArrowUpRight className="h-3 w-3" />
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -318,27 +342,12 @@ export function OverviewBalanceSheet({
                 <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   {t("wealth.totalAssets")}
                 </span>
-                <TooltipProvider>
-                  <Tooltip delayDuration={100}>
-                    <TooltipTrigger asChild>
-                      <button type="button" className="text-slate-400 hover:text-emerald-500 transition-colors cursor-help">
-                        <Info className="h-3.5 w-3.5" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="w-80 p-3.5 space-y-2 text-xs bg-slate-900 text-slate-100 border border-slate-700 shadow-2xl rounded-2xl">
-                      <div className="font-extrabold text-emerald-400 text-xs tracking-wide">
-                        TỔNG TÀI SẢN (Total Assets)
-                      </div>
-                      <p className="text-[11px] text-slate-300 leading-relaxed">
-                        Là tổng giá trị quy đổi theo thị trường của toàn bộ 5 loại danh mục tài sản bạn đang nắm giữ.
-                      </p>
-                      <div className="pt-2 border-t border-slate-800 text-[11px] text-emerald-400 font-mono font-bold flex items-start gap-1.5">
-                        <span className="shrink-0">🧮</span>
-                        <span>Tài Sản = (0)Thanh khoản + (1)Tăng trưởng + (2)Vật chất + (3)Nợ + (4)Cho vay</span>
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <MetricHelpInfo
+                  title="TỔNG TÀI SẢN (Total Assets)"
+                  description="Là tổng giá trị quy đổi theo thị trường của toàn bộ 5 loại danh mục tài sản bạn đang nắm giữ."
+                  formula="Tài Sản = (0)Thanh khoản + (1)Tăng trưởng + (2)Vật chất + (3)Nợ + (4)Cho vay"
+                  titleColorClass="text-emerald-400"
+                />
               </div>
               <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                 <Building2 className="h-5 w-5" />
@@ -363,27 +372,12 @@ export function OverviewBalanceSheet({
                 <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   {t("wealth.totalLiabilities")}
                 </span>
-                <TooltipProvider>
-                  <Tooltip delayDuration={100}>
-                    <TooltipTrigger asChild>
-                      <button type="button" className="text-slate-400 hover:text-rose-500 transition-colors cursor-help">
-                        <Info className="h-3.5 w-3.5" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="w-80 p-3.5 space-y-2 text-xs bg-slate-900 text-slate-100 border border-slate-700 shadow-2xl rounded-2xl">
-                      <div className="font-extrabold text-rose-400 text-xs tracking-wide">
-                        TỔNG NỢ PHẢI TRẢ (Total Liabilities)
-                      </div>
-                      <p className="text-[11px] text-slate-300 leading-relaxed">
-                        Là tổng số tiền nợ thế chấp, vay ngân hàng và các nghĩa vụ tài chính cần trả (Thuộc Danh mục 3 - Nợ & Thế chấp).
-                      </p>
-                      <div className="pt-2 border-t border-slate-800 text-[11px] text-rose-400 font-mono font-bold flex items-center gap-1.5">
-                        <span>🧮</span>
-                        <span>Tổng Nợ = Tổng dư nợ còn lại của Danh mục 3</span>
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <MetricHelpInfo
+                  title="TỔNG NỢ PHẢI TRẢ (Total Liabilities)"
+                  description="Là tổng số tiền nợ thế chấp, vay ngân hàng và các nghĩa vụ tài chính cần trả (Thuộc Danh mục 3 - Nợ & Thế chấp)."
+                  formula="Tổng Nợ = Tổng dư nợ còn lại của Danh mục 3"
+                  titleColorClass="text-rose-400"
+                />
               </div>
               <span className="p-2 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400">
                 <CreditCard className="h-5 w-5" />
@@ -408,27 +402,12 @@ export function OverviewBalanceSheet({
                 <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   {t("wealth.liquidAssets")}
                 </span>
-                <TooltipProvider>
-                  <Tooltip delayDuration={100}>
-                    <TooltipTrigger asChild>
-                      <button type="button" className="text-slate-400 hover:text-amber-500 transition-colors cursor-help">
-                        <Info className="h-3.5 w-3.5" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="w-80 p-3.5 space-y-2 text-xs bg-slate-900 text-slate-100 border border-slate-700 shadow-2xl rounded-2xl">
-                      <div className="font-extrabold text-amber-400 text-xs tracking-wide">
-                        TÀI SẢN THANH KHOẢN (Liquid Assets)
-                      </div>
-                      <p className="text-[11px] text-slate-300 leading-relaxed">
-                        Là số tiền mặt, số dư ngân hàng khả dụng có thể chi tiêu hoặc đầu tư ngay lập tức mà không có rủi ro sụt giảm giá trị.
-                      </p>
-                      <div className="pt-2 border-t border-slate-800 text-[11px] text-amber-400 font-mono font-bold flex items-center gap-1.5">
-                        <span>🧮</span>
-                        <span>Thanh Khoản = Tổng số dư thuộc Danh mục 0</span>
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <MetricHelpInfo
+                  title="TÀI SẢN THANH KHOẢN (Liquid Assets)"
+                  description="Là số tiền mặt, số dư ngân hàng khả dụng có thể chi tiêu hoặc đầu tư ngay lập tức mà không có rủi ro sụt giảm giá trị."
+                  formula="Thanh Khoản = Tổng số dư thuộc Danh mục 0"
+                  titleColorClass="text-amber-400"
+                />
               </div>
               <span className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
                 <Wallet className="h-5 w-5" />
@@ -538,19 +517,11 @@ export function OverviewBalanceSheet({
                         <span className="text-slate-600 dark:text-slate-400 font-medium text-[11px] hidden sm:inline">
                           ({catCfg.name})
                         </span>
-                        <TooltipProvider>
-                          <Tooltip delayDuration={100}>
-                            <TooltipTrigger asChild>
-                              <button type="button" className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-help">
-                                <Info className="h-3.5 w-3.5" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="right" className="p-3 max-w-xs space-y-1 text-xs bg-slate-900 text-slate-100 border border-slate-700 shadow-xl rounded-xl">
-                              <div className="font-bold text-sky-400">Danh mục {catCfg.type}: {catCfg.name}</div>
-                              <p className="text-[11px] text-slate-300 leading-relaxed">{catCfg.description}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                        <MetricHelpInfo
+                          title={`Danh mục ${catCfg.type}: ${catCfg.name}`}
+                          description={catCfg.description || ""}
+                          titleColorClass="text-sky-400"
+                        />
                       </span>
                       <span className="text-slate-700 dark:text-slate-300 font-extrabold">
                         {formatVND(cat.value)} ({percent.toFixed(1)}%)
@@ -621,6 +592,22 @@ export function OverviewBalanceSheet({
           </CardContent>
         </Card>
       </div>
+
+      {/* Net Worth Variance Breakdown Modal */}
+      <NetWorthVarianceModal
+        open={varianceModalOpen}
+        onOpenChange={setVarianceModalOpen}
+        summary={summary}
+        previousNetWorth={previousNetWorth}
+        netWorthChangeAmount={netWorthChangeAmount}
+        netWorthChangePercent={netWorthChangePercent}
+        compareLabel={compareLabel}
+        holdings={holdings}
+        liabilities={liabilities}
+        transactions={transactions}
+        cashFlows={cashFlows}
+        snapshots={snapshots}
+      />
     </div>
   );
 }

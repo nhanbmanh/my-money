@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { fetchClosingPriceForSymbol } from "@/lib/market-ticker-service";
+import { fetchClosingPriceDetailsForSymbol } from "@/lib/market-ticker-service";
 import { ASSET_CATEGORY_TYPES } from "@/lib/asset-category-types";
 import { getOrCreateLiquidHolding, recordDailyAssetSnapshot } from "@/lib/wealth-service";
 
@@ -32,24 +32,27 @@ export async function GET() {
       orderBy: { createdAt: "asc" },
     });
 
-    // Enrich holdings dynamically with realtime market price for STOCKS / Type 1
+    // Enrich holdings dynamically with realtime market price & 24h change for STOCKS / Type 1 / MarketDriven
     const holdings = await Promise.all(
       rawHoldings.map(async (h) => {
         let currentMarketPrice = 0;
+        let change24h = 0;
         let currentValue = h.quantity * h.averageCostBasis;
 
         if (h.asset.isMarketDriven || h.categoryType === 1) {
-          const livePrice = await fetchClosingPriceForSymbol(
+          const details = await fetchClosingPriceDetailsForSymbol(
             h.asset.symbolOrTicker,
             h.averageCostBasis
           );
-          currentMarketPrice = livePrice || h.averageCostBasis;
+          currentMarketPrice = details.price || h.averageCostBasis;
+          change24h = details.change24h || 0;
           currentValue = h.quantity * currentMarketPrice;
         }
 
         return {
           ...h,
           currentMarketPrice,
+          change24h,
           currentValue,
         };
       })
@@ -67,6 +70,14 @@ export async function GET() {
       where: { userId },
       include: { asset: true },
       orderBy: { date: "desc" },
+      take: 50,
+    });
+
+    // Fetch recent cash flows from Financial Management app
+    const cashFlows = await prisma.cashFlow.findMany({
+      where: { userId },
+      include: { primaryCategory: true, source: true },
+      orderBy: { datetime: "desc" },
       take: 50,
     });
 
@@ -146,6 +157,7 @@ export async function GET() {
       holdings,
       liabilities,
       transactions,
+      cashFlows,
       snapshots,
       breakdownByCategoryType: breakdownList,
       breakdownByMacro: breakdownList, // Backwards compatibility for breakdown rendering

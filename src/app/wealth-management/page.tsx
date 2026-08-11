@@ -174,6 +174,9 @@ export default function WealthManagementPage() {
             breakdownByMacro={breakdownByMacro}
             liabilities={liabilities}
             snapshots={data?.snapshots || []}
+            holdings={holdings}
+            transactions={data?.transactions || []}
+            cashFlows={data?.cashFlows || []}
           />
         )}
 

@@ -350,3 +350,32 @@ export async function fetchClosingPriceForSymbol(symbol: string, currentHoldingP
 
   return 10000;
 }
+
+export async function fetchClosingPriceDetailsForSymbol(
+  symbol: string,
+  currentHoldingPrice?: number
+): Promise<{ price: number; change24h: number }> {
+  const clean = symbol.toUpperCase().trim();
+  const liveData = await fetchLivePriceFromPublicAPIs(clean);
+  const matched = BASE_POPULAR_TICKERS.find((t) => t.symbol === clean);
+
+  const price =
+    liveData && liveData.price > 0
+      ? liveData.price
+      : currentHoldingPrice && currentHoldingPrice > 0
+      ? currentHoldingPrice
+      : matched?.currentPrice || 10000;
+
+  let change24h =
+    liveData?.change24h !== undefined && liveData.change24h !== 0
+      ? liveData.change24h
+      : matched?.change24h !== undefined
+      ? matched.change24h
+      : 0;
+
+  if (change24h === 0 && matched?.change24h) {
+    change24h = matched.change24h;
+  }
+
+  return { price, change24h };
+}
