@@ -590,36 +590,40 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                 </Button>
               </div>
 
-              {/* Dedicated Scrollable Tabs Bar */}
-              <div className="flex-1 min-w-0 overflow-x-auto scrollbar-none py-0.5 pr-2">
-                <TabsList className="bg-slate-100 dark:bg-slate-800 p-1.5 rounded-xl h-auto inline-flex items-center flex-nowrap min-w-max shrink-0 space-x-1">
+              {/* Dedicated Non-Scrollable Responsive Tabs Bar */}
+              <div className="flex-1 min-w-0 py-0.5">
+                <TabsList className="grid grid-cols-4 gap-1 w-full bg-slate-100 dark:bg-slate-800 p-1.5 rounded-xl h-auto">
                   <TabsTrigger
                     value="newsfeed"
-                    className="text-xs font-bold gap-1.5 px-3.5 py-1.5 rounded-lg shrink-0 whitespace-nowrap data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-xs transition-all text-sky-600 dark:text-sky-400"
+                    className="text-xs font-bold gap-1.5 px-2 sm:px-3.5 py-1.5 rounded-lg justify-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-xs transition-all text-sky-600 dark:text-sky-400"
+                    title={language === "vi" ? "Bản Tin Giao Dịch" : "Transaction Feed"}
                   >
                     <Newspaper className="h-4 w-4 shrink-0" />
-                    {language === "vi" ? "Bản Tin Giao Dịch" : "Transaction Feed"}
+                    <span className="hidden sm:inline truncate">{language === "vi" ? "Bản Tin Giao Dịch" : "Transaction Feed"}</span>
                   </TabsTrigger>
                   <TabsTrigger
                     value="list"
-                    className="text-xs font-bold gap-1.5 px-3.5 py-1.5 rounded-lg shrink-0 whitespace-nowrap data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-xs transition-all"
+                    className="text-xs font-bold gap-1.5 px-2 sm:px-3.5 py-1.5 rounded-lg justify-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-xs transition-all"
+                    title={t("financial.tabTransactionList")}
                   >
                     <List className="h-4 w-4 shrink-0" />
-                    {t("financial.tabTransactionList")}
+                    <span className="hidden sm:inline truncate">{t("financial.tabTransactionList")}</span>
                   </TabsTrigger>
                   <TabsTrigger
                     value="chart"
-                    className="text-xs font-bold gap-1.5 px-3.5 py-1.5 rounded-lg shrink-0 whitespace-nowrap data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-xs transition-all text-purple-600 dark:text-purple-400"
+                    className="text-xs font-bold gap-1.5 px-2 sm:px-3.5 py-1.5 rounded-lg justify-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-xs transition-all text-purple-600 dark:text-purple-400"
+                    title={t("financial.tabChartAnalysis")}
                   >
                     <BarChart3 className="h-4 w-4 shrink-0" />
-                    {t("financial.tabChartAnalysis")}
+                    <span className="hidden sm:inline truncate">{t("financial.tabChartAnalysis")}</span>
                   </TabsTrigger>
                   <TabsTrigger
                     value="insights"
-                    className="text-xs font-bold gap-1.5 px-3.5 py-1.5 rounded-lg shrink-0 whitespace-nowrap data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-xs transition-all text-emerald-600 dark:text-emerald-400"
+                    className="text-xs font-bold gap-1.5 px-2 sm:px-3.5 py-1.5 rounded-lg justify-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-xs transition-all text-emerald-600 dark:text-emerald-400"
+                    title={t("financial.tabBudget")}
                   >
                     <Sparkles className="h-4 w-4 text-emerald-500 shrink-0" />
-                    {t("financial.tabBudget")}
+                    <span className="hidden sm:inline truncate">{t("financial.tabBudget")}</span>
                   </TabsTrigger>
                 </TabsList>
               </div>

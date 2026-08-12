@@ -1,4 +1,4 @@
-import { HourlyForecastItem, DailyForecastItem, getWmoWeatherInfo } from "./weather-service";
+import { HourlyForecastItem, DailyForecastItem, getWmoWeatherInfo, getRefinedDailyWeatherInfo } from "./weather-service";
 
 export type AirVisualWeatherData = {
   temperature: number;
@@ -22,6 +22,29 @@ export type AirVisualFullData = {
   hourly: HourlyForecastItem[];
   daily: DailyForecastItem[];
 };
+
+export function calculateUsAqiFromPm25(pm25: number): number {
+  if (pm25 < 0) return 0;
+  if (pm25 <= 12.0) {
+    return Math.round(((50 - 0) / (12.0 - 0.0)) * (pm25 - 0.0));
+  }
+  if (pm25 <= 35.4) {
+    return Math.round(51 + ((100 - 51) / (35.4 - 12.1)) * (pm25 - 12.1));
+  }
+  if (pm25 <= 55.4) {
+    return Math.round(101 + ((150 - 101) / (55.4 - 35.5)) * (pm25 - 35.5));
+  }
+  if (pm25 <= 150.4) {
+    return Math.round(151 + ((200 - 151) / (150.4 - 55.5)) * (pm25 - 55.5));
+  }
+  if (pm25 <= 250.4) {
+    return Math.round(201 + ((300 - 201) / (250.4 - 150.5)) * (pm25 - 150.5));
+  }
+  if (pm25 <= 500.4) {
+    return Math.round(301 + ((500 - 301) / (500.4 - 250.5)) * (pm25 - 250.5));
+  }
+  return 500;
+}
 
 export function getAirVisualWeatherInfo(iconCode: string, lang: "vi" | "en" = "vi"): { desc: string; icon: string; isDay: boolean } {
   const isDay = iconCode.endsWith("d");
@@ -133,7 +156,8 @@ export async function fetchAirVisualData(
           const wData = json.data.current.weather;
           const pData = json.data.current.pollution;
           const wInfo = getAirVisualWeatherInfo(wData.ic);
-          const aqiInfo = getAqiLevelInfo(pData.aqius);
+          const aqiVal = pData.conc ? calculateUsAqiFromPm25(pData.conc) : (pData.aqius || 45);
+          const aqiInfo = getAqiLevelInfo(aqiVal);
           const temp = Math.round(wData.tp);
           const humidity = wData.hu;
           const feelsLike = Math.round(temp + (humidity > 80 ? 3 : 1));
@@ -147,7 +171,7 @@ export async function fetchAirVisualData(
             weatherDesc: wInfo.desc,
             icon: wInfo.icon,
             isDay: wInfo.isDay,
-            aqi: pData.aqius,
+            aqi: aqiVal,
             aqiStatus: aqiInfo.text,
             aqiColor: aqiInfo.color,
             stationName: json.data.city || "Trạm IQAir",
@@ -164,7 +188,7 @@ export async function fetchAirVisualData(
     }
   }
 
-  // FALLBACK / SECONDARY COMPARISON MODEL (Open-Meteo GFS / Air Quality API)
+  // FALLBACK / SECONDARY COMPARISON MODEL (Open-Meteo Air Quality API & Best-Match Forecast)
   try {
     const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,surface_pressure,wind_speed_10m&timezone=auto&_t=${Date.now()}`;
     const aqiUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}&current=us_aqi,pm2_5&timezone=auto&_t=${Date.now()}`;
@@ -179,7 +203,9 @@ export async function fetchAirVisualData(
       let aqiVal = 42; // default good
       if (aRes.ok) {
         const aJson = await aRes.json();
-        if (aJson.current?.us_aqi !== undefined) {
+        if (aJson.current?.pm2_5 !== undefined) {
+          aqiVal = calculateUsAqiFromPm25(aJson.current.pm2_5);
+        } else if (aJson.current?.us_aqi !== undefined) {
           aqiVal = Math.round(aJson.current.us_aqi);
         }
       }
@@ -256,13 +282,13 @@ export async function fetchAirVisualFullData(
 ): Promise<AirVisualFullData> {
   const current = await fetchAirVisualData(lat, lng);
 
-  // Fetch GFS / AirVisual prediction model hourly (12h) & daily (7d)
+  // Fetch prediction model hourly (12h) & daily (7d)
   const hourly: HourlyForecastItem[] = [];
   const daily: DailyForecastItem[] = [];
 
   try {
-    const gfsUrl = `https://api.open-meteo.com/v1/gfs?latitude=${lat}&longitude=${lng}&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max&timezone=auto&_t=${Date.now()}`;
-    const res = await fetch(gfsUrl, { cache: "no-store" });
+    const forecastUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,uv_index_max&timezone=auto&_t=${Date.now()}`;
+    const res = await fetch(forecastUrl, { cache: "no-store" });
     if (res.ok) {
       const data = await res.json();
       const hData = data.hourly;
@@ -296,22 +322,26 @@ export async function fetchAirVisualFullData(
         const dStr = dData.time[i];
         const dDate = new Date(dStr);
         const dayName = i === 0 ? "Hôm nay" : daysOfWeek[dDate.getDay()];
-        const wInfo = getWmoWeatherInfo(dData.weather_code[i], true);
+        const tempMax = Math.round(dData.temperature_2m_max[i]);
+        const tempMin = Math.round(dData.temperature_2m_min[i]);
+        const rainSum = dData.precipitation_sum ? dData.precipitation_sum[i] : 0;
+        const popMax = dData.precipitation_probability_max ? dData.precipitation_probability_max[i] : 0;
+        const wInfo = getRefinedDailyWeatherInfo(dData.weather_code[i], rainSum, popMax, tempMax);
 
         daily.push({
           date: dStr,
           dayName,
-          tempMax: Math.round(dData.temperature_2m_max[i]),
-          tempMin: Math.round(dData.temperature_2m_min[i]),
+          tempMax,
+          tempMin,
           weatherCode: dData.weather_code[i],
           weatherDesc: wInfo.desc,
-          popMax: dData.precipitation_probability_max[i] || 0,
+          popMax,
           uvMax: Math.round(dData.uv_index_max?.[i] || 5),
         });
       }
     }
   } catch {
-    // Fallback if GFS fetch fails
+    // Fallback if forecast fetch fails
   }
 
   return {

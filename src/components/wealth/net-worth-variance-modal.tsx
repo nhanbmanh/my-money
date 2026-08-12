@@ -40,9 +40,9 @@ export function NetWorthVarianceModal({
   open,
   onOpenChange,
   summary,
-  previousNetWorth,
-  netWorthChangeAmount,
-  netWorthChangePercent,
+  previousNetWorth: propsPreviousNetWorth,
+  netWorthChangeAmount: propsNetWorthChangeAmount,
+  netWorthChangePercent: propsNetWorthChangePercent,
   compareLabel,
   holdings = [],
   liabilities = [],
@@ -58,22 +58,14 @@ export function NetWorthVarianceModal({
     }).format(val);
   };
 
-  const isPositive = netWorthChangeAmount >= 0;
-
-  // 1. Baseline Previous Snapshot Date
-  const prevSnapshotDate = useMemo(() => {
-    if (snapshots && snapshots.length >= 2) {
-      const prev = snapshots[snapshots.length - 2];
-      if (prev?.date) {
-        return new Date(prev.date);
-      }
-    }
+  // 1. Baseline start of today (00:00:00 local time)
+  const startOfToday = useMemo(() => {
     const d = new Date();
-    d.setUTCHours(0, 0, 0, 0);
+    d.setHours(0, 0, 0, 0);
     return d;
-  }, [snapshots]);
+  }, []);
 
-  // 2. Filter Cashflows created IN THIS TIMEFRAME (after previous snapshot date)
+  // 2. Filter Cashflows created TODAY (since 00:00:00 local time today)
   const { todayIncome, todayExpense, todayNetCashFlow, timeframeCashFlows } = useMemo(() => {
     let income = 0;
     let expense = 0;
@@ -81,7 +73,7 @@ export function NetWorthVarianceModal({
 
     (cashFlows || []).forEach((cf: any) => {
       const cfDate = new Date(cf.datetime || cf.createdAt);
-      if (cfDate >= prevSnapshotDate) {
+      if (cfDate >= startOfToday) {
         const amt = Number(cf.amountOfMoney || 0);
         if (cf.cashType === "Income") {
           income += amt;
@@ -98,7 +90,7 @@ export function NetWorthVarianceModal({
       todayNetCashFlow: income - expense,
       timeframeCashFlows: list,
     };
-  }, [cashFlows, prevSnapshotDate]);
+  }, [cashFlows, startOfToday]);
 
   // 3. Map holdings and FILTER ONLY ITEMS WITH ACTUAL 1-DAY VARIANCE (oneDayChange !== 0)
   const allHoldingItems = useMemo(() => {
@@ -144,6 +136,15 @@ export function NetWorthVarianceModal({
     return allHoldingItems.reduce((acc, item) => acc + item.oneDayChange, 0);
   }, [allHoldingItems]);
 
+  // 4. Absolute Mathematical Net Worth Change & Baseline Reconciliation:
+  // Net Worth Variance = Market Valuation Variance + Today's Net Cashflows
+  const netWorthChangeAmount = portfolioMarketChange + todayNetCashFlow;
+  const currentNetWorth = Number(summary?.netWorth || 0);
+  const previousNetWorth = currentNetWorth - netWorthChangeAmount;
+  const rawChangePercent = previousNetWorth > 0 ? (netWorthChangeAmount / previousNetWorth) * 100 : 0;
+  const netWorthChangePercent = Math.abs(rawChangePercent) < 0.01 ? 0 : rawChangePercent;
+
+  const isPositive = netWorthChangeAmount >= 0;
   const isPortfolioPositive = portfolioMarketChange >= 0;
   const isCashFlowPositive = todayNetCashFlow >= 0;
 
@@ -196,7 +197,7 @@ export function NetWorthVarianceModal({
           </div>
           <div className="flex sm:flex-col justify-between sm:justify-center items-center">
             <div className="text-[10px] text-slate-400 font-medium uppercase">Gia sản hiện tại</div>
-            <div className="text-xs font-bold text-sky-400">{formatVND(summary.netWorth)}</div>
+            <div className="text-xs font-bold text-sky-400">{formatVND(currentNetWorth)}</div>
           </div>
         </div>
 
@@ -289,7 +290,6 @@ export function NetWorthVarianceModal({
             </div>
 
             <div className="p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
-
               {timeframeCashFlows.length === 0 ? (
                 <div className="text-[11px] text-slate-400 text-center py-2 space-y-0.5">
                   <p>Không có giao dịch Thu/Chi mới phát sinh trong kỳ này.</p>

@@ -50,6 +50,52 @@ export type WeatherData = {
   daily: DailyForecastItem[];
 };
 
+export function getRefinedDailyWeatherInfo(
+  code: number,
+  rainSum?: number,
+  popMax?: number,
+  tempMax?: number,
+  lang: "vi" | "en" = "vi"
+): { desc: string; icon: string } {
+  // If rain volume is negligible (< 1.0mm) or rain probability is low (< 35%), the day is effectively DRY
+  const isDry = (rainSum !== undefined && rainSum < 1.0) || (popMax !== undefined && popMax < 35);
+
+  if (isDry) {
+    if (tempMax !== undefined && tempMax >= 35) {
+      return { desc: lang === "vi" ? "Nắng nóng gay gắt" : "Very Hot & Sunny", icon: "☀️" };
+    }
+    if (tempMax !== undefined && tempMax >= 33) {
+      return { desc: lang === "vi" ? "Nắng nóng, mây rải rác" : "Hot & Partly Cloudy", icon: "🌤️" };
+    }
+    if (code === 0 || code === 1) {
+      return { desc: lang === "vi" ? "Trời quang, nắng đẹp" : "Sunny & Clear", icon: "☀️" };
+    }
+    if (code === 2) {
+      return { desc: lang === "vi" ? "Nắng nhẹ, có mây" : "Partly Cloudy", icon: "🌤️" };
+    }
+    if (code === 3) {
+      return { desc: lang === "vi" ? "Nhiều mây, âm u" : "Cloudy", icon: "⛅" };
+    }
+    return {
+      desc: tempMax !== undefined && tempMax >= 32
+        ? (lang === "vi" ? "Nắng nóng, ít mây" : "Hot & Mostly Sunny")
+        : (lang === "vi" ? "Nắng nhẹ, khô ráo" : "Dry & Pleasant"),
+      icon: tempMax !== undefined && tempMax >= 32 ? "☀️" : "🌤️",
+    };
+  }
+
+  // Moderate rain (1.0mm to 5.0mm)
+  if (rainSum !== undefined && rainSum < 5.0) {
+    if (code === 95 || code === 96) {
+      return { desc: lang === "vi" ? "Chiều tối có dông rải rác" : "Scattered Evening Storms", icon: "⛈️" };
+    }
+    return { desc: lang === "vi" ? "Có lúc có mưa rào" : "Passing Showers", icon: "🌦️" };
+  }
+
+  // Heavy rain (>= 5.0mm)
+  return getWmoWeatherInfo(code, true, lang);
+}
+
 export function getWmoWeatherInfo(code: number, isDay = true, lang: "vi" | "en" = "vi"): { desc: string; icon: string } {
   if (lang === "en") {
     switch (code) {
@@ -338,16 +384,21 @@ export async function fetchWeatherData(
     const isToday = i === 0;
     const dayName = isToday ? "Hôm nay" : daysOfWeek[dDate.getDay()];
 
-    const wInfo = getWmoWeatherInfo(dailyData.weather_code[i], true);
+    const tempMax = Math.round(dailyData.temperature_2m_max[i]);
+    const tempMin = Math.round(dailyData.temperature_2m_min[i]);
+    const rainSum = dailyData.precipitation_sum ? dailyData.precipitation_sum[i] : 0;
+    const popMax = dailyData.precipitation_probability_max ? dailyData.precipitation_probability_max[i] : 0;
+
+    const wInfo = getRefinedDailyWeatherInfo(dailyData.weather_code[i], rainSum, popMax, tempMax);
 
     daily.push({
       date: dStr,
       dayName,
-      tempMax: Math.round(dailyData.temperature_2m_max[i]),
-      tempMin: Math.round(dailyData.temperature_2m_min[i]),
+      tempMax,
+      tempMin,
       weatherCode: dailyData.weather_code[i],
       weatherDesc: wInfo.desc,
-      popMax: dailyData.precipitation_probability_max[i] || 0,
+      popMax,
       uvMax: Math.round(dailyData.uv_index_max?.[i] || 5),
     });
   }

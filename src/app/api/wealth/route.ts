@@ -19,20 +19,41 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Ensure single merged liquid holding for user
-    await getOrCreateLiquidHolding(userId);
+    // 1. Parallelize initial setup and DB queries for ultra-fast response
+    const [_, rawHoldings, liabilities, transactions, cashFlows, snapshots] = await Promise.all([
+      getOrCreateLiquidHolding(userId),
+      prisma.holding.findMany({
+        where: { userId },
+        include: {
+          asset: true,
+          linkedLiability: true,
+        },
+        orderBy: { createdAt: "asc" },
+      }),
+      prisma.liability.findMany({
+        where: { userId },
+        include: { linkedHolding: { include: { asset: true } } },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.wealthTransaction.findMany({
+        where: { userId },
+        include: { asset: true },
+        orderBy: { date: "desc" },
+        take: 50,
+      }),
+      prisma.cashFlow.findMany({
+        where: { userId },
+        include: { primaryCategory: true, source: true },
+        orderBy: { datetime: "desc" },
+        take: 50,
+      }),
+      prisma.assetSnapshot.findMany({
+        where: { userId },
+        orderBy: { date: "asc" },
+      }),
+    ]);
 
-    // Fetch user holdings
-    const rawHoldings = await prisma.holding.findMany({
-      where: { userId },
-      include: {
-        asset: true,
-        linkedLiability: true,
-      },
-      orderBy: { createdAt: "asc" },
-    });
-
-    // Enrich holdings dynamically with realtime market price & 24h change for STOCKS / Type 1 / MarketDriven
+    // 2. Enrich holdings in parallel with strict 1.2s timeout on external APIs
     const holdings = await Promise.all(
       rawHoldings.map(async (h) => {
         let currentMarketPrice = 0;
@@ -58,32 +79,9 @@ export async function GET() {
       })
     );
 
-    // Fetch liabilities
-    const liabilities = await prisma.liability.findMany({
-      where: { userId },
-      include: { linkedHolding: { include: { asset: true } } },
-      orderBy: { createdAt: "desc" },
-    });
-
-    // Fetch recent wealth transactions
-    const transactions = await prisma.wealthTransaction.findMany({
-      where: { userId },
-      include: { asset: true },
-      orderBy: { date: "desc" },
-      take: 50,
-    });
-
-    // Fetch recent cash flows from Financial Management app
-    const cashFlows = await prisma.cashFlow.findMany({
-      where: { userId },
-      include: { primaryCategory: true, source: true },
-      orderBy: { datetime: "desc" },
-      take: 50,
-    });
-
-    // Calculate aggregated totals
+    // 3. Aggregate totals
     let totalAssets = 0;
-    let totalInvestableAssets = 0; // Strictly Type 0 (Tài sản thanh khoản / Tiền mặt)
+    let totalInvestableAssets = 0;
     let totalInvestedCostBasis = 0;
     let totalMarketValueInvestments = 0;
 
@@ -103,7 +101,6 @@ export async function GET() {
 
       const catType = h.categoryType >= 0 && h.categoryType <= 4 ? h.categoryType : 0;
 
-      // Tài sản thanh khoản KPI: Strictly Type 0 (Tiền mặt / Thanh khoản)
       if (catType === 0) {
         totalInvestableAssets += h.currentValue;
       }
@@ -127,20 +124,14 @@ export async function GET() {
 
     const breakdownList = Object.values(breakdownByCategoryType);
 
-    // Auto-record today's Asset Snapshot in PostgreSQL
-    await recordDailyAssetSnapshot(userId, {
+    // 4. Record daily asset snapshot asynchronously in background so response is non-blocking
+    recordDailyAssetSnapshot(userId, {
       totalAssets,
       totalLiabilities,
       netWorth,
       totalInvestableAssets,
       breakdownJson: breakdownList,
-    });
-
-    // Fetch all historical daily snapshots for user
-    const snapshots = await prisma.assetSnapshot.findMany({
-      where: { userId },
-      orderBy: { date: "asc" },
-    });
+    }).catch((err) => console.error("Async snapshot error:", err));
 
     return NextResponse.json({
       success: true,
@@ -154,16 +145,15 @@ export async function GET() {
         unrealizedPnL,
         unrealizedPnLPercent,
       },
+      breakdownByCategoryType: breakdownList,
       holdings,
       liabilities,
       transactions,
       cashFlows,
       snapshots,
-      breakdownByCategoryType: breakdownList,
-      breakdownByMacro: breakdownList, // Backwards compatibility for breakdown rendering
     });
-  } catch (error: any) {
-    console.error("Error fetching wealth data:", error);
-    return NextResponse.json({ error: error.message || "Server Error" }, { status: 500 });
+  } catch (error) {
+    console.error("GET /api/wealth Error:", error);
+    return NextResponse.json({ error: "Failed to fetch wealth management data" }, { status: 500 });
   }
 }

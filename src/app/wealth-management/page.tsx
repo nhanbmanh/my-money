@@ -128,41 +128,44 @@ export default function WealthManagementPage() {
         }`}
       >
         {/* Main View Tabs Bar */}
-        <div className="flex items-center gap-1.5 bg-muted/80 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-x-auto">
+        <div className="grid grid-cols-3 gap-1 bg-muted/80 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 w-full">
           <button
             onClick={() => setActiveView("OVERVIEW")}
-            className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center justify-center gap-2 px-2 sm:px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
               activeView === "OVERVIEW"
                 ? "bg-background text-foreground shadow-sm ring-1 ring-slate-200 dark:ring-slate-700"
                 : "text-muted-foreground hover:text-foreground"
             }`}
+            title="Bảng Cân Đối Gia Sản"
           >
-            <ShieldCheck className="h-4 w-4 text-sky-500" />
-            <span>Bảng Cân Đối Gia Sản</span>
+            <ShieldCheck className="h-4.5 w-4.5 text-sky-500 shrink-0" />
+            <span className="hidden sm:inline truncate">Bảng Cân Đối Gia Sản</span>
           </button>
 
           <button
             onClick={() => setActiveView("PORTFOLIO")}
-            className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center justify-center gap-2 px-2 sm:px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
               activeView === "PORTFOLIO"
                 ? "bg-background text-foreground shadow-sm ring-1 ring-slate-200 dark:ring-slate-700"
                 : "text-muted-foreground hover:text-foreground"
             }`}
+            title="Danh Mục Đầu Tư"
           >
-            <PieIcon className="h-4 w-4 text-emerald-500" />
-            <span>Danh Mục Đầu Tư</span>
+            <PieIcon className="h-4.5 w-4.5 text-emerald-500 shrink-0" />
+            <span className="hidden sm:inline truncate">Danh Mục Đầu Tư</span>
           </button>
 
           <button
             onClick={() => setActiveView("HOLDINGS")}
-            className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center justify-center gap-2 px-2 sm:px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
               activeView === "HOLDINGS"
                 ? "bg-background text-foreground shadow-sm ring-1 ring-slate-200 dark:ring-slate-700"
                 : "text-muted-foreground hover:text-foreground"
             }`}
+            title="Bảng Số Dư & Quản Lý Tài Sản"
           >
-            <TableIcon className="h-4 w-4 text-amber-500" />
-            <span>Bảng Số Dư & Quản Lý Tài Sản</span>
+            <TableIcon className="h-4.5 w-4.5 text-amber-500 shrink-0" />
+            <span className="hidden sm:inline truncate">Bảng Số Dư & Quản Lý Tài Sản</span>
           </button>
         </div>
 

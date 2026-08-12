@@ -400,9 +400,105 @@ export function AssetManagementTable({
         </CardContent>
       </Card>
 
-      {/* Holdings Table */}
-      <Card className="border-slate-200 dark:border-slate-800 shadow-md overflow-hidden">
-        <div className="overflow-x-auto">
+      {/* Holdings Container: Responsive Dual Mode */}
+      <Card className="border-slate-200 dark:border-slate-800 shadow-md overflow-hidden bg-transparent md:bg-card border-0 md:border">
+        {/* Mobile View: Clean Vertical Cards (< md) */}
+        <div className="block md:hidden space-y-3">
+          {isLoading ? (
+            Array.from({ length: 3 }).map((_, idx) => (
+              <div key={idx} className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3 animate-pulse">
+                <Skeleton className="h-6 w-40 rounded-lg" />
+                <Skeleton className="h-10 w-full rounded-xl" />
+              </div>
+            ))
+          ) : activeHoldings.length === 0 ? (
+            <div className="text-center py-8 text-xs text-muted-foreground font-medium bg-slate-900/40 rounded-2xl border border-slate-800 p-4">
+              Chưa có tài sản đang sở hữu nào phù hợp điều kiện lọc. Vui lòng nhấn nút "+ Thêm tài sản" để thêm mới!
+            </div>
+          ) : (
+            activeHoldings.map((h) => {
+              const catCfg = getCategoryConfig(h.categoryType);
+              const isGrowth = h.categoryType === 1 || h.asset.isMarketDriven;
+              const pnl = (h.currentMarketPrice - h.averageCostBasis) * h.quantity;
+              const isProfit = pnl >= 0;
+              const unitLabel = (h.asset?.metadata as Record<string, any>)?.unit;
+
+              return (
+                <div
+                  key={h.id}
+                  className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3"
+                >
+                  {/* Card Header */}
+                  <div className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800/80 pb-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <div className="w-9 h-9 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 font-extrabold flex items-center justify-center text-xs shrink-0 uppercase border border-sky-500/20">
+                        {h.asset.isMarketDriven ? h.asset.symbolOrTicker.slice(0, 3) : (h.asset.assetName || catCfg.shortName).slice(0, 3)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-extrabold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-1.5 flex-wrap">
+                          <span>{h.asset.isMarketDriven ? h.asset.symbolOrTicker : h.asset.assetName}</span>
+                          <span className={`px-2 py-0.5 rounded-lg text-[9px] font-extrabold border shrink-0 ${catCfg.badgeBg}`}>
+                            {catCfg.type}. {catCfg.shortName}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-muted-foreground truncate">
+                          {h.asset.isMarketDriven ? h.asset.assetName : catCfg.name}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        onClick={() => handleOpenEdit(h)}
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950/40 rounded-xl cursor-pointer"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        onClick={() => setDeleteConfirmTarget({ id: h.id, name: h.asset.assetName || h.asset.symbolOrTicker })}
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl cursor-pointer"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Card Body Metrics */}
+                  <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50/80 dark:bg-slate-800/40 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                    <div>
+                      <div className="text-[10px] text-muted-foreground font-medium uppercase">Tổng Giá Trị</div>
+                      <div className="font-black text-sm text-sky-600 dark:text-sky-400 mt-0.5">
+                        {formatVND(isGrowth ? h.currentValue : h.quantity * h.averageCostBasis)}
+                      </div>
+                      {isGrowth && pnl !== 0 && (
+                        <div className={`text-[10px] font-bold mt-0.5 ${isProfit ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
+                          {isProfit ? "+" : ""}{formatVND(pnl)} (PnL)
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="text-right border-l border-slate-200/60 dark:border-slate-700/60 pl-2">
+                      <div className="text-[10px] text-muted-foreground font-medium uppercase">Số Lượng Nắm Giữ</div>
+                      <div className="font-extrabold text-xs text-slate-800 dark:text-slate-200 mt-0.5">
+                        {h.quantity.toLocaleString("vi-VN", { maximumFractionDigits: 6 })} {unitLabel && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">({unitLabel})</span>}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">
+                        Giá vốn: {formatVND(h.averageCostBasis)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Desktop View: Full Table (>= md) */}
+        <div className="hidden md:block overflow-x-auto">
           <Table>
             <TableHeader className="bg-slate-50 dark:bg-slate-900/80">
               <TableRow>

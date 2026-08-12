@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -62,6 +63,81 @@ const PRESET_CITIES: WeatherLocation[] = [
   { name: "Phú Quốc", latitude: 10.2899, longitude: 103.984, country: "Việt Nam" },
 ];
 
+function WeatherSkeletonLoader({ language }: { language: string }) {
+  return (
+    <div className="space-y-4 animate-pulse">
+      {/* SECTION 2 SKELETON: Hero Realtime Card */}
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between px-1">
+          <Skeleton className="h-4 w-64 rounded-lg bg-slate-200 dark:bg-slate-800" />
+          <Skeleton className="h-4 w-36 rounded-lg bg-slate-200 dark:bg-slate-800" />
+        </div>
+        
+        <div className="rounded-3xl p-6 bg-slate-900/80 border border-slate-800 space-y-6 min-h-[280px] flex flex-col justify-between shadow-xl">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-6 w-52 rounded-full bg-slate-800" />
+              <Skeleton className="h-6 w-28 rounded-full bg-slate-800" />
+            </div>
+            <div className="flex items-baseline gap-3 pt-2">
+              <Skeleton className="h-16 w-36 rounded-2xl bg-slate-800" />
+              <Skeleton className="h-12 w-12 rounded-full bg-slate-800" />
+            </div>
+            <Skeleton className="h-6 w-48 rounded-xl bg-slate-800" />
+            <Skeleton className="h-4 w-64 rounded-xl bg-slate-800" />
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 border-t border-slate-800">
+            <Skeleton className="h-14 rounded-2xl col-span-2 sm:col-span-1 bg-slate-800" />
+            <Skeleton className="h-14 rounded-2xl bg-slate-800" />
+            <Skeleton className="h-14 rounded-2xl bg-slate-800" />
+            <Skeleton className="h-14 rounded-2xl bg-slate-800" />
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION 3 SKELETON: Hourly 12h Forecast Grid */}
+      <Card className="bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-5 w-5 rounded-full bg-sky-500/20" />
+          <Skeleton className="h-5 w-64 rounded-lg bg-slate-200 dark:bg-slate-800" />
+        </div>
+        <div className="grid grid-cols-6 lg:grid-cols-12 gap-2.5">
+          {[...Array(12)].map((_, i) => (
+            <Skeleton key={i} className="h-28 rounded-2xl bg-slate-100 dark:bg-slate-800" />
+          ))}
+        </div>
+      </Card>
+
+      {/* SECTION 4 SKELETON: 7-Day Forecast & Tips Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Card className="lg:col-span-2 bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 space-y-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Skeleton className="h-5 w-5 rounded-full bg-amber-500/20" />
+            <Skeleton className="h-5 w-56 rounded-lg bg-slate-200 dark:bg-slate-800" />
+          </div>
+          {[...Array(7)].map((_, i) => (
+            <Skeleton key={i} className="h-12 rounded-2xl bg-slate-100 dark:bg-slate-800" />
+          ))}
+        </Card>
+
+        <Card className="bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 space-y-4 flex flex-col justify-between">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-5 w-5 rounded-full bg-indigo-500/20" />
+              <Skeleton className="h-5 w-48 rounded-lg bg-slate-200 dark:bg-slate-800" />
+            </div>
+            <Skeleton className="h-24 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/40" />
+            <Skeleton className="h-24 rounded-2xl bg-sky-50 dark:bg-sky-950/30 border border-sky-100 dark:border-sky-900/40" />
+            <Skeleton className="h-24 rounded-2xl bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40" />
+          </div>
+          <Skeleton className="h-10 rounded-2xl bg-slate-100 dark:bg-slate-800" />
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 export function WeatherDashboard() {
   const { t, language } = useLanguage();
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
@@ -80,8 +156,8 @@ export function WeatherDashboard() {
   const [searching, setSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  const loadWeather = useCallback(async (lat: number, lng: number, locName?: string) => {
-    setLoading(true);
+  const loadWeather = useCallback(async (lat: number, lng: number, locName?: string, isSilent = false) => {
+    if (!isSilent) setLoading(true);
     setError(null);
     try {
       const [data, avFullData] = await Promise.all([
@@ -90,38 +166,79 @@ export function WeatherDashboard() {
       ]);
       setWeatherData(data);
       setAirVisualFullData(avFullData);
+
+      // Persist last location and data to localStorage for instant reload
+      try {
+        localStorage.setItem(
+          "my_money_last_weather_location",
+          JSON.stringify({ lat, lng, name: locName || data.location.name })
+        );
+        localStorage.setItem("my_money_cached_weather_data", JSON.stringify(data));
+        localStorage.setItem("my_money_cached_airvisual_data", JSON.stringify(avFullData));
+      } catch {}
     } catch (err: any) {
-      setError(err?.message || "Không thể tải dữ liệu thời tiết");
+      if (!isSilent) setError(err?.message || "Không thể tải dữ liệu thời tiết");
     } finally {
       setLoading(false);
     }
   }, []);
 
   // Detect user geolocation
-  const detectUserLocation = useCallback(() => {
+  const detectUserLocation = useCallback((forceGps: boolean | React.MouseEvent = false) => {
+    const isForce = typeof forceGps === "boolean" ? forceGps : true;
     if (typeof window === "undefined" || !navigator.geolocation) {
       loadWeather(PRESET_CITIES[0].latitude, PRESET_CITIES[0].longitude, PRESET_CITIES[0].name);
       return;
     }
 
-    setLoading(true);
+    if (isForce) setLoading(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
         loadWeather(latitude, longitude);
       },
       () => {
+        try {
+          const savedLoc = localStorage.getItem("my_money_last_weather_location");
+          if (savedLoc) {
+            const { lat, lng, name } = JSON.parse(savedLoc);
+            if (lat && lng) {
+              loadWeather(lat, lng, name);
+              return;
+            }
+          }
+        } catch {}
         loadWeather(PRESET_CITIES[0].latitude, PRESET_CITIES[0].longitude, PRESET_CITIES[0].name);
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: false, timeout: 4000, maximumAge: 60000 }
     );
   }, [loadWeather]);
 
   useEffect(() => {
-    detectUserLocation();
+    let hasRestoredFromCache = false;
+    try {
+      const savedLoc = localStorage.getItem("my_money_last_weather_location");
+      const cachedW = localStorage.getItem("my_money_cached_weather_data");
+      const cachedAv = localStorage.getItem("my_money_cached_airvisual_data");
+
+      if (cachedW && cachedAv && savedLoc) {
+        setWeatherData(JSON.parse(cachedW));
+        setAirVisualFullData(JSON.parse(cachedAv));
+        setLoading(false);
+        hasRestoredFromCache = true;
+
+        // Background update for saved location
+        const { lat, lng, name } = JSON.parse(savedLoc);
+        loadWeather(lat, lng, name, true);
+      }
+    } catch {}
+
+    if (!hasRestoredFromCache) {
+      detectUserLocation();
+    }
 
     const handleOpenSummary = () => setSummaryOpen(true);
-    const handleRefreshLocation = () => detectUserLocation();
+    const handleRefreshLocation = () => detectUserLocation(true);
 
     window.addEventListener("open-weather-summary", handleOpenSummary);
     window.addEventListener("refresh-weather-location", handleRefreshLocation);
@@ -130,7 +247,7 @@ export function WeatherDashboard() {
       window.removeEventListener("open-weather-summary", handleOpenSummary);
       window.removeEventListener("refresh-weather-location", handleRefreshLocation);
     };
-  }, [detectUserLocation]);
+  }, [detectUserLocation, loadWeather]);
 
   // Handle Search Input Change
   useEffect(() => {
@@ -352,17 +469,8 @@ export function WeatherDashboard() {
     : null;
 
   const airVisualData = airVisualFullData?.current;
-  const hourlyList = (
-    hourlySource === "openmeteo"
-      ? weatherData?.hourly
-      : airVisualFullData?.hourly
-  )?.slice(0, 12) || [];
-
-  const dailyList = (
-    dailySource === "openmeteo"
-      ? weatherData?.daily
-      : airVisualFullData?.daily
-  ) || [];
+  const hourlyList = airVisualFullData?.hourly?.slice(0, 12) || [];
+  const dailyList = airVisualFullData?.daily || [];
 
   return (
     <div className="space-y-4 w-full max-w-[1400px] mx-auto pb-8 min-w-0">
@@ -469,13 +577,8 @@ export function WeatherDashboard() {
         ))}
       </div>
 
-      {loading && !weatherData ? (
-        <div className="flex flex-col items-center justify-center py-24 gap-3 bg-white/50 dark:bg-slate-900/50 rounded-3xl border border-slate-100 dark:border-slate-800">
-          <Spinner className="h-10 w-10 text-sky-500" />
-          <p className="text-sm font-black text-slate-400">
-            {language === "vi" ? "Đang tải dự báo thời tiết thời gian thực..." : "Loading realtime weather forecast..."}
-          </p>
-        </div>
+      {(loading && (!weatherData || !airVisualFullData)) ? (
+        <WeatherSkeletonLoader language={language} />
       ) : error ? (
         <div className="p-8 text-center bg-rose-50 dark:bg-rose-950/40 rounded-3xl border border-rose-200 text-rose-600 text-sm font-bold space-y-2">
           <p>{error}</p>
@@ -490,241 +593,84 @@ export function WeatherDashboard() {
         </div>
       ) : weatherData && weatherTheme ? (
         <>
-          {/* SECTION 2: COMPARISON OF 2 REAL-TIME WEATHER APIS (AIRVISUAL & OPEN-METEO) */}
+          {/* SECTION 2: AIRVISUAL REAL-TIME HERO CARD */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                <Sparkles className="h-4 w-4 text-sky-500" /> {language === "vi" ? "SO SÁNH THỜI TIẾT THỜI GIAN THỰC (2 NGUỒN API DỰ BÁO)" : "REALTIME WEATHER COMPARISON (2 API SOURCES)"}
+                <Sparkles className="h-4 w-4 text-sky-500" /> {language === "vi" ? "DỰ BÁO THỜI TIẾT THỜI GIAN THỰC (AIRVISUAL / IQAIR)" : "REALTIME WEATHER FORECAST (AIRVISUAL / IQAIR)"}
               </div>
               <span className="text-[11px] font-extrabold text-slate-400">
-                {language === "vi" ? "Đồng bộ cùng vị trí GPS" : "Synced with GPS location"}
+                {language === "vi" ? "Đồng bộ từ Trạm Khí Tượng AirVisual" : "Synced from AirVisual Weather Station"}
               </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* CARD 1: AIRVISUAL / IQAIR API (CHÍNH XÁC NHẤT) */}
-              {airVisualData ? (
-                <div className="relative overflow-hidden rounded-3xl text-white p-5 sm:p-6 shadow-xl border border-white/20 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 transition-all duration-700 flex flex-col justify-between min-h-[300px]">
-                  {/* Decorative Background Glow */}
-                  <div className="absolute -top-16 -right-16 w-60 h-60 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none" />
-
-                  <div className="relative z-10 space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <Badge className="bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-200 border-emerald-400/30 backdrop-blur text-xs font-black px-3 py-1 rounded-full truncate">
-                        💨 {language === "vi" ? "Nguồn 1: AirVisual / IQAir (Mỹ - Chuẩn xác)" : "Source 1: AirVisual / IQAir (US - Primary)"}
-                      </Badge>
-                      <Badge className={cn("text-xs font-black px-2.5 py-0.5 rounded-full border shadow-xs shrink-0", airVisualData.aqiColor)}>
-                        AQI {airVisualData.aqi} • {getAqiLevelInfo(airVisualData.aqi, language).text}
-                      </Badge>
-                    </div>
-
-                    <div className="flex items-baseline gap-3 pt-1">
-                      <h1 className="text-5xl sm:text-6xl font-black tracking-tight drop-shadow-md text-white">
-                        {airVisualData.temperature}°
-                        <span className="text-3xl font-black text-indigo-200">C</span>
-                      </h1>
-                      <div className="text-4xl drop-shadow-sm">{airVisualData.icon}</div>
-                    </div>
-
-                    <h3 className="text-lg font-black text-white tracking-wide truncate">
-                      {getAirVisualWeatherInfo(airVisualData.weatherDesc, language).desc}
-                    </h3>
-
-                    <p className="text-xs font-extrabold text-indigo-200 flex items-center gap-2 truncate">
-                      <span>{language === "vi" ? `Cảm giác như ${airVisualData.feelsLike}°C` : `Feels like ${airVisualData.feelsLike}°C`}</span>
-                      <span>•</span>
-                      <span>{language === "vi" ? `Độ ẩm ${airVisualData.humidity}%` : `Humidity ${airVisualData.humidity}%`}</span>
-                    </p>
-                  </div>
-
-                  {/* AirVisual Grid of Key Weather Metrics */}
-                  <div className="relative z-10 grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-white/20">
-                    <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2 text-center col-span-2">
-                      <div className="text-[10px] font-black text-indigo-200 truncate">🍃 {language === "vi" ? "Chất Lượng Không Khí US AQI" : "US AQI Air Quality"}</div>
-                      <div className="text-xs sm:text-sm font-black text-emerald-300 truncate">{language === "vi" ? `Chỉ số ${airVisualData.aqi} • ${getAqiLevelInfo(airVisualData.aqi, language).text}` : `Index ${airVisualData.aqi} • ${getAqiLevelInfo(airVisualData.aqi, language).text}`}</div>
-                    </div>
-
-                    <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2 text-center">
-                      <div className="text-[10px] font-black text-indigo-200 truncate">💧 {language === "vi" ? "Độ Ẩm" : "Humidity"}</div>
-                      <div className="text-sm font-black text-white">{airVisualData.humidity}%</div>
-                    </div>
-
-                    <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2 text-center">
-                      <div className="text-[10px] font-black text-indigo-200 truncate">💨 {language === "vi" ? "Tốc Độ Gió" : "Wind Speed"}</div>
-                      <div className="text-sm font-black text-white">{airVisualData.windSpeed} km/h</div>
-                    </div>
-
-                    <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2 text-center">
-                      <div className="text-[10px] font-black text-indigo-200 truncate">⏲️ {language === "vi" ? "Áp Suất" : "Pressure"}</div>
-                      <div className="text-sm font-black text-white">{airVisualData.pressure} hPa</div>
-                    </div>
-
-                    <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2 text-center">
-                      <div className="text-[10px] font-black text-indigo-200 truncate">⏰ {language === "vi" ? "Cập Nhật" : "Updated"}</div>
-                      <div className="text-xs font-bold text-white truncate">{airVisualData.updatedAt}</div>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-
-              {/* CARD 2: OPEN-METEO API */}
-              <div
-                className={cn(
-                  "relative overflow-hidden rounded-3xl text-white p-5 sm:p-6 shadow-xl border border-white/20 transition-all duration-700 flex flex-col justify-between min-h-[300px]",
-                  weatherTheme.gradient
-                )}
-              >
-                {/* 1. ANIMATED FALLING RAINDROPS */}
-                {(weatherTheme.type === "rain" || weatherTheme.type === "storm") && (
-                  <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 opacity-60">
-                    {[...Array(15)].map((_, i) => (
-                      <div
-                        key={i}
-                        className="absolute w-[1.5px] bg-gradient-to-b from-transparent via-sky-200 to-transparent rounded-full animate-raindrop"
-                        style={{
-                          left: `${(i * 6.5 + 1) % 100}%`,
-                          height: `${24 + (i % 6) * 6}px`,
-                          animationDuration: `${0.45 + (i % 5) * 0.12}s`,
-                          animationDelay: `${(i % 7) * 0.1}s`,
-                        }}
-                      />
-                    ))}
-                  </div>
-                )}
-
-                {/* 2. ANIMATED DRIFTING CLOUDS */}
-                {(weatherTheme.type === "cloud" || weatherTheme.type === "rain") && (
-                  <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 opacity-15 animate-cloud-float">
-                    <div className="absolute top-2 left-6 text-6xl">☁️</div>
-                    <div className="absolute top-8 right-12 text-5xl">☁️</div>
-                  </div>
-                )}
-
-                {/* 3. ANIMATED SUNBURST PULSE */}
-                {weatherTheme.type === "sun" && (
-                  <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-amber-300/35 blur-2xl pointer-events-none animate-sun-pulse z-0" />
-                )}
-
-                {/* 4. ANIMATED NIGHT STARS */}
-                {weatherTheme.type === "night" && (
-                  <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 opacity-40">
-                    {[...Array(10)].map((_, i) => (
-                      <div
-                        key={i}
-                        className="absolute w-1.5 h-1.5 bg-white rounded-full animate-pulse"
-                        style={{
-                          top: `${(i * 8 + 4) % 85}%`,
-                          left: `${(i * 9 + 2) % 95}%`,
-                          animationDuration: `${1.2 + (i % 3) * 0.6}s`,
-                          animationDelay: `${(i % 5) * 0.25}s`,
-                        }}
-                      />
-                    ))}
-                  </div>
-                )}
+            {airVisualData ? (
+              <div className="relative overflow-hidden rounded-3xl text-white p-5 sm:p-6 shadow-xl border border-white/20 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 transition-all duration-700 flex flex-col justify-between min-h-[280px]">
+                {/* Decorative Background Glow */}
+                <div className="absolute -top-16 -right-16 w-60 h-60 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none" />
 
                 <div className="relative z-10 space-y-3">
                   <div className="flex items-center justify-between gap-2">
-                    <Badge className="bg-white/25 hover:bg-white/35 text-white border-white/40 backdrop-blur text-xs font-black px-3 py-1 rounded-full truncate">
-                      🌐 {language === "vi" ? "Nguồn 2: Open-Meteo (Châu Âu)" : "Source 2: Open-Meteo (Europe)"}
+                    <Badge className="bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-200 border-emerald-400/30 backdrop-blur text-xs font-black px-3 py-1 rounded-full truncate">
+                      💨 {language === "vi" ? "Trạm AirVisual / IQAir (Mỹ - Trực Tiếp)" : "AirVisual / IQAir Station (US - Live)"}
                     </Badge>
-                    <span className="text-[11px] font-extrabold text-sky-100">
-                      {weatherData.current.isDay ? (language === "vi" ? "☀️ Ban Ngày" : "☀️ Daytime") : (language === "vi" ? "🌙 Ban Đêm" : "🌙 Nighttime")}
-                    </span>
+                    <Badge className={cn("text-xs font-black px-2.5 py-0.5 rounded-full border shadow-xs shrink-0", airVisualData.aqiColor)}>
+                      AQI {airVisualData.aqi} • {getAqiLevelInfo(airVisualData.aqi, language).text}
+                    </Badge>
                   </div>
 
                   <div className="flex items-baseline gap-3 pt-1">
-                    <h1 className="text-5xl sm:text-6xl font-black tracking-tight drop-shadow-md">
-                      {weatherData.current.temperature}°
-                      <span className="text-3xl font-black text-sky-100">C</span>
+                    <h1 className="text-5xl sm:text-6xl font-black tracking-tight drop-shadow-md text-white">
+                      {airVisualData.temperature}°
+                      <span className="text-3xl font-black text-indigo-200">C</span>
                     </h1>
-                    <div className="text-4xl drop-shadow-sm">
-                      {getWmoWeatherInfo(weatherData.current.weatherCode, weatherData.current.isDay, language).icon}
-                    </div>
+                    <div className="text-4xl drop-shadow-sm">{airVisualData.icon}</div>
                   </div>
 
                   <h3 className="text-lg font-black text-white tracking-wide truncate">
-                    {getWmoWeatherInfo(weatherData.current.weatherCode, weatherData.current.isDay, language).desc}
+                    {getAirVisualWeatherInfo(airVisualData.weatherDesc, language).desc}
                   </h3>
 
-                  <p className="text-xs font-extrabold text-sky-100 flex items-center gap-2 truncate">
-                    <span>{language === "vi" ? `Cảm giác như ${weatherData.current.feelsLike}°C` : `Feels like ${weatherData.current.feelsLike}°C`}</span>
+                  <p className="text-xs font-extrabold text-indigo-200 flex items-center gap-2 truncate">
+                    <span>{language === "vi" ? `Cảm giác như ${airVisualData.feelsLike}°C` : `Feels like ${airVisualData.feelsLike}°C`}</span>
                     <span>•</span>
-                    <span>{language === "vi" ? `Độ ẩm ${weatherData.current.humidity}%` : `Humidity ${weatherData.current.humidity}%`}</span>
+                    <span>{language === "vi" ? `Độ ẩm ${airVisualData.humidity}%` : `Humidity ${airVisualData.humidity}%`}</span>
                   </p>
                 </div>
 
-                {/* Open-Meteo Grid of Key Weather Metrics */}
-                <div className="relative z-10 grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-white/20">
-                  <div className="bg-white/15 backdrop-blur border border-white/25 rounded-2xl p-2 text-center">
-                    <div className="text-[10px] font-black text-sky-100 truncate">💧 {language === "vi" ? "Độ Ẩm" : "Humidity"}</div>
-                    <div className="text-sm font-black text-white">{weatherData.current.humidity}%</div>
+                {/* AirVisual Grid of Key Weather Metrics */}
+                <div className="relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4 pt-3 border-t border-white/20">
+                  <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2.5 text-center col-span-2 sm:col-span-1">
+                    <div className="text-[10px] font-black text-indigo-200 truncate">🍃 {language === "vi" ? "Chất Lượng Không Khí US AQI" : "US AQI Air Quality"}</div>
+                    <div className="text-xs sm:text-sm font-black text-emerald-300 truncate">{language === "vi" ? `Chỉ số ${airVisualData.aqi} • ${getAqiLevelInfo(airVisualData.aqi, language).text}` : `Index ${airVisualData.aqi} • ${getAqiLevelInfo(airVisualData.aqi, language).text}`}</div>
                   </div>
 
-                  <div className="bg-white/15 backdrop-blur border border-white/25 rounded-2xl p-2 text-center">
-                    <div className="text-[10px] font-black text-sky-100 truncate">💨 {language === "vi" ? "Tốc Độ Gió" : "Wind Speed"}</div>
-                    <div className="text-sm font-black text-white">{weatherData.current.windSpeed} km/h</div>
+                  <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2.5 text-center">
+                    <div className="text-[10px] font-black text-indigo-200 truncate">💧 {language === "vi" ? "Độ Ẩm" : "Humidity"}</div>
+                    <div className="text-sm font-black text-white">{airVisualData.humidity}%</div>
                   </div>
 
-                  <div className="bg-white/15 backdrop-blur border border-white/25 rounded-2xl p-2 text-center">
-                    <div className="text-[10px] font-black text-sky-100 truncate">☀️ {language === "vi" ? "Chỉ Số UV" : "UV Index"}</div>
-                    <div className="text-sm font-black text-white">
-                      {weatherData.current.uvIndex} ({getUvLevelInfo(weatherData.current.uvIndex).text})
-                    </div>
+                  <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2.5 text-center">
+                    <div className="text-[10px] font-black text-indigo-200 truncate">💨 {language === "vi" ? "Tốc Độ Gió" : "Wind Speed"}</div>
+                    <div className="text-sm font-black text-white">{airVisualData.windSpeed} km/h</div>
                   </div>
 
-                  <div className="bg-white/15 backdrop-blur border border-white/25 rounded-2xl p-2 text-center">
-                    <div className="text-[10px] font-black text-sky-100 truncate">⏲️ {language === "vi" ? "Áp Suất" : "Pressure"}</div>
-                    <div className="text-sm font-black text-white">{weatherData.current.pressure} hPa</div>
-                  </div>
-
-                  <div className="bg-white/15 backdrop-blur border border-white/25 rounded-2xl p-2 text-center">
-                    <div className="text-[10px] font-black text-sky-100 truncate">🌧️ {language === "vi" ? "Lượng Mưa" : "Precipitation"}</div>
-                    <div className="text-sm font-black text-white">{weatherData.current.rain} mm</div>
-                  </div>
-
-                  <div className="bg-white/15 backdrop-blur border border-white/25 rounded-2xl p-2 text-center">
-                    <div className="text-[10px] font-black text-sky-100 truncate">🌅 {language === "vi" ? "Mọc / Lặn" : "Sunrise/Sunset"}</div>
-                    <div className="text-[11px] font-black text-white truncate">{weatherData.current.sunrise} / {weatherData.current.sunset}</div>
+                  <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2.5 text-center">
+                    <div className="text-[10px] font-black text-indigo-200 truncate">⏲️ {language === "vi" ? "Áp Suất" : "Pressure"}</div>
+                    <div className="text-sm font-black text-white">{airVisualData.pressure} hPa</div>
                   </div>
                 </div>
               </div>
-            </div>
+            ) : null}
           </div>
 
-          {/* SECTION 3: HOURLY FORECAST (12 HOURS) */}
+          {/* SECTION 3: HOURLY FORECAST (12 HOURS - AIRVISUAL) */}
           <Card className="bg-white/90 dark:bg-slate-900/90 backdrop-blur border border-sky-100 dark:border-slate-800 shadow-xs rounded-3xl overflow-hidden">
-            <CardHeader className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <CardHeader className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
               <CardTitle className="text-lg sm:text-base font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
                 <Sparkles className="h-5.5 w-5.5 text-sky-500" />
-                {language === "vi" ? "Thời Tiết Trong Ngày (12 Giờ Tới)" : "Hourly Forecast (Next 12 Hours)"}
+                {language === "vi" ? "Thời Tiết Trong Ngày (12 Giờ Tới - AirVisual)" : "Hourly Forecast (Next 12 Hours - AirVisual)"}
               </CardTitle>
-
-              {/* Source Switcher Tabs: AirVisual vs Open-Meteo */}
-              <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shrink-0 self-stretch sm:self-auto overflow-x-auto">
-                <button
-                  onClick={() => setHourlySource("airvisual")}
-                  className={cn(
-                    "flex-1 sm:flex-initial px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap",
-                    hourlySource === "airvisual"
-                      ? "bg-indigo-600 text-white shadow-xs"
-                      : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
-                  )}
-                >
-                  💨 AirVisual ({language === "vi" ? "Mỹ" : "US"})
-                </button>
-                <button
-                  onClick={() => setHourlySource("openmeteo")}
-                  className={cn(
-                    "flex-1 sm:flex-initial px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap",
-                    hourlySource === "openmeteo"
-                      ? "bg-sky-500 text-white shadow-xs"
-                      : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
-                  )}
-                >
-                  🌐 Open-Meteo ({language === "vi" ? "Châu Âu" : "Europe"})
-                </button>
-              </div>
             </CardHeader>
             <CardContent className="p-4 sm:p-5">
               {/* Mobile View: Vertical 1 Item/Row List (< 640px) */}
@@ -815,37 +761,11 @@ export function WeatherDashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* 7-Day Forecast Column */}
             <Card className="lg:col-span-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur border border-sky-100 dark:border-slate-800 shadow-xs rounded-3xl overflow-hidden">
-              <CardHeader className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <CardHeader className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                 <CardTitle className="text-lg sm:text-base font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
                   <Sun className="h-5.5 w-5.5 text-amber-500" />
-                  {language === "vi" ? "Dự Báo Thời Tiết 1 Tuần Tới (7 Ngày)" : "7-Day Extended Forecast"}
+                  {language === "vi" ? "Dự Báo Thời Tiết 1 Tuần Tới (7 Ngày - AirVisual)" : "7-Day Extended Forecast (AirVisual)"}
                 </CardTitle>
-
-                {/* Source Switcher Tabs for 7-Day: AirVisual vs Open-Meteo */}
-                <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shrink-0 self-stretch sm:self-auto overflow-x-auto">
-                  <button
-                    onClick={() => setDailySource("airvisual")}
-                    className={cn(
-                      "flex-1 sm:flex-initial px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap",
-                      dailySource === "airvisual"
-                        ? "bg-indigo-600 text-white shadow-xs"
-                        : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
-                    )}
-                  >
-                    💨 AirVisual
-                  </button>
-                  <button
-                    onClick={() => setDailySource("openmeteo")}
-                    className={cn(
-                      "flex-1 sm:flex-initial px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap",
-                      dailySource === "openmeteo"
-                        ? "bg-sky-500 text-white shadow-xs"
-                        : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
-                    )}
-                  >
-                    🌐 Open-Meteo
-                  </button>
-                </div>
               </CardHeader>
               <CardContent className="p-4 sm:p-5 space-y-3">
                 {/* Mobile View 1 Item/Row for 7-Day Forecast (< 640px) */}

@@ -217,35 +217,56 @@ export function OverviewBalanceSheet({
     return [];
   }, [timeframe, snapshots, summary]);
 
-  const previousNetWorth = useMemo(() => {
-    // 1. If we have real DB daily snapshots (at least 2 snapshots)
-    if (snapshots && snapshots.length >= 2) {
-      const prev = snapshots[snapshots.length - 2];
-      if (prev && typeof prev.netWorthValue === "number" && prev.netWorthValue > 0) {
-        return prev.netWorthValue;
-      }
-    }
+  // 1-day Net Worth Variance Calculation (100% mathematically balanced)
+  const { previousNetWorth, netWorthChangeAmount, netWorthChangePercent, isPositive } = useMemo(() => {
+    const currentNetWorth = Number(summary?.netWorth || 0);
 
-    // 2. If recent cashflows exist, baseline is current netWorth minus net cashflows
-    let netCashFlowDelta = 0;
-    (cashFlows || []).forEach((cf: any) => {
-      const amt = Number(cf.amountOfMoney || 0);
-      if (cf.cashType === "Income") netCashFlowDelta += amt;
-      else netCashFlowDelta -= amt;
+    // 1. Calculate today's market value variance across holdings
+    let marketChangeToday = 0;
+    (holdings || []).forEach((h: any) => {
+      const quantity = Number(h.quantity || 0);
+      const currentVal = Number(h.currentValue || 0);
+      const currentUnitPrice = Number(h.currentMarketPrice || h.averageCostBasis || 0);
+      const change24hPercent = Number(h.change24h || 0);
+
+      if (change24hPercent !== 0 && currentUnitPrice > 0) {
+        const previousUnitPrice = currentUnitPrice / (1 + change24hPercent / 100);
+        const navDeltaPerUnit = currentUnitPrice - previousUnitPrice;
+        if (quantity > 0) {
+          marketChangeToday += Math.round(navDeltaPerUnit * quantity);
+        } else {
+          marketChangeToday += Math.round(currentVal - currentVal / (1 + change24hPercent / 100));
+        }
+      }
     });
 
-    if (netCashFlowDelta !== 0) {
-      return (summary?.netWorth || 0) - netCashFlowDelta;
-    }
+    // 2. Calculate today's cashflows logged TODAY (since local 00:00:00)
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
 
-    // 3. Fallback: Baseline equals current netWorth (0 change when no real historical delta exists)
-    return summary?.netWorth || 0;
-  }, [snapshots, cashFlows, summary]);
+    let cashFlowToday = 0;
+    (cashFlows || []).forEach((cf: any) => {
+      const cfDate = new Date(cf.datetime || cf.createdAt);
+      if (cfDate >= startOfToday) {
+        const amt = Number(cf.amountOfMoney || 0);
+        if (cf.cashType === "Income") cashFlowToday += amt;
+        else cashFlowToday -= amt;
+      }
+    });
 
-  const netWorthChangeAmount = (summary?.netWorth || 0) - previousNetWorth;
-  const rawChangePercent = previousNetWorth > 0 ? (netWorthChangeAmount / previousNetWorth) * 100 : 0;
-  const netWorthChangePercent = Math.abs(rawChangePercent) < 0.01 ? 0 : rawChangePercent;
-  const isPositive = netWorthChangePercent >= 0;
+    // 3. Absolute Mathematical Reconciliation
+    const totalChangeAmount = marketChangeToday + cashFlowToday;
+    const prevNetWorth = currentNetWorth - totalChangeAmount;
+    const rawPercent = prevNetWorth > 0 ? (totalChangeAmount / prevNetWorth) * 100 : 0;
+    const changePercent = Math.abs(rawPercent) < 0.01 ? 0 : rawPercent;
+
+    return {
+      previousNetWorth: prevNetWorth,
+      netWorthChangeAmount: totalChangeAmount,
+      netWorthChangePercent: changePercent,
+      isPositive: totalChangeAmount >= 0,
+    };
+  }, [summary, holdings, cashFlows]);
 
   const compareLabel = useMemo(() => {
     switch (timeframe) {

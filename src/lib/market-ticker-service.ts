@@ -27,7 +27,7 @@ export const BASE_POPULAR_TICKERS: MarketTicker[] = [
   { symbol: "USDT", name: "Tether USD", assetClass: "CRYPTO", currentPrice: 26190, currency: "VND", defaultUnit: "USDT", change24h: 0.05 },
   { symbol: "BNB", name: "Binance Coin", assetClass: "CRYPTO", currentPrice: 15570000, currency: "VND", defaultUnit: "BNB", change24h: 1.05 },
 
-  // Gold & Precious Metals (Vàng & Kim Loại Quý - Niêm yết thitruonghanghoa.com & thế giới)
+  // Gold & Precious Metals (Vàng & Kim Loại Quý)
   { symbol: "XAUUSD", name: "Vàng Thế Giới (GOLD / XAU USD)", assetClass: "GOLD", currentPrice: 137245670, currency: "VND", defaultUnit: "Lượng", change24h: 0.04 },
   { symbol: "SJC", name: "Vàng Miếng SJC 999.9", assetClass: "GOLD", currentPrice: 141100000, currency: "VND", defaultUnit: "Lượng", change24h: 0.35 },
   { symbol: "PNJ", name: "Vàng Nhẫn PNJ 999.9", assetClass: "GOLD", currentPrice: 14060000, currency: "VND", defaultUnit: "Chỉ", change24h: 0.42 },
@@ -44,9 +44,26 @@ export const BASE_POPULAR_TICKERS: MarketTicker[] = [
   { symbol: "VESAF", name: "Quỹ VinaCapital VESAF", assetClass: "CCQ", currentPrice: 35200, currency: "VND", defaultUnit: "CCQ", change24h: 0.92 }
 ];
 
-// Memory cache for fetched prices
+// Memory cache for fetched prices (15 seconds short cache for fresh realtime market data)
 const priceCache: Record<string, { price: number; change24h?: number; timestamp: number }> = {};
-const CACHE_TTL_MS = 60 * 1000; // 1 minute
+const CACHE_TTL_MS = 15 * 1000; // 15 seconds short cache
+
+/**
+ * Helper function with 4s timeout to prioritize accurate realtime market prices via parallel fetches
+ */
+async function fetchWithTimeout(url: string, options: any = {}, timeoutMs = 4000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return res;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export async function fetchLivePriceFromPublicAPIs(symbol: string): Promise<{ price: number; change24h?: number } | null> {
   const cleanSymbol = symbol.toUpperCase().trim();
@@ -68,8 +85,8 @@ export async function fetchLivePriceFromPublicAPIs(symbol: string): Promise<{ pr
 
     if (cryptoMap[cleanSymbol]) {
       const id = cryptoMap[cleanSymbol];
-      const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=vnd&include_24hr_change=true`, {
-        next: { revalidate: 60 }
+      const res = await fetchWithTimeout(`https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=vnd&include_24hr_change=true`, {
+        next: { revalidate: 300 }
       });
       if (res.ok) {
         const data = await res.json();
@@ -82,12 +99,12 @@ export async function fetchLivePriceFromPublicAPIs(symbol: string): Promise<{ pr
       }
     }
 
-    // 2. Check Vietnam Stock & ETF via Yahoo Finance API (e.g. CTG.VN, HPG.VN, E1VFVN30.VN, FUEVFVND.VN)
+    // 2. Check Vietnam Stock & ETF via Yahoo Finance API
     if (!cleanSymbol.includes(".") && cleanSymbol.length <= 8 && !["SJC", "PNJ", "GOLD9999", "DOJI", "XAUUSD", "SILVER", "PLATINUM", "COPPER", "DCDS", "VESAF"].includes(cleanSymbol)) {
       const yahooSymbol = `${cleanSymbol}.VN`;
-      const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}`, {
+      const res = await fetchWithTimeout(`https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}`, {
         headers: { "User-Agent": "Mozilla/5.0" },
-        next: { revalidate: 60 }
+        next: { revalidate: 300 }
       });
 
       if (res.ok) {
@@ -107,12 +124,12 @@ export async function fetchLivePriceFromPublicAPIs(symbol: string): Promise<{ pr
       }
     }
 
-    // 3. Check Gold & Precious Metals Live API (thitruonghanghoa.com & giavang.org & SJC XML Feed)
+    // 3. Check Gold & Precious Metals Live API
     if (["SJC", "PNJ", "GOLD9999", "DOJI", "XAUUSD", "SILVER", "PLATINUM", "COPPER"].includes(cleanSymbol)) {
       try {
-        const tthhRes = await fetch("https://www.thitruonghanghoa.com/", {
+        const tthhRes = await fetchWithTimeout("https://www.thitruonghanghoa.com/", {
           headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
-          next: { revalidate: 180 }
+          next: { revalidate: 300 }
         });
         if (tthhRes.ok) {
           const htmlText = await tthhRes.text();
@@ -158,7 +175,7 @@ export async function fetchLivePriceFromPublicAPIs(symbol: string): Promise<{ pr
       }
 
       try {
-        const gvRes = await fetch("https://giavang.org/", {
+        const gvRes = await fetchWithTimeout("https://giavang.org/", {
           headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
           next: { revalidate: 300 }
         });
@@ -190,7 +207,7 @@ export async function fetchLivePriceFromPublicAPIs(symbol: string): Promise<{ pr
       }
 
       try {
-        const sjcRes = await fetch("https://sjc.com.vn/xml/tygiavang.xml", {
+        const sjcRes = await fetchWithTimeout("https://sjc.com.vn/xml/tygiavang.xml", {
           headers: { "User-Agent": "Mozilla/5.0" },
           next: { revalidate: 300 }
         });
@@ -221,7 +238,7 @@ export async function fetchLivePriceFromPublicAPIs(symbol: string): Promise<{ pr
 
       if (cleanSymbol === "XAUUSD") {
         try {
-          const goldRes = await fetch("https://query1.finance.yahoo.com/v8/finance/chart/GC=F", {
+          const goldRes = await fetchWithTimeout("https://query1.finance.yahoo.com/v8/finance/chart/GC=F", {
             headers: { "User-Agent": "Mozilla/5.0" },
             next: { revalidate: 300 }
           });
@@ -242,7 +259,7 @@ export async function fetchLivePriceFromPublicAPIs(symbol: string): Promise<{ pr
       }
     }
 
-    // 3. Check Vietnam Mutual Funds (CCQ) via Fmarket API (e.g. DCDS, VESAF, SSISCA)
+    // 4. Check Vietnam Mutual Funds (CCQ) via Fmarket API
     const fundCodeMap: Record<string, string> = {
       DCDS: "VFMVF1",
       VFMVF1: "VFMVF1"
@@ -251,7 +268,7 @@ export async function fetchLivePriceFromPublicAPIs(symbol: string): Promise<{ pr
     const searchCode = fundCodeMap[cleanSymbol] || cleanSymbol;
 
     try {
-      const fmarketRes = await fetch("https://api.fmarket.vn/res/products/filter", {
+      const fmarketRes = await fetchWithTimeout("https://api.fmarket.vn/res/products/filter", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -339,12 +356,10 @@ export async function fetchClosingPriceForSymbol(symbol: string, currentHoldingP
   const liveData = await fetchLivePriceFromPublicAPIs(clean);
   if (liveData && liveData.price > 0) return liveData.price;
 
-  // Priority 1: If user already entered or updated a custom NAV price for this holding, preserve it!
   if (currentHoldingPrice && currentHoldingPrice > 0) {
     return currentHoldingPrice;
   }
 
-  // Priority 2: Return base popular ticker price if available
   const matched = BASE_POPULAR_TICKERS.find((t) => t.symbol === clean);
   if (matched) return matched.currentPrice;
 
