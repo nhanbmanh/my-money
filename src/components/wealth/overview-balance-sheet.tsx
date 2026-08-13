@@ -217,33 +217,13 @@ export function OverviewBalanceSheet({
     return [];
   }, [timeframe, snapshots, summary]);
 
-  // 1-day Net Worth Variance Calculation (100% mathematically balanced)
+  // 1-day Net Worth Variance Calculation (100% mathematically balanced vs Yesterday EOD Snapshot)
   const { previousNetWorth, netWorthChangeAmount, netWorthChangePercent, isPositive } = useMemo(() => {
     const currentNetWorth = Number(summary?.netWorth || 0);
-
-    // 1. Calculate today's market value variance across holdings
-    let marketChangeToday = 0;
-    (holdings || []).forEach((h: any) => {
-      const quantity = Number(h.quantity || 0);
-      const currentVal = Number(h.currentValue || 0);
-      const currentUnitPrice = Number(h.currentMarketPrice || h.averageCostBasis || 0);
-      const change24hPercent = Number(h.change24h || 0);
-
-      if (change24hPercent !== 0 && currentUnitPrice > 0) {
-        const previousUnitPrice = currentUnitPrice / (1 + change24hPercent / 100);
-        const navDeltaPerUnit = currentUnitPrice - previousUnitPrice;
-        if (quantity > 0) {
-          marketChangeToday += Math.round(navDeltaPerUnit * quantity);
-        } else {
-          marketChangeToday += Math.round(currentVal - currentVal / (1 + change24hPercent / 100));
-        }
-      }
-    });
-
-    // 2. Calculate today's cashflows logged TODAY (since local 00:00:00)
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
 
+    // 1. Calculate today's cashflows logged TODAY (since local 00:00:00)
     let cashFlowToday = 0;
     (cashFlows || []).forEach((cf: any) => {
       const cfDate = new Date(cf.datetime || cf.createdAt);
@@ -254,9 +234,42 @@ export function OverviewBalanceSheet({
       }
     });
 
-    // 3. Absolute Mathematical Reconciliation
-    const totalChangeAmount = marketChangeToday + cashFlowToday;
-    const prevNetWorth = currentNetWorth - totalChangeAmount;
+    // 2. Find yesterday's EOD Snapshot (recorded before 00:00:00 today)
+    const pastSnapshots = (snapshots || []).filter(
+      (s: any) => new Date(s.date) < startOfToday
+    );
+    const yesterdaySnapshot = pastSnapshots.length > 0 ? pastSnapshots[pastSnapshots.length - 1] : null;
+
+    let prevNetWorth = 0;
+    let totalChangeAmount = 0;
+
+    if (yesterdaySnapshot && yesterdaySnapshot.netWorthValue !== undefined && yesterdaySnapshot.netWorthValue > 0) {
+      prevNetWorth = Number(yesterdaySnapshot.netWorthValue);
+      totalChangeAmount = currentNetWorth - prevNetWorth;
+    } else {
+      // Fallback if no past snapshot exists
+      let marketChangeToday = 0;
+      (holdings || []).forEach((h: any) => {
+        const quantity = Number(h.quantity || 0);
+        const currentVal = Number(h.currentValue || 0);
+        const currentUnitPrice = Number(h.currentMarketPrice || h.averageCostBasis || 0);
+        const change24hPercent = Number(h.change24h || 0);
+
+        if (change24hPercent !== 0 && currentUnitPrice > 0) {
+          const previousUnitPrice = currentUnitPrice / (1 + change24hPercent / 100);
+          const navDeltaPerUnit = currentUnitPrice - previousUnitPrice;
+          if (quantity > 0) {
+            marketChangeToday += Math.round(navDeltaPerUnit * quantity);
+          } else {
+            marketChangeToday += Math.round(currentVal - currentVal / (1 + change24hPercent / 100));
+          }
+        }
+      });
+
+      totalChangeAmount = marketChangeToday + cashFlowToday;
+      prevNetWorth = currentNetWorth - totalChangeAmount;
+    }
+
     const rawPercent = prevNetWorth > 0 ? (totalChangeAmount / prevNetWorth) * 100 : 0;
     const changePercent = Math.abs(rawPercent) < 0.01 ? 0 : rawPercent;
 
@@ -266,7 +279,7 @@ export function OverviewBalanceSheet({
       netWorthChangePercent: changePercent,
       isPositive: totalChangeAmount >= 0,
     };
-  }, [summary, holdings, cashFlows]);
+  }, [summary, holdings, cashFlows, snapshots]);
 
   const compareLabel = useMemo(() => {
     switch (timeframe) {
@@ -293,6 +306,32 @@ export function OverviewBalanceSheet({
         return "Theo dõi chốt định giá Mark-to-Market hàng ngày (7 ngày gần nhất)";
     }
   }, [timeframe]);
+
+  // Computed Category Breakdown (5 Category Types 0 - 4) with fallback calculation
+  const categoryBreakdown = useMemo(() => {
+    if (breakdownByMacro && breakdownByMacro.length > 0) {
+      return breakdownByMacro;
+    }
+
+    const map: Record<number, { type: number; code: string; name: string; value: number; count: number }> = {
+      0: { type: 0, code: "LIQUID", name: ASSET_CATEGORY_TYPES[0].name, value: 0, count: 0 },
+      1: { type: 1, code: "GROWTH", name: ASSET_CATEGORY_TYPES[1].name, value: 0, count: 0 },
+      2: { type: 2, code: "PHYSICAL", name: ASSET_CATEGORY_TYPES[2].name, value: 0, count: 0 },
+      3: { type: 3, code: "DEBT_MORTGAGE", name: ASSET_CATEGORY_TYPES[3].name, value: 0, count: 0 },
+      4: { type: 4, code: "LENDING", name: ASSET_CATEGORY_TYPES[4].name, value: 0, count: 0 },
+    };
+
+    (holdings || []).forEach((h: any) => {
+      const catType = h.categoryType >= 0 && h.categoryType <= 4 ? h.categoryType : 0;
+      const val = Number(h.currentValue || h.quantity * h.averageCostBasis || 0);
+      if (map[catType]) {
+        map[catType].value += val;
+        map[catType].count += 1;
+      }
+    });
+
+    return Object.values(map);
+  }, [breakdownByMacro, holdings]);
 
   return (
     <div className="space-y-6">
@@ -525,7 +564,7 @@ export function OverviewBalanceSheet({
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {breakdownByMacro.map((cat: any) => {
+              {categoryBreakdown.map((cat: any) => {
                 const catCfg = getCategoryConfig(cat.type !== undefined ? cat.type : 0);
                 const percent = summary.totalAssets > 0 ? (cat.value / summary.totalAssets) * 100 : 0;
                 return (

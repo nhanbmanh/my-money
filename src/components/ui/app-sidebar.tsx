@@ -28,6 +28,8 @@ import {
   Pin,
   Landmark,
   Globe,
+  NotebookPen,
+  CalendarDays,
 } from "lucide-react";
 import { useTheme, ThemeMode } from "@/components/theme-provider";
 import { useLanguage } from "@/components/language-provider";
@@ -51,6 +53,18 @@ export function AppSidebar() {
       label: t("nav.wealthManagement"),
       icon: Landmark,
       iconColor: "text-emerald-600 dark:text-emerald-400",
+    },
+    {
+      href: "/notes",
+      label: t("nav.notes"),
+      icon: NotebookPen,
+      iconColor: "text-purple-600 dark:text-purple-400",
+    },
+    {
+      href: "/calendar",
+      label: t("nav.calendar"),
+      icon: CalendarDays,
+      iconColor: "text-indigo-600 dark:text-indigo-400",
     },
     {
       href: "/weather",

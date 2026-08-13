@@ -92,8 +92,61 @@ export function NetWorthVarianceModal({
     };
   }, [cashFlows, startOfToday]);
 
-  // 3. Map holdings and FILTER ONLY ITEMS WITH ACTUAL 1-DAY VARIANCE (oneDayChange !== 0)
+  // 3. Find yesterday's EOD Snapshot (recorded before 00:00:00 today)
+  const yesterdaySnapshot = useMemo(() => {
+    const pastSnapshots = (snapshots || []).filter(
+      (s: any) => new Date(s.date) < startOfToday
+    );
+    return pastSnapshots.length > 0 ? pastSnapshots[pastSnapshots.length - 1] : null;
+  }, [snapshots, startOfToday]);
+
+  const currentNetWorth = Number(summary?.netWorth || 0);
+
+  // 4. Absolute Snapshot-Based Net Worth Reconciliation & Market Variance Calculation
+  const { previousNetWorth, netWorthChangeAmount, portfolioMarketChange } = useMemo(() => {
+    if (yesterdaySnapshot && yesterdaySnapshot.netWorthValue !== undefined && yesterdaySnapshot.netWorthValue > 0) {
+      const prev = Number(yesterdaySnapshot.netWorthValue);
+      const totalChange = currentNetWorth - prev;
+      const marketChange = totalChange - todayNetCashFlow;
+      return {
+        previousNetWorth: prev,
+        netWorthChangeAmount: totalChange,
+        portfolioMarketChange: marketChange,
+      };
+    }
+
+    // Fallback if no yesterday snapshot exists
+    let rawMarketChange = 0;
+    (holdings || []).forEach((h: any) => {
+      const quantity = Number(h.quantity || 0);
+      const currentVal = Number(h.currentValue || 0);
+      const currentUnitPrice = Number(h.currentMarketPrice || h.averageCostBasis || 0);
+      const change24hPercent = Number(h.change24h || 0);
+
+      if (change24hPercent !== 0 && currentUnitPrice > 0) {
+        const previousUnitPrice = currentUnitPrice / (1 + change24hPercent / 100);
+        const navDeltaPerUnit = currentUnitPrice - previousUnitPrice;
+        if (quantity > 0) {
+          rawMarketChange += Math.round(navDeltaPerUnit * quantity);
+        } else {
+          rawMarketChange += Math.round(currentVal - currentVal / (1 + change24hPercent / 100));
+        }
+      }
+    });
+
+    const totalChange = rawMarketChange + todayNetCashFlow;
+    const prev = currentNetWorth - totalChange;
+    return {
+      previousNetWorth: prev,
+      netWorthChangeAmount: totalChange,
+      portfolioMarketChange: rawMarketChange,
+    };
+  }, [yesterdaySnapshot, currentNetWorth, todayNetCashFlow, holdings]);
+
+  // 5. Map holdings and filter items with actual market variance
   const allHoldingItems = useMemo(() => {
+    if (portfolioMarketChange === 0) return [];
+
     return (holdings || []).map((h) => {
       const quantity = Number(h.quantity || 0);
       const currentVal = Number(h.currentValue || 0);
@@ -122,7 +175,7 @@ export function NetWorthVarianceModal({
         change24hPercent,
       };
     });
-  }, [holdings]);
+  }, [holdings, portfolioMarketChange]);
 
   // Filter only items that actually changed in value (oneDayChange !== 0)
   const portfolioAttribution = useMemo(() => {
@@ -131,16 +184,6 @@ export function NetWorthVarianceModal({
       .sort((a, b) => Math.abs(b.oneDayChange) - Math.abs(a.oneDayChange));
   }, [allHoldingItems]);
 
-  // Total Market Impact = Sum of individual asset 1-day market changes
-  const portfolioMarketChange = useMemo(() => {
-    return allHoldingItems.reduce((acc, item) => acc + item.oneDayChange, 0);
-  }, [allHoldingItems]);
-
-  // 4. Absolute Mathematical Net Worth Change & Baseline Reconciliation:
-  // Net Worth Variance = Market Valuation Variance + Today's Net Cashflows
-  const netWorthChangeAmount = portfolioMarketChange + todayNetCashFlow;
-  const currentNetWorth = Number(summary?.netWorth || 0);
-  const previousNetWorth = currentNetWorth - netWorthChangeAmount;
   const rawChangePercent = previousNetWorth > 0 ? (netWorthChangeAmount / previousNetWorth) * 100 : 0;
   const netWorthChangePercent = Math.abs(rawChangePercent) < 0.01 ? 0 : rawChangePercent;
 

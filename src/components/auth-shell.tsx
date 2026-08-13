@@ -51,6 +51,8 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
   const isWeatherPage = pathname === "/weather";
   const isFinancePage = pathname === "/financial-management" || pathname === "/";
   const isWealthPage = pathname === "/wealth-management";
+  const isNotesPage = pathname === "/notes";
+  const isCalendarPage = pathname === "/calendar";
 
   return (
     <SidebarProvider>
@@ -153,6 +155,36 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
                 >
                   <RefreshCw className="h-4 w-4 text-sky-600 dark:text-sky-400" />
                   <span className="sr-only">{language === "vi" ? "Làm mới vị trí" : "Refresh location"}</span>
+                </Button>
+              </div>
+            )}
+
+            {/* Notes Page Header Actions */}
+            {isNotesPage && (
+              <div className="flex items-center gap-2 shrink-0">
+                <NotificationsPopover />
+                <Button
+                  onClick={() => window.dispatchEvent(new CustomEvent("open-note-modal"))}
+                  className="h-9 px-3.5 text-xs font-bold gap-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl shadow-lg shadow-purple-500/20 transition-all border-0 cursor-pointer"
+                  title={language === "vi" ? "Thêm ghi chú mới" : "Add new note"}
+                >
+                  <PlusCircle className="h-4 w-4 shrink-0" />
+                  <span>{language === "vi" ? "Thêm ghi chú" : "Add Note"}</span>
+                </Button>
+              </div>
+            )}
+
+            {/* Calendar Page Header Actions */}
+            {isCalendarPage && (
+              <div className="flex items-center gap-2 shrink-0">
+                <NotificationsPopover />
+                <Button
+                  onClick={() => window.dispatchEvent(new CustomEvent("open-calendar-modal"))}
+                  className="h-9 px-3.5 text-xs font-bold gap-1.5 bg-gradient-to-r from-indigo-600 to-sky-600 hover:from-indigo-700 hover:to-sky-700 text-white rounded-xl shadow-lg shadow-indigo-500/20 transition-all border-0 cursor-pointer"
+                  title={language === "vi" ? "Thêm kế hoạch mới" : "Add new plan"}
+                >
+                  <PlusCircle className="h-4 w-4 shrink-0" />
+                  <span>{language === "vi" ? "Thêm kế hoạch" : "Add Plan"}</span>
                 </Button>
               </div>
             )}

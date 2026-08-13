@@ -39,6 +39,7 @@ import {
   fetchWeatherData,
   searchLocations,
   getWmoWeatherInfo,
+  detectLocationByIp,
   WeatherData,
   WeatherLocation,
 } from "@/lib/weather-service";
@@ -63,9 +64,21 @@ const PRESET_CITIES: WeatherLocation[] = [
   { name: "Phú Quốc", latitude: 10.2899, longitude: 103.984, country: "Việt Nam" },
 ];
 
-function WeatherSkeletonLoader({ language }: { language: string }) {
+function WeatherSkeletonLoader({
+  language,
+  locatingStatus,
+}: {
+  language: string;
+  locatingStatus?: string | null;
+}) {
   return (
     <div className="space-y-4 animate-pulse">
+      {locatingStatus && (
+        <div className="p-4 rounded-3xl bg-gradient-to-r from-sky-500/15 via-indigo-500/10 to-sky-500/15 border border-sky-400/30 flex items-center justify-center gap-3 text-sky-700 dark:text-sky-300 font-black text-sm shadow-xs">
+          <MapPin className="h-5 w-5 text-sky-500 animate-bounce shrink-0" />
+          <span>{locatingStatus}</span>
+        </div>
+      )}
       {/* SECTION 2 SKELETON: Hero Realtime Card */}
       <div className="space-y-2.5">
         <div className="flex items-center justify-between px-1">
@@ -166,16 +179,6 @@ export function WeatherDashboard() {
       ]);
       setWeatherData(data);
       setAirVisualFullData(avFullData);
-
-      // Persist last location and data to localStorage for instant reload
-      try {
-        localStorage.setItem(
-          "my_money_last_weather_location",
-          JSON.stringify({ lat, lng, name: locName || data.location.name })
-        );
-        localStorage.setItem("my_money_cached_weather_data", JSON.stringify(data));
-        localStorage.setItem("my_money_cached_airvisual_data", JSON.stringify(avFullData));
-      } catch {}
     } catch (err: any) {
       if (!isSilent) setError(err?.message || "Không thể tải dữ liệu thời tiết");
     } finally {
@@ -183,59 +186,75 @@ export function WeatherDashboard() {
     }
   }, []);
 
-  // Detect user geolocation
+  const [locatingStatus, setLocatingStatus] = useState<string | null>(null);
+
+  // Detect user geolocation (GPS -> Client IP Geolocation -> Presets)
   const detectUserLocation = useCallback((forceGps: boolean | React.MouseEvent = false) => {
     const isForce = typeof forceGps === "boolean" ? forceGps : true;
+    if (isForce) setLoading(true);
+    setLocatingStatus(
+      language === "vi"
+        ? "Đang xác định vị trí thực tế của bạn..."
+        : "Detecting your exact live location..."
+    );
+
+    const runFallback = async () => {
+      setLocatingStatus(
+        language === "vi"
+          ? "Đang dò tìm vị trí qua mạng IP..."
+          : "Locating via network IP..."
+      );
+      const ipLoc = await detectLocationByIp();
+      if (ipLoc) {
+        await loadWeather(ipLoc.latitude, ipLoc.longitude, ipLoc.name);
+        setLocatingStatus(null);
+        return;
+      }
+
+      // Ultimate Fallback preset city
+      await loadWeather(PRESET_CITIES[0].latitude, PRESET_CITIES[0].longitude, PRESET_CITIES[0].name);
+      setLocatingStatus(null);
+    };
+
     if (typeof window === "undefined" || !navigator.geolocation) {
-      loadWeather(PRESET_CITIES[0].latitude, PRESET_CITIES[0].longitude, PRESET_CITIES[0].name);
+      runFallback();
       return;
     }
 
-    if (isForce) setLoading(true);
+    setLocatingStatus(
+      language === "vi"
+        ? "Đang xin vị trí từ thiết bị (GPS)..."
+        : "Requesting GPS location from device..."
+    );
+
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
         const { latitude, longitude } = position.coords;
-        loadWeather(latitude, longitude);
+        setLocatingStatus(
+          language === "vi"
+            ? "Đang xác định địa chỉ thời gian thực..."
+            : "Resolving live address..."
+        );
+        await loadWeather(latitude, longitude);
+        setLocatingStatus(null);
       },
       () => {
-        try {
-          const savedLoc = localStorage.getItem("my_money_last_weather_location");
-          if (savedLoc) {
-            const { lat, lng, name } = JSON.parse(savedLoc);
-            if (lat && lng) {
-              loadWeather(lat, lng, name);
-              return;
-            }
-          }
-        } catch {}
-        loadWeather(PRESET_CITIES[0].latitude, PRESET_CITIES[0].longitude, PRESET_CITIES[0].name);
+        runFallback();
       },
-      { enableHighAccuracy: false, timeout: 4000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
     );
-  }, [loadWeather]);
+  }, [loadWeather, language]);
 
   useEffect(() => {
-    let hasRestoredFromCache = false;
+    // Clear any legacy location cache from localStorage
     try {
-      const savedLoc = localStorage.getItem("my_money_last_weather_location");
-      const cachedW = localStorage.getItem("my_money_cached_weather_data");
-      const cachedAv = localStorage.getItem("my_money_cached_airvisual_data");
-
-      if (cachedW && cachedAv && savedLoc) {
-        setWeatherData(JSON.parse(cachedW));
-        setAirVisualFullData(JSON.parse(cachedAv));
-        setLoading(false);
-        hasRestoredFromCache = true;
-
-        // Background update for saved location
-        const { lat, lng, name } = JSON.parse(savedLoc);
-        loadWeather(lat, lng, name, true);
-      }
+      localStorage.removeItem("my_money_last_weather_location");
+      localStorage.removeItem("my_money_cached_weather_data");
+      localStorage.removeItem("my_money_cached_airvisual_data");
     } catch {}
 
-    if (!hasRestoredFromCache) {
-      detectUserLocation();
-    }
+    // Always auto-detect current live location on page load / mount
+    detectUserLocation(true);
 
     const handleOpenSummary = () => setSummaryOpen(true);
     const handleRefreshLocation = () => detectUserLocation(true);
@@ -247,7 +266,7 @@ export function WeatherDashboard() {
       window.removeEventListener("open-weather-summary", handleOpenSummary);
       window.removeEventListener("refresh-weather-location", handleRefreshLocation);
     };
-  }, [detectUserLocation, loadWeather]);
+  }, [detectUserLocation]);
 
   // Handle Search Input Change
   useEffect(() => {
@@ -535,9 +554,16 @@ export function WeatherDashboard() {
           <Button
             variant="outline"
             size="icon"
-            onClick={detectUserLocation}
-            className="h-11 w-11 sm:h-9 sm:w-9 rounded-xl border-sky-200 dark:border-slate-700 text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-slate-800 shrink-0"
-            title="Định vị vị trí GPS hiện tại"
+            onClick={() => {
+              try {
+                localStorage.removeItem("my_money_last_weather_location");
+                localStorage.removeItem("my_money_cached_weather_data");
+                localStorage.removeItem("my_money_cached_airvisual_data");
+              } catch {}
+              detectUserLocation(true);
+            }}
+            className="h-11 w-11 sm:h-9 sm:w-9 rounded-xl border-sky-200 dark:border-slate-700 text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-slate-800 shrink-0 cursor-pointer"
+            title={language === "vi" ? "Định vị vị trí GPS / IP hiện tại" : "Detect current GPS / IP location"}
           >
             <Navigation className="h-5 w-5 sm:h-4 sm:w-4" />
           </Button>
@@ -564,21 +590,31 @@ export function WeatherDashboard() {
         <span className="text-xs font-black text-slate-400 shrink-0 mr-1">
           {language === "vi" ? "Nhanh:" : "Quick:"}
         </span>
-        {PRESET_CITIES.map((city, idx) => (
-          <Button
-            key={idx}
-            variant="outline"
-            size="sm"
-            onClick={() => handleSelectLocation(city)}
-            className="h-8 sm:h-7 text-xs font-black px-3.5 sm:px-3 rounded-full border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 hover:bg-sky-50 dark:hover:bg-slate-800 hover:text-sky-600 dark:hover:text-sky-400 transition-all shrink-0 cursor-pointer"
-          >
-            {city.name}
-          </Button>
-        ))}
+        {PRESET_CITIES.map((city, idx) => {
+          const isSelected = Boolean(
+            weatherData?.location.name?.toLowerCase().includes(city.name.toLowerCase())
+          );
+          return (
+            <Button
+              key={idx}
+              variant={isSelected ? "default" : "outline"}
+              size="sm"
+              onClick={() => handleSelectLocation(city)}
+              className={cn(
+                "h-8 sm:h-7 text-xs font-black px-3.5 sm:px-3 rounded-full transition-all shrink-0 cursor-pointer",
+                isSelected
+                  ? "bg-sky-600 text-white hover:bg-sky-700 shadow-xs border-sky-600"
+                  : "border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 hover:bg-sky-50 dark:hover:bg-slate-800 hover:text-sky-600 dark:hover:text-sky-400"
+              )}
+            >
+              {city.name}
+            </Button>
+          );
+        })}
       </div>
 
       {(loading && (!weatherData || !airVisualFullData)) ? (
-        <WeatherSkeletonLoader language={language} />
+        <WeatherSkeletonLoader language={language} locatingStatus={locatingStatus} />
       ) : error ? (
         <div className="p-8 text-center bg-rose-50 dark:bg-rose-950/40 rounded-3xl border border-rose-200 text-rose-600 text-sm font-bold space-y-2">
           <p>{error}</p>
@@ -610,11 +646,11 @@ export function WeatherDashboard() {
                 <div className="absolute -top-16 -right-16 w-60 h-60 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none" />
 
                 <div className="relative z-10 space-y-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <Badge className="bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-200 border-emerald-400/30 backdrop-blur text-xs font-black px-3 py-1 rounded-full truncate">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <Badge className="bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-200 border-emerald-400/30 backdrop-blur text-xs font-black px-3 py-1 rounded-full w-fit max-w-full truncate">
                       💨 {language === "vi" ? "Trạm AirVisual / IQAir (Mỹ - Trực Tiếp)" : "AirVisual / IQAir Station (US - Live)"}
                     </Badge>
-                    <Badge className={cn("text-xs font-black px-2.5 py-0.5 rounded-full border shadow-xs shrink-0", airVisualData.aqiColor)}>
+                    <Badge className={cn("text-xs font-black px-2.5 py-1 rounded-full border shadow-xs w-fit shrink-0", airVisualData.aqiColor)}>
                       AQI {airVisualData.aqi} • {getAqiLevelInfo(airVisualData.aqi, language).text}
                     </Badge>
                   </div>
@@ -628,7 +664,7 @@ export function WeatherDashboard() {
                   </div>
 
                   <h3 className="text-lg font-black text-white tracking-wide truncate">
-                    {getAirVisualWeatherInfo(airVisualData.weatherDesc, language).desc}
+                    {airVisualData.weatherDesc}
                   </h3>
 
                   <p className="text-xs font-extrabold text-indigo-200 flex items-center gap-2 truncate">
@@ -640,22 +676,22 @@ export function WeatherDashboard() {
 
                 {/* AirVisual Grid of Key Weather Metrics */}
                 <div className="relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4 pt-3 border-t border-white/20">
-                  <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2.5 text-center col-span-2 sm:col-span-1">
-                    <div className="text-[10px] font-black text-indigo-200 truncate">🍃 {language === "vi" ? "Chất Lượng Không Khí US AQI" : "US AQI Air Quality"}</div>
-                    <div className="text-xs sm:text-sm font-black text-emerald-300 truncate">{language === "vi" ? `Chỉ số ${airVisualData.aqi} • ${getAqiLevelInfo(airVisualData.aqi, language).text}` : `Index ${airVisualData.aqi} • ${getAqiLevelInfo(airVisualData.aqi, language).text}`}</div>
+                  <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2.5 text-center col-span-1">
+                    <div className="text-[10px] font-black text-indigo-200 truncate">🍃 {language === "vi" ? "Chất Lượng US AQI" : "US AQI Quality"}</div>
+                    <div className="text-xs sm:text-sm font-black text-emerald-300 truncate">{language === "vi" ? `AQI ${airVisualData.aqi} • ${getAqiLevelInfo(airVisualData.aqi, language).text}` : `AQI ${airVisualData.aqi} • ${getAqiLevelInfo(airVisualData.aqi, language).text}`}</div>
                   </div>
 
-                  <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2.5 text-center">
+                  <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2.5 text-center col-span-1">
                     <div className="text-[10px] font-black text-indigo-200 truncate">💧 {language === "vi" ? "Độ Ẩm" : "Humidity"}</div>
                     <div className="text-sm font-black text-white">{airVisualData.humidity}%</div>
                   </div>
 
-                  <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2.5 text-center">
+                  <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2.5 text-center col-span-1">
                     <div className="text-[10px] font-black text-indigo-200 truncate">💨 {language === "vi" ? "Tốc Độ Gió" : "Wind Speed"}</div>
                     <div className="text-sm font-black text-white">{airVisualData.windSpeed} km/h</div>
                   </div>
 
-                  <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2.5 text-center">
+                  <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2.5 text-center col-span-1">
                     <div className="text-[10px] font-black text-indigo-200 truncate">⏲️ {language === "vi" ? "Áp Suất" : "Pressure"}</div>
                     <div className="text-sm font-black text-white">{airVisualData.pressure} hPa</div>
                   </div>

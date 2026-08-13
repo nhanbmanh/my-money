@@ -34,6 +34,10 @@ model User {
   liabilities        Liability[]
   assetSnapshots     AssetSnapshot[]
 
+  // Note & Calendar Relations
+  notes         Note[]
+  calendarPlans CalendarPlan[]
+
   @@map("users")
 }
 
@@ -253,4 +257,40 @@ model AssetSnapshot {
   @@unique([userId, date])
   @@index([userId, date])
   @@map("asset_snapshots")
+}
+
+// --------------------------------------------------------
+// NOTE APP MODELS
+// --------------------------------------------------------
+
+model Note {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@map("notes")
+}
+
+// --------------------------------------------------------
+// CALENDAR APP MODELS
+// --------------------------------------------------------
+
+model CalendarPlan {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  content   String?
+  date      DateTime
+  status    Int      @default(0) // 0: Todo, 1: In Progress, 2: Done, 3: Pending
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, date])
+  @@map("calendar_plans")
 }

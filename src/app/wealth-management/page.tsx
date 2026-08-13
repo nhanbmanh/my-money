@@ -106,7 +106,7 @@ export default function WealthManagementPage() {
   const macroCategories = data?.macroCategories || [];
   const holdings = data?.holdings || [];
   const liabilities = data?.liabilities || [];
-  const breakdownByMacro = data?.breakdownByMacro || [];
+  const breakdownByMacro = data?.breakdownByCategoryType || data?.breakdownByMacro || [];
 
   return (
     <div className="w-full flex-1 flex flex-col space-y-6 pb-12 relative">

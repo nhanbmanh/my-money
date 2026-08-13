@@ -221,10 +221,11 @@ export async function searchLocations(query: string): Promise<WeatherLocation[]>
 }
 
 export async function reverseGeocode(lat: number, lng: number): Promise<string> {
-  // Method 1: Try OpenStreetMap Nominatim for exact Ward / District / City in Vietnam
+  // Method 1: Try OpenStreetMap Nominatim with proper headers
   try {
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=vi`
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=vi`,
+      { headers: { "User-Agent": "MyMoneyApp/1.0 (Weather Module)" } }
     );
     if (res.ok) {
       const data = await res.json();
@@ -248,11 +249,14 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
           addr.city ||
           addr.state ||
           addr.province ||
+          addr.municipality ||
           "";
+        const country = addr.country || "Việt Nam";
 
-        const parts = [ward, district, city].filter(Boolean);
-        if (parts.length > 0) {
-          return parts.join(", ");
+        const parts = [ward, district, city, country].filter(Boolean);
+        const uniqueParts = parts.filter((item, index) => parts.indexOf(item) === index);
+        if (uniqueParts.length > 0) {
+          return uniqueParts.join(", ");
         }
       }
     }
@@ -269,16 +273,65 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
       const data = await res.json();
       const ward = data.locality || "";
       const city = data.city || data.principalSubdivision || "";
-      const country = data.countryName || "";
+      const country = data.countryName || "Việt Nam";
 
       const parts = [ward, city, country].filter(Boolean);
-      if (parts.length > 0) return parts.join(", ");
+      const uniqueParts = parts.filter((item, index) => parts.indexOf(item) === index);
+      if (uniqueParts.length > 0) return uniqueParts.join(", ");
     }
   } catch {
     // Fallback
   }
 
-  return `${lat.toFixed(3)}°, ${lng.toFixed(3)}°`;
+  return `Vị trí (${lat.toFixed(2)}°, ${lng.toFixed(2)}°)`;
+}
+
+export async function detectLocationByIp(): Promise<WeatherLocation | null> {
+  // Method 1: BigDataCloud Client IP Reverse Geocode (free, high accuracy in VN)
+  try {
+    const res = await fetch(
+      "https://api.bigdatacloud.net/data/reverse-geocode-client?localityLanguage=vi"
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (data.latitude && data.longitude) {
+        const city = data.city || data.principalSubdivision || data.locality || "";
+        const country = data.countryName || "Việt Nam";
+        const parts = [city, country].filter(Boolean);
+        const uniqueParts = parts.filter((item, index) => parts.indexOf(item) === index);
+        const name = uniqueParts.join(", ") || "Vị trí của bạn";
+        return {
+          name,
+          latitude: data.latitude,
+          longitude: data.longitude,
+          country,
+        };
+      }
+    }
+  } catch {
+    // Fallback to ip-api.com
+  }
+
+  // Method 2: ip-api.com
+  try {
+    const res = await fetch("https://ip-api.com/json/?lang=vi");
+    if (res.ok) {
+      const data = await res.json();
+      if (data.status === "success" && data.lat && data.lon) {
+        const name = [data.city, data.country].filter(Boolean).join(", ");
+        return {
+          name: name || "Vị trí của bạn",
+          latitude: data.lat,
+          longitude: data.lon,
+          country: data.country,
+        };
+      }
+    }
+  } catch {
+    // Fallback
+  }
+
+  return null;
 }
 
 export async function fetchWeatherData(
