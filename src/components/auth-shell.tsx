@@ -77,12 +77,12 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
                 <Popover open={wealthMenuOpen} onOpenChange={setWealthMenuOpen}>
                   <PopoverTrigger asChild>
                     <Button
-                      className="h-9 px-3 sm:px-3.5 text-xs font-bold gap-1.5 bg-gradient-to-r from-sky-500 via-blue-600 to-emerald-500 hover:from-sky-600 hover:to-emerald-600 text-white rounded-xl shadow-lg shadow-sky-500/20 transition-all border-0 cursor-pointer shrink-0"
+                      className="h-9 w-9 sm:w-auto p-0 sm:px-3.5 text-xs font-bold gap-1.5 bg-gradient-to-r from-sky-500 via-blue-600 to-emerald-500 hover:from-sky-600 hover:to-emerald-600 text-white rounded-xl shadow-lg shadow-sky-500/20 transition-all border-0 cursor-pointer shrink-0 justify-center"
                       title={language === "vi" ? "Thêm tài sản mới" : "Add new asset"}
                     >
-                      <PlusCircle className="h-4 w-4 shrink-0" />
-                      <span>{language === "vi" ? "Thêm tài sản" : "Add Asset"}</span>
-                      <ChevronDown className="h-3.5 w-3.5 opacity-80" />
+                      <PlusCircle className="h-5 w-5 sm:h-4 sm:w-4 shrink-0" />
+                      <span className="hidden sm:inline">{language === "vi" ? "Thêm tài sản" : "Add Asset"}</span>
+                      <ChevronDown className="hidden sm:inline-block h-3.5 w-3.5 opacity-80" />
                     </Button>
                   </PopoverTrigger>
 
@@ -138,10 +138,10 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
                 <Button
                   variant="outline"
                   onClick={() => window.dispatchEvent(new CustomEvent("open-weather-summary"))}
-                  className="h-9 px-3 text-xs font-bold gap-1.5 border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 hover:bg-amber-50 dark:hover:bg-slate-800 hover:text-amber-600 rounded-xl shadow-xs transition-all cursor-pointer"
+                  className="h-9 w-9 sm:w-auto p-0 sm:px-3 text-xs font-bold gap-1.5 border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 hover:bg-amber-50 dark:hover:bg-slate-800 hover:text-amber-600 rounded-xl shadow-xs transition-all cursor-pointer shrink-0 justify-center"
                   title={language === "vi" ? "Xem tóm tắt thời tiết nhanh" : "Weather summary"}
                 >
-                  <FileText className="h-4 w-4 text-amber-500" />
+                  <FileText className="h-5 w-5 sm:h-4 sm:w-4 text-amber-500 shrink-0" />
                   <span className="hidden sm:inline">{language === "vi" ? "Tóm tắt thời tiết" : "Weather Summary"}</span>
                 </Button>
 
@@ -165,11 +165,11 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
                 <NotificationsPopover />
                 <Button
                   onClick={() => window.dispatchEvent(new CustomEvent("open-note-modal"))}
-                  className="h-9 px-3.5 text-xs font-bold gap-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl shadow-lg shadow-purple-500/20 transition-all border-0 cursor-pointer"
+                  className="h-9 w-9 sm:w-auto p-0 sm:px-3.5 text-xs font-bold gap-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl shadow-lg shadow-purple-500/20 transition-all border-0 cursor-pointer shrink-0 justify-center"
                   title={language === "vi" ? "Thêm ghi chú mới" : "Add new note"}
                 >
-                  <PlusCircle className="h-4 w-4 shrink-0" />
-                  <span>{language === "vi" ? "Thêm ghi chú" : "Add Note"}</span>
+                  <PlusCircle className="h-5 w-5 sm:h-4 sm:w-4 shrink-0" />
+                  <span className="hidden sm:inline">{language === "vi" ? "Thêm ghi chú" : "Add Note"}</span>
                 </Button>
               </div>
             )}
@@ -180,11 +180,11 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
                 <NotificationsPopover />
                 <Button
                   onClick={() => window.dispatchEvent(new CustomEvent("open-calendar-modal"))}
-                  className="h-9 px-3.5 text-xs font-bold gap-1.5 bg-gradient-to-r from-indigo-600 to-sky-600 hover:from-indigo-700 hover:to-sky-700 text-white rounded-xl shadow-lg shadow-indigo-500/20 transition-all border-0 cursor-pointer"
+                  className="h-9 w-9 sm:w-auto p-0 sm:px-3.5 text-xs font-bold gap-1.5 bg-gradient-to-r from-indigo-600 to-sky-600 hover:from-indigo-700 hover:to-sky-700 text-white rounded-xl shadow-lg shadow-indigo-500/20 transition-all border-0 cursor-pointer shrink-0 justify-center"
                   title={language === "vi" ? "Thêm kế hoạch mới" : "Add new plan"}
                 >
-                  <PlusCircle className="h-4 w-4 shrink-0" />
-                  <span>{language === "vi" ? "Thêm kế hoạch" : "Add Plan"}</span>
+                  <PlusCircle className="h-5 w-5 sm:h-4 sm:w-4 shrink-0" />
+                  <span className="hidden sm:inline">{language === "vi" ? "Thêm kế hoạch" : "Add Plan"}</span>
                 </Button>
               </div>
             )}
