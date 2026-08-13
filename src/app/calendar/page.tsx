@@ -10,6 +10,8 @@ import {
 } from "@/components/calendar-plan-modal";
 import { CalendarPlanDetailModal } from "@/components/calendar-plan-detail-modal";
 import { formatLunarDate } from "@/lib/lunar-calendar";
+import { getSpecialDaysForDate, SpecialDayInfo } from "@/lib/vietnam-holidays";
+import { SpecialDayModal } from "@/components/special-day-modal";
 import {
   Popover,
   PopoverContent,
@@ -25,6 +27,7 @@ import {
   Loader2,
   ListFilter,
   CheckCircle2,
+  Star,
 } from "lucide-react";
 import {
   format,
@@ -65,6 +68,7 @@ export default function CalendarPage() {
   }, []);
 
   const [plans, setPlans] = useState<CalendarPlanItem[]>([]);
+  const [userBod, setUserBod] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Modals state
@@ -74,6 +78,29 @@ export default function CalendarPage() {
 
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedPlanForDetail, setSelectedPlanForDetail] = useState<CalendarPlanItem | null>(null);
+
+  // Special Day Modal State
+  const [specialDayModalOpen, setSpecialDayModalOpen] = useState(false);
+  const [selectedSpecialDayDate, setSelectedSpecialDayDate] = useState<Date | null>(null);
+  const [selectedSpecialDays, setSelectedSpecialDays] = useState<SpecialDayInfo[]>([]);
+
+  // Fetch User Profile for Birthday (bod)
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const res = await fetch("/api/user/profile");
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.bod) {
+            setUserBod(new Date(data.bod));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch user profile:", err);
+      }
+    };
+    fetchUserProfile();
+  }, []);
 
   // Fetch plans from API
   const fetchPlans = useCallback(async () => {
@@ -166,6 +193,13 @@ export default function CalendarPage() {
     setCreateModalOpen(true);
   };
 
+  const handleStarClick = (day: Date, specials: SpecialDayInfo[], e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedSpecialDayDate(day);
+    setSelectedSpecialDays(specials);
+    setSpecialDayModalOpen(true);
+  };
+
   const weekDayHeaders = language === "vi"
     ? ["T2", "T3", "T4", "T5", "T6", "T7", "CN"]
     : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -222,7 +256,7 @@ export default function CalendarPage() {
               </Button>
             </PopoverTrigger>
             <PopoverContent
-              className="w-auto p-0 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-[250]"
+              className="w-auto p-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-[250]"
               align="end"
             >
               <Calendar
@@ -287,7 +321,7 @@ export default function CalendarPage() {
             </Button>
           </PopoverTrigger>
           <PopoverContent
-            className="w-auto p-0 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-[250]"
+            className="w-auto p-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-[250]"
             align="end"
           >
             <Calendar
@@ -346,6 +380,7 @@ export default function CalendarPage() {
                 const dayPlans = plans.filter((plan) =>
                   isSameDay(parseISO(plan.date), day)
                 );
+                const specials = getSpecialDaysForDate(day, userBod);
 
                 return (
                   <div
@@ -385,18 +420,37 @@ export default function CalendarPage() {
                         </div>
                       </div>
 
-                      {/* Plus Action Button */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDayClick(day);
-                        }}
-                        className="p-1 rounded-lg text-slate-400 opacity-0 group-hover:opacity-100 group-hover:text-white dark:group-hover:text-slate-900 hover:bg-white/20 dark:hover:bg-slate-300 transition-all cursor-pointer shrink-0"
-                        title={language === "vi" ? "Thêm kế hoạch cho ngày này" : "Add plan for this day"}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </button>
+                      {/* Right Header Actions: Special Star Icon & Plus Action Button */}
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        {specials.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={(e) => handleStarClick(day, specials, e)}
+                            className="p-1 rounded-lg hover:bg-white/20 dark:hover:bg-slate-300 transition-all cursor-pointer"
+                            title={specials.map((s) => (language === "vi" ? s.name : s.nameEn)).join(", ")}
+                          >
+                            <Star
+                              className={`h-4 w-4 ${
+                                specials.some((s) => s.iconType === "blue_star")
+                                  ? "text-sky-400 fill-sky-400 drop-shadow-md animate-pulse"
+                                  : "text-amber-400 fill-amber-400 drop-shadow-md"
+                              }`}
+                            />
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDayClick(day);
+                          }}
+                          className="p-1 rounded-lg text-slate-400 opacity-0 group-hover:opacity-100 group-hover:text-white dark:group-hover:text-slate-900 hover:bg-white/20 dark:hover:bg-slate-300 transition-all cursor-pointer"
+                          title={language === "vi" ? "Thêm kế hoạch cho ngày này" : "Add plan for this day"}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
 
                     {/* List of Plan Items */}
@@ -437,6 +491,7 @@ export default function CalendarPage() {
               const dayPlans = plans.filter((plan) =>
                 isSameDay(parseISO(plan.date), day)
               );
+              const specials = getSpecialDaysForDate(day, userBod);
 
               return (
                 <div
@@ -471,17 +526,36 @@ export default function CalendarPage() {
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDayClick(day);
-                      }}
-                      className="p-1.5 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors"
-                      title={language === "vi" ? "Thêm kế hoạch" : "Add plan"}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      {specials.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleStarClick(day, specials, e)}
+                          className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                          title={specials.map((s) => (language === "vi" ? s.name : s.nameEn)).join(", ")}
+                        >
+                          <Star
+                            className={`h-4 w-4 ${
+                              specials.some((s) => s.iconType === "blue_star")
+                                ? "text-sky-400 fill-sky-400 drop-shadow-md animate-pulse"
+                                : "text-amber-400 fill-amber-400 drop-shadow-md"
+                            }`}
+                          />
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDayClick(day);
+                        }}
+                        className="p-1.5 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors"
+                        title={language === "vi" ? "Thêm kế hoạch" : "Add plan"}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Day Plans List */}
@@ -547,6 +621,14 @@ export default function CalendarPage() {
           setCreateModalOpen(true);
         }}
         onDeleted={fetchPlans}
+      />
+
+      {/* Special Day Information Modal */}
+      <SpecialDayModal
+        open={specialDayModalOpen}
+        onOpenChange={setSpecialDayModalOpen}
+        date={selectedSpecialDayDate}
+        specialDays={selectedSpecialDays}
       />
     </div>
   );
