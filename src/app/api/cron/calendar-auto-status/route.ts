@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getEndOfTodayVN } from "@/lib/date-utils";
 
 export async function GET(req: Request) {
   try {
-    const endOfToday = new Date();
-    endOfToday.setHours(23, 59, 59, 999);
+    const endOfToday = getEndOfTodayVN();
 
-    // Auto update all Todo (0) plans to In Progress (1) if date <= end of today
-    const result = await prisma.calendarPlan.updateMany({
+    // 1. Auto update Todo (0) to In Progress (1) for plans that reached execution date
+    const updatedCount = await prisma.calendarPlan.updateMany({
       where: {
         status: 0,
         date: {
@@ -19,10 +19,23 @@ export async function GET(req: Request) {
       },
     });
 
+    // 2. Revert any future plans back to Todo (0)
+    const revertedCount = await prisma.calendarPlan.updateMany({
+      where: {
+        status: 1,
+        date: {
+          gt: endOfToday,
+        },
+      },
+      data: {
+        status: 0,
+      },
+    });
+
     return NextResponse.json({
       success: true,
-      message: `Successfully auto-updated ${result.count} plans to In Progress`,
-      updatedCount: result.count,
+      updatedToInProgress: updatedCount.count,
+      revertedToTodo: revertedCount.count,
     });
   } catch (error: any) {
     console.error("Cron /api/cron/calendar-auto-status error:", error);

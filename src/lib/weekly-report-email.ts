@@ -2,6 +2,7 @@ import { format, startOfWeek, endOfWeek, subWeeks } from "date-fns";
 import { vi } from "date-fns/locale";
 import nodemailer from "nodemailer";
 import { prisma } from "@/lib/prisma";
+import { getStartOfDayVN, getEndOfDayVN } from "@/lib/date-utils";
 
 export function formatVND(val: number) {
   return new Intl.NumberFormat("vi-VN", {
@@ -27,8 +28,11 @@ export async function buildAndSendWeeklyReportEmail({
   userEmail: string;
   targetDate?: Date;
 }) {
-  const weekStart = startOfWeek(targetDate, { weekStartsOn: 1 });
-  const weekEnd = endOfWeek(targetDate, { weekStartsOn: 1 });
+  const rawWeekStart = startOfWeek(targetDate, { weekStartsOn: 1 });
+  const rawWeekEnd = endOfWeek(targetDate, { weekStartsOn: 1 });
+
+  const weekStart = getStartOfDayVN(rawWeekStart);
+  const weekEnd = getEndOfDayVN(rawWeekEnd);
 
   const weekRangeStr = `${format(weekStart, "dd/MM/yyyy")} — ${format(
     weekEnd,

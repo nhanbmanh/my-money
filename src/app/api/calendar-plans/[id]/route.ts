@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { getEndOfTodayVN } from "@/lib/date-utils";
 
 const updatePlanSchema = z.object({
   title: z.string().min(1, "Tiêu đề không được để trống"),
@@ -45,12 +46,11 @@ export async function PUT(
     }
 
     const planDate = new Date(validatedData.date);
-    const endOfToday = new Date();
-    endOfToday.setHours(23, 59, 59, 999);
+    const endOfToday = getEndOfTodayVN();
 
     let finalStatus = validatedData.status;
     if (finalStatus === 0 && planDate <= endOfToday) {
-      finalStatus = 1; // Auto-transition to In Progress (1) if plan date is today or past
+      finalStatus = 1; // Auto-transition to In Progress (1) only if plan date is today or past
     }
 
     const updatedPlan = await prisma.calendarPlan.update({

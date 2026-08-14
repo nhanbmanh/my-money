@@ -1,6 +1,6 @@
 /**
  * Vietnamese Lunar Calendar Converter (Âm lịch Việt Nam GMT+7)
- * Based on Ho Ngoc Duc's astronomical algorithm for Vietnam timezone (+7).
+ * Based on Dr. Ho Ngoc Duc's astronomical algorithm for Vietnam timezone (+7).
  */
 
 function jdFromDate(dd: number, mm: number, yyyy: number): number {
@@ -43,7 +43,7 @@ function getNewMoonDay(k: number, timeZone: number = 7): number {
     0.0004 * Math.sin(3 * Mpr * dr) +
     0.0104 * Math.sin(2 * F * dr) -
     0.0051 * Math.sin((M + Mpr) * dr) -
-    0.0074 * Math.sin((M - Mpr) * dr) +
+    0.00074 * Math.sin((M - Mpr) * dr) +
     0.0004 * Math.sin((2 * F + M) * dr) -
     0.0004 * Math.sin((2 * F - M) * dr) -
     0.0006 * Math.sin((2 * F + Mpr) * dr) +
@@ -93,7 +93,6 @@ export function getLunarDate(date: Date, timeZone: number = 7): LunarDate {
 
   const dayNumber = jdFromDate(dd, mm, yyyy);
   const k = Math.floor((dayNumber - 2415021) / 29.5305888);
-
   let monthStart = getNewMoonDay(k + 1, timeZone);
   if (monthStart > dayNumber) {
     monthStart = getNewMoonDay(k, timeZone);
@@ -112,19 +111,17 @@ export function getLunarDate(date: Date, timeZone: number = 7): LunarDate {
   }
 
   const lunarDay = dayNumber - monthStart + 1;
-  const diff = Math.round((monthStart - a11) / 29.5);
-  let isLeap = false;
-  let lunarMonth = diff;
+  const diff = Math.round((monthStart - a11) / 29.53);
+  let isLeap = 0;
+  let lunarMonth = diff + 11;
 
   if (b11 - a11 > 365) {
-    const leapMonthDiff = Math.floor((b11 - a11) / 29.5);
-    // Find leap month
-    let kLeap = Math.floor((a11 - 2415021) / 29.5305888);
+    const leapk = Math.floor((a11 - 2415021) / 29.5305888);
     let lastSunLong = getSunLongitude(a11, timeZone);
     let leapIndex = -1;
 
-    for (let i = 1; i <= leapMonthDiff; i++) {
-      const nm = getNewMoonDay(kLeap + i, timeZone);
+    for (let i = 1; i <= Math.floor((b11 - a11) / 29.5); i++) {
+      const nm = getNewMoonDay(leapk + i, timeZone);
       const sunLong = getSunLongitude(nm, timeZone);
       if (sunLong === lastSunLong) {
         leapIndex = i;
@@ -135,10 +132,10 @@ export function getLunarDate(date: Date, timeZone: number = 7): LunarDate {
 
     if (leapIndex > 0) {
       if (diff > leapIndex) {
-        lunarMonth = diff - 1;
+        lunarMonth = diff + 10;
       } else if (diff === leapIndex) {
-        lunarMonth = diff - 1;
-        isLeap = true;
+        lunarMonth = diff + 10;
+        isLeap = 1;
       }
     }
   }
@@ -146,14 +143,11 @@ export function getLunarDate(date: Date, timeZone: number = 7): LunarDate {
   if (lunarMonth > 12) {
     lunarMonth = lunarMonth - 12;
   }
-  if (lunarMonth === 0) {
-    lunarMonth = 12;
-  }
 
   let lunarYearFinal = yyyy;
-  if (mm < 3 && lunarMonth > 9) {
+  if (lunarMonth >= 11 && mm <= 2) {
     lunarYearFinal = yyyy - 1;
-  } else if (mm > 10 && lunarMonth < 3) {
+  } else if (lunarMonth <= 2 && mm >= 11) {
     lunarYearFinal = yyyy + 1;
   }
 
@@ -161,12 +155,12 @@ export function getLunarDate(date: Date, timeZone: number = 7): LunarDate {
     day: lunarDay,
     month: lunarMonth,
     year: lunarYearFinal,
-    isLeap,
+    isLeap: isLeap === 1,
   };
 }
 
 /**
- * Format lunar date string: e.g. "1/7 ÂL" or "15/7 ÂL"
+ * Format lunar date string: e.g. "01/07 ÂL" or "15/07 ÂL"
  */
 export function formatLunarDate(date: Date): string {
   const lunar = getLunarDate(date);

@@ -1,4 +1,5 @@
-import { startOfDay, subDays, addDays, isSameDay, isBefore, isAfter, parseISO } from "date-fns";
+import { startOfDay, subDays, addDays, isSameDay, isBefore, isAfter, parseISO, differenceInCalendarDays } from "date-fns";
+import { getStartOfTodayVN, getStartOfDayVN } from "@/lib/date-utils";
 
 export interface CalendarNotificationItem {
   id: string;
@@ -13,7 +14,7 @@ export interface CalendarNotificationItem {
 
 export async function fetchCalendarNotifications(): Promise<CalendarNotificationItem[]> {
   try {
-    const today = startOfDay(new Date());
+    const today = getStartOfTodayVN();
     const startDate = subDays(today, 2); // 2 days ago
     const endDate = addDays(today, 2);   // 2 days ahead
 
@@ -29,7 +30,7 @@ export async function fetchCalendarNotifications(): Promise<CalendarNotification
       // Only Todo (0) and In Progress (1)
       if (plan.status !== 0 && plan.status !== 1) continue;
 
-      const planDate = startOfDay(parseISO(plan.date));
+      const planDate = getStartOfDayVN(parseISO(plan.date));
 
       // Must be within [today - 2 days, today + 2 days]
       if (isBefore(planDate, startDate) || isAfter(planDate, endDate)) continue;
@@ -38,18 +39,28 @@ export async function fetchCalendarNotifications(): Promise<CalendarNotification
       let tagLabelVi: string;
       let tagLabelEn: string;
 
+      const diffDays = Math.abs(differenceInCalendarDays(planDate, today));
+
       if (isSameDay(planDate, today)) {
         tagType = "ONGOING";
         tagLabelVi = "Đang diễn ra";
         tagLabelEn = "Ongoing";
       } else if (isBefore(planDate, today)) {
         tagType = "OVERDUE";
-        tagLabelVi = "Quá hạn";
-        tagLabelEn = "Overdue";
+        tagLabelVi = `Quá hạn ${diffDays} ngày`;
+        tagLabelEn = `Overdue by ${diffDays} day${diffDays > 1 ? "s" : ""}`;
       } else {
         tagType = "UPCOMING";
-        tagLabelVi = "Sắp tới";
-        tagLabelEn = "Upcoming";
+        if (diffDays === 1) {
+          tagLabelVi = "Diễn ra trong ngày mai";
+          tagLabelEn = "Occurring tomorrow";
+        } else if (diffDays === 2) {
+          tagLabelVi = "Diễn ra trong ngày kia";
+          tagLabelEn = "Occurring day after tomorrow";
+        } else {
+          tagLabelVi = `Diễn ra trong ${diffDays} ngày tới`;
+          tagLabelEn = `Occurring in ${diffDays} days`;
+        }
       }
 
       notifications.push({

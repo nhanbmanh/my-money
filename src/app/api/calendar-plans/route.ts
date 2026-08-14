@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { getEndOfTodayVN } from "@/lib/date-utils";
 
 const createPlanSchema = z.object({
   title: z.string().min(1, "Tiêu đề không được để trống"),
@@ -39,10 +40,9 @@ export async function GET(req: Request) {
       };
     }
 
-    // Auto-update plans that have reached their execution date (date <= end of today) and still have status === 0 (Todo) to status === 1 (In Progress)
-    const endOfToday = new Date();
-    endOfToday.setHours(23, 59, 59, 999);
+    const endOfToday = getEndOfTodayVN();
 
+    // 1. Auto-update plans that have reached their execution date (date <= endOfToday) and still have status === 0 (Todo) to status === 1 (In Progress)
     await prisma.calendarPlan.updateMany({
       where: {
         userId,
@@ -53,6 +53,20 @@ export async function GET(req: Request) {
       },
       data: {
         status: 1,
+      },
+    });
+
+    // 2. Revert any future plans (date > endOfToday) that were incorrectly set to status 1 back to status 0 (Todo)
+    await prisma.calendarPlan.updateMany({
+      where: {
+        userId,
+        status: 1,
+        date: {
+          gt: endOfToday,
+        },
+      },
+      data: {
+        status: 0,
       },
     });
 
@@ -91,12 +105,11 @@ export async function POST(req: Request) {
     const validatedData = createPlanSchema.parse(body);
 
     const planDate = new Date(validatedData.date);
-    const endOfToday = new Date();
-    endOfToday.setHours(23, 59, 59, 999);
+    const endOfToday = getEndOfTodayVN();
 
     let finalStatus = validatedData.status;
     if (finalStatus === 0 && planDate <= endOfToday) {
-      finalStatus = 1; // Auto-transition to In Progress (1) if plan date is today or past
+      finalStatus = 1; // Auto-transition to In Progress (1) only if plan date is today or past
     }
 
     const newPlan = await prisma.calendarPlan.create({

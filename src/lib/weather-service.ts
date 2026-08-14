@@ -86,8 +86,8 @@ export function getRefinedDailyWeatherInfo(
 
   // Moderate rain (1.0mm to 5.0mm)
   if (rainSum !== undefined && rainSum < 5.0) {
-    if (code === 95 || code === 96) {
-      return { desc: lang === "vi" ? "Chiều tối có dông rải rác" : "Scattered Evening Storms", icon: "⛈️" };
+    if (code === 95 || code === 96 || code === 99) {
+      return { desc: lang === "vi" ? "Chiều tối có mưa dông rải rác" : "Scattered Evening Showers", icon: "⛈️" };
     }
     return { desc: lang === "vi" ? "Có lúc có mưa rào" : "Passing Showers", icon: "🌦️" };
   }
@@ -141,7 +141,7 @@ export function getWmoWeatherInfo(code: number, isDay = true, lang: "vi" | "en" 
         return { desc: "Thunderstorm", icon: "⛈️" };
       case 96:
       case 99:
-        return { desc: "Thunderstorm with hail", icon: "⛈️" };
+        return { desc: "Heavy thunderstorm", icon: "⛈️" };
       default:
         return { desc: "Fair weather", icon: "⛅" };
     }
@@ -173,7 +173,7 @@ export function getWmoWeatherInfo(code: number, isDay = true, lang: "vi" | "en" 
       return { desc: "Mưa to nặng hạt", icon: "🌧️" };
     case 66:
     case 67:
-      return { desc: "Mưa đá", icon: "🌨️" };
+      return { desc: "Mưa rào lớn", icon: "🌧️" };
     case 71:
     case 73:
     case 75:
@@ -187,10 +187,10 @@ export function getWmoWeatherInfo(code: number, isDay = true, lang: "vi" | "en" 
     case 86:
       return { desc: "Tuyết rào", icon: "🌨️" };
     case 95:
-      return { desc: "Dông bão, sấm chớp", icon: "⛈️" };
+      return { desc: "Mưa dông, sấm chớp", icon: "⛈️" };
     case 96:
     case 99:
-      return { desc: "Dông bão kèm mưa đá", icon: "⛈️" };
+      return { desc: "Mưa dông lớn, sấm chớp", icon: "⛈️" };
     default:
       return { desc: "Thời tiết bình thường", icon: "⛅" };
   }

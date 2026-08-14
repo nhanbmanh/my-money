@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getStartOfTodayVN } from "@/lib/date-utils";
 
 export const DEFAULT_MACRO_CATEGORIES = [
   {
@@ -178,9 +179,8 @@ export async function recordDailyAssetSnapshot(
   }
 ) {
   try {
-    const today = new Date();
-    // Normalize date to start of UTC day
-    today.setUTCHours(0, 0, 0, 0);
+    // Normalize date to 00:00:00.000 Vietnam Time (GMT+7)
+    const today = getStartOfTodayVN();
 
     await prisma.assetSnapshot.upsert({
       where: {

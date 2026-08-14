@@ -184,11 +184,18 @@ export function NetWorthVarianceModal({
       .sort((a, b) => Math.abs(b.oneDayChange) - Math.abs(a.oneDayChange));
   }, [allHoldingItems]);
 
+  const sumPortfolioAttribution = useMemo(() => {
+    if (portfolioAttribution.length > 0) {
+      return portfolioAttribution.reduce((sum, item) => sum + item.oneDayChange, 0);
+    }
+    return portfolioMarketChange;
+  }, [portfolioAttribution, portfolioMarketChange]);
+
   const rawChangePercent = previousNetWorth > 0 ? (netWorthChangeAmount / previousNetWorth) * 100 : 0;
   const netWorthChangePercent = Math.abs(rawChangePercent) < 0.01 ? 0 : rawChangePercent;
 
   const isPositive = netWorthChangeAmount >= 0;
-  const isPortfolioPositive = portfolioMarketChange >= 0;
+  const isPortfolioPositive = sumPortfolioAttribution >= 0;
   const isCashFlowPositive = todayNetCashFlow >= 0;
 
   return (
@@ -261,7 +268,7 @@ export function NetWorthVarianceModal({
                 )}
               >
                 Tác động định giá: {isPortfolioPositive ? "+" : ""}
-                {formatVND(portfolioMarketChange)}
+                {formatVND(sumPortfolioAttribution)}
               </span>
             </div>
 
@@ -380,9 +387,9 @@ export function NetWorthVarianceModal({
             </div>
             <div className="space-y-1.5 text-[11px] text-slate-300">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between py-0.5 border-b border-sky-500/20 gap-0.5">
-                <span>• Biến động định giá thị trường (ΔNAV × SL):</span>
+                <span>• Biến động định giá thị trường danh mục đầu tư:</span>
                 <strong className={isPortfolioPositive ? "text-emerald-400" : "text-rose-400"}>
-                  {isPortfolioPositive ? "+" : ""}{formatVND(portfolioMarketChange)}
+                  {isPortfolioPositive ? "+" : ""}{formatVND(sumPortfolioAttribution)}
                 </strong>
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between py-0.5 border-b border-sky-500/20 gap-0.5">
@@ -391,6 +398,15 @@ export function NetWorthVarianceModal({
                   {isCashFlowPositive ? "+" : ""}{formatVND(todayNetCashFlow)}
                 </strong>
               </div>
+              {Math.abs(netWorthChangeAmount - (sumPortfolioAttribution + todayNetCashFlow)) > 0 && (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between py-0.5 border-b border-sky-500/20 gap-0.5 text-slate-400">
+                  <span>• Chênh lệch điều chỉnh tài sản / nợ khác (Snapshot kỳ trước):</span>
+                  <strong className={netWorthChangeAmount - (sumPortfolioAttribution + todayNetCashFlow) >= 0 ? "text-emerald-400" : "text-rose-400"}>
+                    {netWorthChangeAmount - (sumPortfolioAttribution + todayNetCashFlow) >= 0 ? "+" : ""}
+                    {formatVND(netWorthChangeAmount - (sumPortfolioAttribution + todayNetCashFlow))}
+                  </strong>
+                </div>
+              )}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-1 font-bold text-xs gap-0.5">
                 <span className="text-sky-300">🎯 Tổng chênh lệch gia sản ròng:</span>
                 <strong className={isPositive ? "text-emerald-400" : "text-rose-400"}>

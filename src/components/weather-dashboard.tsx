@@ -39,6 +39,7 @@ import {
   fetchWeatherData,
   searchLocations,
   getWmoWeatherInfo,
+  getRefinedDailyWeatherInfo,
   detectLocationByIp,
   WeatherData,
   WeatherLocation,
@@ -648,11 +649,24 @@ export function WeatherDashboard() {
                 <div className="relative z-10 space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <Badge className="bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-200 border-emerald-400/30 backdrop-blur text-xs font-black px-3 py-1 rounded-full w-fit max-w-full truncate">
-                      💨 {language === "vi" ? "Trạm AirVisual / IQAir (Mỹ - Trực Tiếp)" : "AirVisual / IQAir Station (US - Live)"}
+                      💨 {language === "vi" ? "Trạm Khí Tượng Realtime (Trực Tiếp)" : "Live Weather Station (Realtime)"}
                     </Badge>
-                    <Badge className={cn("text-xs font-black px-2.5 py-1 rounded-full border shadow-xs w-fit shrink-0", airVisualData.aqiColor)}>
-                      AQI {airVisualData.aqi} • {getAqiLevelInfo(airVisualData.aqi, language).text}
-                    </Badge>
+                    {(() => {
+                      const uvVal = weatherData?.current?.uvIndex ?? 0;
+                      const getUvInfo = (uv: number) => {
+                        if (uv <= 2) return { text: language === "vi" ? "Thấp (An toàn)" : "Low (Safe)", color: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" };
+                        if (uv <= 5) return { text: language === "vi" ? "Trung bình" : "Moderate", color: "bg-amber-500/20 text-amber-300 border-amber-500/30" };
+                        if (uv <= 7) return { text: language === "vi" ? "Cao (Cần mũ/dù)" : "High (Sun Protection)", color: "bg-orange-500/20 text-orange-300 border-orange-500/30" };
+                        if (uv <= 10) return { text: language === "vi" ? "Rất cao (Nắng gắt)" : "Very High", color: "bg-rose-500/20 text-rose-300 border-rose-500/30" };
+                        return { text: language === "vi" ? "Cực kỳ nguy hại" : "Extreme", color: "bg-purple-500/20 text-purple-300 border-purple-500/30" };
+                      };
+                      const uvInfo = getUvInfo(uvVal);
+                      return (
+                        <Badge className={cn("text-xs font-black px-2.5 py-1 rounded-full border shadow-xs w-fit shrink-0", uvInfo.color)}>
+                          ☀️ UV {uvVal.toFixed(1)} • {uvInfo.text}
+                        </Badge>
+                      );
+                    })()}
                   </div>
 
                   <div className="flex items-baseline gap-3 pt-1">
@@ -676,10 +690,22 @@ export function WeatherDashboard() {
 
                 {/* AirVisual Grid of Key Weather Metrics */}
                 <div className="relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4 pt-3 border-t border-white/20">
-                  <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2.5 text-center col-span-1">
-                    <div className="text-[10px] font-black text-indigo-200 truncate">🍃 {language === "vi" ? "Chất Lượng US AQI" : "US AQI Quality"}</div>
-                    <div className="text-xs sm:text-sm font-black text-emerald-300 truncate">{language === "vi" ? `AQI ${airVisualData.aqi} • ${getAqiLevelInfo(airVisualData.aqi, language).text}` : `AQI ${airVisualData.aqi} • ${getAqiLevelInfo(airVisualData.aqi, language).text}`}</div>
-                  </div>
+                  {(() => {
+                    const uvVal = weatherData?.current?.uvIndex ?? 0;
+                    const getUvInfo = (uv: number) => {
+                      if (uv <= 2) return { text: language === "vi" ? "An toàn" : "Safe" };
+                      if (uv <= 5) return { text: language === "vi" ? "Trung bình" : "Moderate" };
+                      if (uv <= 7) return { text: language === "vi" ? "Cao (Che chắn)" : "High" };
+                      if (uv <= 10) return { text: language === "vi" ? "Rất cao" : "Very High" };
+                      return { text: language === "vi" ? "Cực kỳ nguy hại" : "Extreme" };
+                    };
+                    return (
+                      <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2.5 text-center col-span-1">
+                        <div className="text-[10px] font-black text-indigo-200 truncate">☀️ {language === "vi" ? "Chỉ Số Bức Xạ UV" : "UV Index"}</div>
+                        <div className="text-xs sm:text-sm font-black text-amber-300 truncate">UV {uvVal.toFixed(1)} • {getUvInfo(uvVal).text}</div>
+                      </div>
+                    );
+                  })()}
 
                   <div className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-2.5 text-center col-span-1">
                     <div className="text-[10px] font-black text-indigo-200 truncate">💧 {language === "vi" ? "Độ Ẩm" : "Humidity"}</div>
@@ -830,10 +856,10 @@ export function WeatherDashboard() {
                       <div className="flex items-center justify-between gap-3 pt-1">
                         <div className="flex items-center gap-2.5 min-w-0">
                           <span className="text-3xl shrink-0">
-                            {getWmoWeatherInfo(day.weatherCode, true, language).icon}
+                            {getRefinedDailyWeatherInfo(day.weatherCode, undefined, day.popMax, day.tempMax, language).icon}
                           </span>
                           <span className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">
-                            {getWmoWeatherInfo(day.weatherCode, true, language).desc}
+                            {getRefinedDailyWeatherInfo(day.weatherCode, undefined, day.popMax, day.tempMax, language).desc}
                           </span>
                         </div>
 
@@ -866,10 +892,10 @@ export function WeatherDashboard() {
                       {/* Weather Icon & Desc */}
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <span className="text-xl shrink-0">
-                          {getWmoWeatherInfo(day.weatherCode, true, language).icon}
+                          {getRefinedDailyWeatherInfo(day.weatherCode, undefined, day.popMax, day.tempMax, language).icon}
                         </span>
                         <span className="truncate text-slate-600 dark:text-slate-300 font-medium">
-                          {getWmoWeatherInfo(day.weatherCode, true, language).desc}
+                          {getRefinedDailyWeatherInfo(day.weatherCode, undefined, day.popMax, day.tempMax, language).desc}
                         </span>
                       </div>
 

@@ -2,6 +2,7 @@ import * as XLSX from "xlsx";
 import { format, startOfMonth, endOfMonth, parse } from "date-fns";
 import nodemailer from "nodemailer";
 import { prisma } from "@/lib/prisma";
+import { getStartOfDayVN, getEndOfDayVN } from "@/lib/date-utils";
 
 export function formatVND(val: number) {
   return new Intl.NumberFormat("vi-VN", {
@@ -33,8 +34,11 @@ export async function buildAndSendMonthlyReportEmail({
   const year = parseInt(yearStr, 10);
   const month = parseInt(monthNumStr, 10) - 1;
 
-  const startDate = startOfMonth(new Date(year, month, 1));
-  const endDate = endOfMonth(new Date(year, month, 1));
+  const rawStartDate = startOfMonth(new Date(year, month, 1));
+  const rawEndDate = endOfMonth(new Date(year, month, 1));
+
+  const startDate = getStartOfDayVN(rawStartDate);
+  const endDate = getEndOfDayVN(rawEndDate);
 
   // 1. Fetch user data & transactions for specified month
   const [items, userSources, userPrimaryCategories, userSecondaryCategories] =
