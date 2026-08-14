@@ -35,9 +35,10 @@ export async function GET(req: Request) {
           ],
         }),
       },
-      orderBy: {
-        createdAt: "desc",
-      },
+      orderBy: [
+        { updatedAt: "desc" },
+        { createdAt: "desc" },
+      ],
     });
 
     return NextResponse.json(notes);

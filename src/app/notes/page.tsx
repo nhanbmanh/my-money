@@ -170,8 +170,9 @@ export default function NotesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           {notes.map((note) => {
+            const displayDate = note.updatedAt || note.createdAt;
             const formattedDate = format(
-              new Date(note.createdAt),
+              new Date(displayDate),
               "HH:mm - dd/MM/yyyy",
               { locale: dateLocale }
             );
