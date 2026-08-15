@@ -1,5 +1,5 @@
-import { startOfDay, subDays, addDays, isSameDay, isBefore, isAfter, parseISO, differenceInCalendarDays } from "date-fns";
-import { getStartOfTodayVN, getStartOfDayVN } from "@/lib/date-utils";
+import { subDays, addDays, isSameDay, isBefore, isAfter, parseISO, differenceInCalendarDays } from "date-fns";
+import { getStartOfTodayVN, getStartOfDayVN, getEndOfDayVN } from "@/lib/date-utils";
 
 export interface CalendarNotificationItem {
   id: string;
@@ -15,8 +15,8 @@ export interface CalendarNotificationItem {
 export async function fetchCalendarNotifications(): Promise<CalendarNotificationItem[]> {
   try {
     const today = getStartOfTodayVN();
-    const startDate = subDays(today, 2); // 2 days ago
-    const endDate = addDays(today, 2);   // 2 days ahead
+    const startDate = getStartOfDayVN(subDays(today, 2)); // 2 days ago (00:00:00 VNT)
+    const endDate = getEndOfDayVN(addDays(today, 2));     // 2 days ahead (23:59:59 VNT)
 
     const res = await fetch(
       `/api/calendar-plans?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`

@@ -28,6 +28,15 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
+function renderRichNoteContent(content: string) {
+  if (!content) return "";
+  const isHtml = /<[a-z][\s\S]*>/i.test(content);
+  if (!isHtml) {
+    return content.replace(/\n/g, "<br/>");
+  }
+  return content;
+}
+
 export default function NotesPage() {
   const { language } = useLanguage();
   const dateLocale = language === "vi" ? vi : enUS;
@@ -196,10 +205,13 @@ export default function NotesPage() {
                     </div>
                   </div>
 
-                  {/* Card Content Text */}
-                  <div className="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-wrap line-clamp-6 leading-relaxed bg-slate-50/60 dark:bg-slate-800/40 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800/60">
-                    {note.content}
-                  </div>
+                  {/* Card Content Text (Rich Text HTML) */}
+                  <div
+                    className="text-xs text-slate-700 dark:text-slate-300 line-clamp-6 leading-relaxed bg-slate-50/60 dark:bg-slate-800/40 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800/60 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_blockquote]:border-l-4 [&_blockquote]:border-purple-500 [&_blockquote]:pl-2 [&_blockquote]:italic"
+                    dangerouslySetInnerHTML={{
+                      __html: renderRichNoteContent(note.content),
+                    }}
+                  />
                 </div>
 
                 {/* Card Action Buttons: Edit & Delete */}

@@ -17,6 +17,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLanguage } from "@/components/language-provider";
 import { cn } from "@/lib/utils";
 
+import { getStartOfTodayVN } from "@/lib/date-utils";
+
 interface PortfolioProps {
   summary: {
     totalInvestedCostBasis: number;
@@ -46,8 +48,36 @@ export function InvestmentPortfolioView({ summary, holdings = [], snapshots = []
     return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(val);
   };
 
-  // Calculate 1-day market valuation change for portfolio holdings
+  const startOfToday = useMemo(() => getStartOfTodayVN(), []);
+  const midnightTimestamp = useMemo(() => startOfToday.getTime(), [startOfToday]);
+
+  // Find 00:00 VNT Today Baseline Snapshot (or latest past snapshot before 00:00 VNT today)
+  const baselineSnapshot = useMemo(() => {
+    const todaySnapshots = (snapshots || []).filter(
+      (s: any) => new Date(s.date) >= startOfToday
+    );
+    if (todaySnapshots.length > 0) return todaySnapshots[0];
+
+    const pastSnapshots = (snapshots || []).filter(
+      (s: any) => new Date(s.date) < startOfToday
+    );
+    return pastSnapshots.length > 0 ? pastSnapshots[pastSnapshots.length - 1] : null;
+  }, [snapshots, startOfToday]);
+
+  // Calculate intraday market valuation change for portfolio holdings relative to 00:00 VNT today baseline
   const { oneDayPortfolioMarketChange, portfolioMarketChangePercent } = useMemo(() => {
+    let snapshotHoldingsMap: Record<string, any> = {};
+    if (baselineSnapshot && baselineSnapshot.breakdownJson) {
+      const json = baselineSnapshot.breakdownJson;
+      const list = Array.isArray(json) ? json : json.holdings || [];
+      if (Array.isArray(list)) {
+        list.forEach((item: any) => {
+          if (item.id) snapshotHoldingsMap[item.id] = item;
+          if (item.assetId) snapshotHoldingsMap[item.assetId] = item;
+        });
+      }
+    }
+
     let changeVND = 0;
 
     (holdings || []).forEach((h: any) => {
@@ -56,15 +86,37 @@ export function InvestmentPortfolioView({ summary, holdings = [], snapshots = []
       const currentUnitPrice = Number(h.currentMarketPrice || h.averageCostBasis || 0);
       const change24hPercent = Number(h.change24h || 0);
 
-      if (change24hPercent !== 0 && currentUnitPrice > 0) {
-        const previousUnitPrice = currentUnitPrice / (1 + change24hPercent / 100);
-        const navDeltaPerUnit = currentUnitPrice - previousUnitPrice;
-        if (quantity > 0) {
-          changeVND += Math.round(navDeltaPerUnit * quantity);
+      let intradayChange = 0;
+
+      // Method A: Check snapshot holdings breakdown at 00:00 VNT baseline
+      const snapItem = snapshotHoldingsMap[h.id] || snapshotHoldingsMap[h.assetId];
+      if (snapItem && Number(snapItem.currentMarketPrice || 0) > 0) {
+        const snapPrice = Number(snapItem.currentMarketPrice);
+        const priceDelta = currentUnitPrice - snapPrice;
+        intradayChange = Math.round(priceDelta * quantity);
+      } else {
+        // Method B: Check whether price update occurred AFTER 00:00:00 VNT today
+        const holdingUpdated = h.updatedAt ? new Date(h.updatedAt).getTime() : 0;
+        const assetUpdated = h.asset?.updatedAt ? new Date(h.asset?.updatedAt).getTime() : 0;
+        const lastUpdated = Math.max(holdingUpdated, assetUpdated);
+
+        const isUpdatedToday = lastUpdated >= midnightTimestamp;
+
+        if (isUpdatedToday && change24hPercent !== 0 && currentUnitPrice > 0) {
+          const previousUnitPrice = currentUnitPrice / (1 + change24hPercent / 100);
+          const navDeltaPerUnit = currentUnitPrice - previousUnitPrice;
+          if (quantity > 0) {
+            intradayChange = Math.round(navDeltaPerUnit * quantity);
+          } else {
+            intradayChange = Math.round(currentVal - currentVal / (1 + change24hPercent / 100));
+          }
         } else {
-          changeVND += Math.round(currentVal - currentVal / (1 + change24hPercent / 100));
+          // If price did NOT update after 00:00:00 VNT today
+          intradayChange = 0;
         }
       }
+
+      changeVND += intradayChange;
     });
 
     const marketValue = Number(summary?.totalMarketValueInvestments || 0);
@@ -75,7 +127,7 @@ export function InvestmentPortfolioView({ summary, holdings = [], snapshots = []
       oneDayPortfolioMarketChange: changeVND,
       portfolioMarketChangePercent: percent,
     };
-  }, [holdings, summary]);
+  }, [holdings, summary, baselineSnapshot, midnightTimestamp]);
 
   const isMarketChangePositive = oneDayPortfolioMarketChange >= 0;
 
@@ -133,7 +185,7 @@ export function InvestmentPortfolioView({ summary, holdings = [], snapshots = []
               {formatVND(summary.totalMarketValueInvestments)}
             </div>
             
-            {/* 1-Day Comparison vs Yesterday */}
+            {/* 1-Day Comparison vs 00:00 VNT Midnight Baseline */}
             <div className="mt-2 flex items-center gap-1.5 text-xs font-bold">
               <span
                 className={cn(
@@ -148,7 +200,7 @@ export function InvestmentPortfolioView({ summary, holdings = [], snapshots = []
                 <span className="opacity-90">({portfolioMarketChangePercent >= 0 ? "+" : ""}{portfolioMarketChangePercent.toFixed(1)}%)</span>
               </span>
               <span className="text-muted-foreground font-medium text-[11px]">
-                {language === "vi" ? "so với hôm qua" : "vs yesterday"}
+                {language === "vi" ? "trong ngày (từ 00:00 VNT)" : "intraday (since 00:00 VNT)"}
               </span>
             </div>
           </CardContent>
@@ -171,28 +223,24 @@ export function InvestmentPortfolioView({ summary, holdings = [], snapshots = []
               <span>{isProfit ? "+" : ""}{formatVND(summary.unrealizedPnL)}</span>
             </div>
 
-            <div className="mt-1 flex items-center justify-between gap-2 text-xs">
-              <span className={`font-bold ${isProfit ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
-                {isProfit ? "+" : ""}{summary.unrealizedPnLPercent.toFixed(2)}% ROI
+            <div className="mt-2 flex items-center gap-2 text-xs font-bold">
+              <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${isProfit ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/10 text-rose-600 dark:text-rose-400"}`}>
+                {summary.unrealizedPnLPercent >= 0 ? "+" : ""}{summary.unrealizedPnLPercent.toFixed(2)}% ROI
               </span>
-
-              {/* 1-Day Comparison vs Yesterday */}
-              <div className="flex items-center gap-1 font-bold text-[11px]">
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-md",
-                    isMarketChangePositive
-                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                      : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
-                  )}
-                >
-                  {isMarketChangePositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                  <span>{oneDayPortfolioMarketChange >= 0 ? "+" : ""}{formatVND(oneDayPortfolioMarketChange)}</span>
-                </span>
-                <span className="text-muted-foreground text-[10px]">
-                  {language === "vi" ? "so với hôm qua" : "vs yesterday"}
-                </span>
-              </div>
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px]",
+                  isMarketChangePositive
+                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                    : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                )}
+              >
+                {isMarketChangePositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                <span>{oneDayPortfolioMarketChange >= 0 ? "+" : ""}{formatVND(oneDayPortfolioMarketChange)}</span>
+              </span>
+              <span className="text-muted-foreground font-medium text-[11px]">
+                {language === "vi" ? "trong ngày (từ 00:00 VNT)" : "intraday (since 00:00 VNT)"}
+              </span>
             </div>
           </CardContent>
         </Card>

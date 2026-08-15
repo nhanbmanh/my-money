@@ -124,13 +124,25 @@ export async function GET() {
 
     const breakdownList = Object.values(breakdownByCategoryType);
 
+    const holdingsSnapshot = holdings.map((h) => ({
+      id: h.id,
+      assetId: h.assetId,
+      quantity: h.quantity,
+      currentMarketPrice: h.currentMarketPrice,
+      currentValue: h.currentValue,
+      updatedAt: h.updatedAt || h.asset?.updatedAt,
+    }));
+
     // 4. Record daily asset snapshot asynchronously in background so response is non-blocking
     recordDailyAssetSnapshot(userId, {
       totalAssets,
       totalLiabilities,
       netWorth,
       totalInvestableAssets,
-      breakdownJson: breakdownList,
+      breakdownJson: {
+        byCategory: breakdownList,
+        holdings: holdingsSnapshot,
+      },
     }).catch((err) => console.error("Async snapshot error:", err));
 
     return NextResponse.json({

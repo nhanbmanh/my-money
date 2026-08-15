@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCategoryConfig } from "@/lib/asset-category-types";
+import { getStartOfTodayVN } from "@/lib/date-utils";
 
 interface NetWorthVarianceModalProps {
   open: boolean;
@@ -43,7 +44,7 @@ export function NetWorthVarianceModal({
   previousNetWorth: propsPreviousNetWorth,
   netWorthChangeAmount: propsNetWorthChangeAmount,
   netWorthChangePercent: propsNetWorthChangePercent,
-  compareLabel,
+  compareLabel: propsCompareLabel,
   holdings = [],
   liabilities = [],
   transactions = [],
@@ -58,12 +59,10 @@ export function NetWorthVarianceModal({
     }).format(val);
   };
 
-  // 1. Baseline start of today (00:00:00 local time)
-  const startOfToday = useMemo(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }, []);
+  // 1. Baseline start of today (00:00:00 Vietnam Time)
+  const startOfToday = useMemo(() => getStartOfTodayVN(), []);
+
+  const compareLabel = propsCompareLabel || "Trong ngày (từ 00:00 VNT)";
 
   // 2. Filter Cashflows created TODAY (since 00:00:00 local time today)
   const { todayIncome, todayExpense, todayNetCashFlow, timeframeCashFlows } = useMemo(() => {
@@ -143,9 +142,25 @@ export function NetWorthVarianceModal({
     };
   }, [yesterdaySnapshot, currentNetWorth, todayNetCashFlow, holdings]);
 
-  // 5. Map holdings and filter items with actual market variance
+  // 5. Map holdings and filter items with actual intraday market variance (since 00:00 VNT today)
   const allHoldingItems = useMemo(() => {
-    if (portfolioMarketChange === 0) return [];
+    const midnightTimestamp = startOfToday.getTime();
+
+    // Find 00:00 VNT Baseline Snapshot
+    const todaySnapshots = (snapshots || []).filter((s: any) => new Date(s.date) >= startOfToday);
+    const baselineSnapshot = todaySnapshots.length > 0 ? todaySnapshots[0] : yesterdaySnapshot;
+
+    let snapshotHoldingsMap: Record<string, any> = {};
+    if (baselineSnapshot && baselineSnapshot.breakdownJson) {
+      const json = baselineSnapshot.breakdownJson;
+      const list = Array.isArray(json) ? json : json.holdings || [];
+      if (Array.isArray(list)) {
+        list.forEach((item: any) => {
+          if (item.id) snapshotHoldingsMap[item.id] = item;
+          if (item.assetId) snapshotHoldingsMap[item.assetId] = item;
+        });
+      }
+    }
 
     return (holdings || []).map((h) => {
       const quantity = Number(h.quantity || 0);
@@ -155,13 +170,32 @@ export function NetWorthVarianceModal({
       const change24hPercent = Number(h.change24h || 0);
 
       let oneDayChange = 0;
-      if (change24hPercent !== 0 && currentUnitPrice > 0) {
-        const previousUnitPrice = currentUnitPrice / (1 + change24hPercent / 100);
-        const navDeltaPerUnit = currentUnitPrice - previousUnitPrice;
-        if (quantity > 0) {
-          oneDayChange = Math.round(navDeltaPerUnit * quantity);
+
+      // Method A: Check snapshot holdings breakdown at 00:00 VNT baseline
+      const snapItem = snapshotHoldingsMap[h.id] || snapshotHoldingsMap[h.assetId];
+      if (snapItem && Number(snapItem.currentMarketPrice || 0) > 0) {
+        const snapPrice = Number(snapItem.currentMarketPrice);
+        const priceDelta = currentUnitPrice - snapPrice;
+        oneDayChange = Math.round(priceDelta * quantity);
+      } else {
+        // Method B: Check whether price update occurred AFTER 00:00:00 VNT today
+        const holdingUpdated = h.updatedAt ? new Date(h.updatedAt).getTime() : 0;
+        const assetUpdated = h.asset?.updatedAt ? new Date(h.asset?.updatedAt).getTime() : 0;
+        const lastUpdated = Math.max(holdingUpdated, assetUpdated);
+
+        const isUpdatedToday = lastUpdated >= midnightTimestamp;
+
+        if (isUpdatedToday && change24hPercent !== 0 && currentUnitPrice > 0) {
+          const previousUnitPrice = currentUnitPrice / (1 + change24hPercent / 100);
+          const navDeltaPerUnit = currentUnitPrice - previousUnitPrice;
+          if (quantity > 0) {
+            oneDayChange = Math.round(navDeltaPerUnit * quantity);
+          } else {
+            oneDayChange = Math.round(currentVal - currentVal / (1 + change24hPercent / 100));
+          }
         } else {
-          oneDayChange = Math.round(currentVal - currentVal / (1 + change24hPercent / 100));
+          // If price did NOT update after 00:00:00 VNT today
+          oneDayChange = 0;
         }
       }
 
@@ -175,7 +209,7 @@ export function NetWorthVarianceModal({
         change24hPercent,
       };
     });
-  }, [holdings, portfolioMarketChange]);
+  }, [holdings, startOfToday, snapshots, yesterdaySnapshot]);
 
   // Filter only items that actually changed in value (oneDayChange !== 0)
   const portfolioAttribution = useMemo(() => {
@@ -185,11 +219,8 @@ export function NetWorthVarianceModal({
   }, [allHoldingItems]);
 
   const sumPortfolioAttribution = useMemo(() => {
-    if (portfolioAttribution.length > 0) {
-      return portfolioAttribution.reduce((sum, item) => sum + item.oneDayChange, 0);
-    }
-    return portfolioMarketChange;
-  }, [portfolioAttribution, portfolioMarketChange]);
+    return portfolioAttribution.reduce((sum, item) => sum + item.oneDayChange, 0);
+  }, [portfolioAttribution]);
 
   const rawChangePercent = previousNetWorth > 0 ? (netWorthChangeAmount / previousNetWorth) * 100 : 0;
   const netWorthChangePercent = Math.abs(rawChangePercent) < 0.01 ? 0 : rawChangePercent;

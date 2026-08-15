@@ -10,10 +10,10 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { NotebookPen, Save, Loader2 } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
+import { RichTextEditor } from "@/components/rich-text-editor";
 
 export interface NoteItem {
   id: string;
@@ -65,7 +65,8 @@ export function NoteModal({
       );
       return;
     }
-    if (!content.trim()) {
+    const cleanContent = content.replace(/<br\s*\/?>/gi, "").trim();
+    if (!content.trim() || cleanContent === "") {
       setError(
         language === "vi"
           ? "Vui lòng nhập nội dung ghi chú"
@@ -103,7 +104,7 @@ export function NoteModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl p-6">
+      <DialogContent className="sm:max-w-2xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
         <DialogHeader className="space-y-2">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
@@ -121,8 +122,8 @@ export function NoteModal({
               </DialogTitle>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {language === "vi"
-                  ? "Lưu trữ thông tin & ý tưởng quan trọng của bạn"
-                  : "Save your important information & ideas"}
+                  ? "Định dạng ghi chú linh hoạt với công cụ Rich Text Editor"
+                  : "Format note content flexibly with Rich Text Editor"}
               </p>
             </div>
           </div>
@@ -148,7 +149,7 @@ export function NoteModal({
               }
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="h-10 rounded-xl text-xs bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700"
+              className="h-10 rounded-xl text-xs bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 font-semibold"
               disabled={loading}
               autoFocus
             />
@@ -156,20 +157,17 @@ export function NoteModal({
 
           <div className="space-y-1.5">
             <Label htmlFor="note-content" className="text-xs font-bold text-slate-700 dark:text-slate-300">
-              {language === "vi" ? "Nội dung ghi chú" : "Content"} <span className="text-rose-500">*</span>
+              {language === "vi" ? "Nội dung ghi chú (Rich Text)" : "Content (Rich Text)"} <span className="text-rose-500">*</span>
             </Label>
-            <Textarea
-              id="note-content"
-              rows={6}
+            <RichTextEditor
+              value={content}
+              onChange={setContent}
               placeholder={
                 language === "vi"
-                  ? "Nhập chi tiết nội dung ghi chú..."
-                  : "Enter detailed content..."
+                  ? "Nhập chi tiết nội dung ghi chú (hỗ trợ in đậm, nghiêng, danh sách, màu chữ...)"
+                  : "Enter detailed note content (supports bold, italic, lists, text colors...)"
               }
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="rounded-xl text-xs bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 resize-y min-h-[120px]"
-              disabled={loading}
+              minHeight="220px"
             />
           </div>
 
