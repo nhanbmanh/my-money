@@ -127,6 +127,7 @@ export async function GET() {
     const holdingsSnapshot = holdings.map((h) => ({
       id: h.id,
       assetId: h.assetId,
+      categoryType: h.categoryType,
       quantity: h.quantity,
       currentMarketPrice: h.currentMarketPrice,
       currentValue: h.currentValue,

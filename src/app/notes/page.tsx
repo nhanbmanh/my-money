@@ -207,7 +207,8 @@ export default function NotesPage() {
 
                   {/* Card Content Text (Rich Text HTML) */}
                   <div
-                    className="text-xs text-slate-700 dark:text-slate-300 line-clamp-6 leading-relaxed bg-slate-50/60 dark:bg-slate-800/40 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800/60 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_blockquote]:border-l-4 [&_blockquote]:border-purple-500 [&_blockquote]:pl-2 [&_blockquote]:italic"
+                    onClick={() => handleEdit(note)}
+                    className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50/60 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 break-words [word-break:break-word] overflow-wrap-anywhere whitespace-normal [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_p]:my-1 [&_blockquote]:border-l-4 [&_blockquote]:border-purple-500 [&_blockquote]:pl-2 [&_blockquote]:italic max-h-[480px] overflow-y-auto custom-scrollbar cursor-pointer"
                     dangerouslySetInnerHTML={{
                       __html: renderRichNoteContent(note.content),
                     }}

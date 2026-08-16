@@ -103,8 +103,26 @@ export function NetWorthVarianceModal({
 
   // 4. Absolute Snapshot-Based Net Worth Reconciliation & Market Variance Calculation
   const { previousNetWorth, netWorthChangeAmount, portfolioMarketChange } = useMemo(() => {
-    if (yesterdaySnapshot && yesterdaySnapshot.netWorthValue !== undefined && yesterdaySnapshot.netWorthValue > 0) {
-      const prev = Number(yesterdaySnapshot.netWorthValue);
+    let prev = 0;
+    if (yesterdaySnapshot) {
+      let holdingsSum = 0;
+      if (yesterdaySnapshot.breakdownJson) {
+        const json = yesterdaySnapshot.breakdownJson;
+        const list = Array.isArray(json) ? json : json.holdings || [];
+        if (Array.isArray(list) && list.length > 0) {
+          list.forEach((item: any) => {
+            holdingsSum += Number(item.currentValue ?? (item.quantity * item.currentMarketPrice || 0));
+          });
+        }
+      }
+      if (holdingsSum > 0) {
+        prev = holdingsSum - Number(yesterdaySnapshot.totalLiabilitiesValue || 0);
+      } else if (yesterdaySnapshot.netWorthValue !== undefined && yesterdaySnapshot.netWorthValue > 0) {
+        prev = Number(yesterdaySnapshot.netWorthValue);
+      }
+    }
+
+    if (prev > 0) {
       const totalChange = currentNetWorth - prev;
       const marketChange = totalChange - todayNetCashFlow;
       return {
@@ -134,9 +152,9 @@ export function NetWorthVarianceModal({
     });
 
     const totalChange = rawMarketChange + todayNetCashFlow;
-    const prev = currentNetWorth - totalChange;
+    const fallbackPrev = currentNetWorth - totalChange;
     return {
-      previousNetWorth: prev,
+      previousNetWorth: fallbackPrev,
       netWorthChangeAmount: totalChange,
       portfolioMarketChange: rawMarketChange,
     };
@@ -146,9 +164,8 @@ export function NetWorthVarianceModal({
   const allHoldingItems = useMemo(() => {
     const midnightTimestamp = startOfToday.getTime();
 
-    // Find 00:00 VNT Baseline Snapshot
-    const todaySnapshots = (snapshots || []).filter((s: any) => new Date(s.date) >= startOfToday);
-    const baselineSnapshot = todaySnapshots.length > 0 ? todaySnapshots[0] : yesterdaySnapshot;
+    // Baseline Snapshot MUST ALWAYS BE yesterdaySnapshot (EOD snapshot before 00:00 VNT today)
+    const baselineSnapshot = yesterdaySnapshot;
 
     let snapshotHoldingsMap: Record<string, any> = {};
     if (baselineSnapshot && baselineSnapshot.breakdownJson) {
@@ -173,10 +190,16 @@ export function NetWorthVarianceModal({
 
       // Method A: Check snapshot holdings breakdown at 00:00 VNT baseline
       const snapItem = snapshotHoldingsMap[h.id] || snapshotHoldingsMap[h.assetId];
-      if (snapItem && Number(snapItem.currentMarketPrice || 0) > 0) {
-        const snapPrice = Number(snapItem.currentMarketPrice);
-        const priceDelta = currentUnitPrice - snapPrice;
-        oneDayChange = Math.round(priceDelta * quantity);
+      if (snapItem) {
+        const snapVal = Number(snapItem.currentValue ?? (snapItem.quantity * snapItem.currentMarketPrice || 0));
+        let diff = currentVal - snapVal;
+
+        // If this is Liquid Cash (categoryType 0), subtract today's cashflow so cashflow isn't double-counted as market change
+        if (h.categoryType === 0) {
+          diff = diff - todayNetCashFlow;
+        }
+
+        oneDayChange = Math.round(diff);
       } else {
         // Method B: Check whether price update occurred AFTER 00:00:00 VNT today
         const holdingUpdated = h.updatedAt ? new Date(h.updatedAt).getTime() : 0;
@@ -194,7 +217,6 @@ export function NetWorthVarianceModal({
             oneDayChange = Math.round(currentVal - currentVal / (1 + change24hPercent / 100));
           }
         } else {
-          // If price did NOT update after 00:00:00 VNT today
           oneDayChange = 0;
         }
       }
@@ -209,7 +231,7 @@ export function NetWorthVarianceModal({
         change24hPercent,
       };
     });
-  }, [holdings, startOfToday, snapshots, yesterdaySnapshot]);
+  }, [holdings, startOfToday, yesterdaySnapshot, todayNetCashFlow]);
 
   // Filter only items that actually changed in value (oneDayChange !== 0)
   const portfolioAttribution = useMemo(() => {

@@ -243,8 +243,26 @@ export function OverviewBalanceSheet({
     let prevNetWorth = 0;
     let totalChangeAmount = 0;
 
-    if (yesterdaySnapshot && yesterdaySnapshot.netWorthValue !== undefined && yesterdaySnapshot.netWorthValue > 0) {
-      prevNetWorth = Number(yesterdaySnapshot.netWorthValue);
+    if (yesterdaySnapshot) {
+      let holdingsSum = 0;
+      if (yesterdaySnapshot.breakdownJson) {
+        const json = yesterdaySnapshot.breakdownJson;
+        const list = Array.isArray(json) ? json : json.holdings || [];
+        if (Array.isArray(list) && list.length > 0) {
+          list.forEach((item: any) => {
+            holdingsSum += Number(item.currentValue ?? (item.quantity * item.currentMarketPrice || 0));
+          });
+        }
+      }
+
+      if (holdingsSum > 0) {
+        prevNetWorth = holdingsSum - Number(yesterdaySnapshot.totalLiabilitiesValue || 0);
+      } else if (yesterdaySnapshot.netWorthValue !== undefined && yesterdaySnapshot.netWorthValue > 0) {
+        prevNetWorth = Number(yesterdaySnapshot.netWorthValue);
+      }
+    }
+
+    if (prevNetWorth > 0) {
       totalChangeAmount = currentNetWorth - prevNetWorth;
     } else {
       // Fallback if no past snapshot exists
