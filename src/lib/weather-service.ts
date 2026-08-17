@@ -57,14 +57,18 @@ export function getRefinedDailyWeatherInfo(
   tempMax?: number,
   lang: "vi" | "en" = "vi"
 ): { desc: string; icon: string } {
-  // If rain volume is negligible (< 1.0mm) or rain probability is low (< 35%), the day is effectively DRY
-  const isDry = (rainSum !== undefined && rainSum < 1.0) || (popMax !== undefined && popMax < 35);
+  const rSum = rainSum ?? 0;
+  const pMax = popMax ?? 0;
+  const tMax = tempMax ?? 28;
+
+  // 1. Dry or negligible rain (< 2.0mm total rainfall or < 40% probability)
+  const isDry = rSum < 2.0 || pMax < 40;
 
   if (isDry) {
-    if (tempMax !== undefined && tempMax >= 35) {
+    if (tMax >= 35) {
       return { desc: lang === "vi" ? "Nắng nóng gay gắt" : "Very Hot & Sunny", icon: "☀️" };
     }
-    if (tempMax !== undefined && tempMax >= 33) {
+    if (tMax >= 33) {
       return { desc: lang === "vi" ? "Nắng nóng, mây rải rác" : "Hot & Partly Cloudy", icon: "🌤️" };
     }
     if (code === 0 || code === 1) {
@@ -77,22 +81,29 @@ export function getRefinedDailyWeatherInfo(
       return { desc: lang === "vi" ? "Nhiều mây, âm u" : "Cloudy", icon: "⛅" };
     }
     return {
-      desc: tempMax !== undefined && tempMax >= 32
+      desc: tMax >= 31
         ? (lang === "vi" ? "Nắng nóng, ít mây" : "Hot & Mostly Sunny")
         : (lang === "vi" ? "Nắng nhẹ, khô ráo" : "Dry & Pleasant"),
-      icon: tempMax !== undefined && tempMax >= 32 ? "☀️" : "🌤️",
+      icon: tMax >= 31 ? "☀️" : "🌤️",
     };
   }
 
-  // Moderate rain (1.0mm to 5.0mm)
-  if (rainSum !== undefined && rainSum < 5.0) {
+  // 2. Light / Moderate rain (2.0mm <= rSum < 8.0mm or pMax < 65%)
+  if (rSum < 8.0 || pMax < 65) {
     if (code === 95 || code === 96 || code === 99) {
-      return { desc: lang === "vi" ? "Chiều tối có mưa dông rải rác" : "Scattered Evening Showers", icon: "⛈️" };
+      return { desc: lang === "vi" ? "Chiều tối có thể có mưa dông rải rác" : "Scattered Evening Showers", icon: "⛈️" };
     }
-    return { desc: lang === "vi" ? "Có lúc có mưa rào" : "Passing Showers", icon: "🌦️" };
+    return { desc: lang === "vi" ? "Có lúc có mưa rào rải rác" : "Scattered Showers", icon: "🌦️" };
   }
 
-  // Heavy rain (>= 5.0mm)
+  // 3. True Heavy Rain / Thunderstorm (rSum >= 8.0mm AND pMax >= 65%)
+  if (code === 95) {
+    return { desc: lang === "vi" ? "Mưa dông, sấm chớp" : "Thunderstorm", icon: "⛈️" };
+  }
+  if (code === 96 || code === 99) {
+    return { desc: lang === "vi" ? "Mưa dông lớn, sấm chớp" : "Heavy Thunderstorm", icon: "⛈️" };
+  }
+
   return getWmoWeatherInfo(code, true, lang);
 }
 
@@ -356,11 +367,6 @@ export async function fetchWeatherData(
     resolvedLocationName = await reverseGeocode(lat, lng);
   }
 
-  const currentInfo = getWmoWeatherInfo(
-    currentData.weather_code,
-    currentData.is_day === 1
-  );
-
   const isDay = currentData.is_day === 1;
 
   // Process 24-hour hourly forecast (from current hour in local time)
@@ -394,17 +400,39 @@ export async function fetchWeatherData(
     return isoStr;
   };
 
+  // Standardized Realtime Weather Refinement
+  const currentRain = currentData.rain || currentData.showers || currentData.precipitation || 0;
+  const currentPop = hourlyData.precipitation_probability?.[startIndex] || 0;
+  let currentCode = currentData.weather_code;
+
+  // If current rain volume < 0.5mm or probability < 40%, override thunderstorm codes
+  if (currentRain < 0.5 && currentPop < 40 && (currentCode >= 50 || currentCode === 95 || currentCode === 96 || currentCode === 99)) {
+    currentCode = isDay ? 2 : 1;
+  }
+
+  let currentInfo = getWmoWeatherInfo(currentCode, isDay);
+  const curTemp = Math.round(currentData.temperature_2m);
+  if (currentRain < 0.5 && currentPop < 40) {
+    if (isDay && curTemp >= 35) {
+      currentInfo = { desc: "Nắng nóng gay gắt", icon: "☀️" };
+    } else if (isDay && curTemp >= 33) {
+      currentInfo = { desc: "Nắng nóng, mây rải rác", icon: "🌤️" };
+    } else if (isDay && curTemp >= 31) {
+      currentInfo = { desc: "Nắng nóng, ít mây", icon: "☀️" };
+    }
+  }
+
   const current: CurrentWeather = {
-    temperature: Math.round(currentData.temperature_2m),
+    temperature: curTemp,
     feelsLike: Math.round(currentData.apparent_temperature),
     humidity: currentData.relative_humidity_2m,
     windSpeed: Math.round(currentData.wind_speed_10m),
     pressure: Math.round(currentData.surface_pressure),
-    weatherCode: currentData.weather_code,
+    weatherCode: currentCode,
     weatherDesc: currentInfo.desc,
     isDay,
     uvIndex: currentUv,
-    rain: currentData.rain || currentData.showers || currentData.precipitation || 0,
+    rain: currentRain,
     sunrise: formatLocalTimeStr(dailyData?.sunrise?.[0]) || "05:32",
     sunset: formatLocalTimeStr(dailyData?.sunset?.[0]) || "18:32",
   };
@@ -415,14 +443,29 @@ export async function fetchWeatherData(
     const hourStr = formatLocalTimeStr(timeStr); // e.g. "22:00"
     const hourNum = parseInt(hourStr.split(":")[0], 10) || 0;
     const isDayTime = hourNum >= 6 && hourNum <= 18;
-    const wInfo = getWmoWeatherInfo(hourlyData.weather_code[i], isDayTime);
+    const hTemp = Math.round(hourlyData.temperature_2m[i]);
+
+    const hourlyPop = hourlyData.precipitation_probability[i] || 0;
+    let hourlyCode = hourlyData.weather_code[i];
+
+    // If hourly precipitation probability is low (< 40%), override thunderstorm codes to clear/cloudy/sunny
+    if (hourlyPop < 40 && (hourlyCode >= 50 || hourlyCode === 95 || hourlyCode === 96 || hourlyCode === 99)) {
+      hourlyCode = isDayTime ? (hTemp >= 33 ? 1 : 2) : 1;
+    }
+
+    let wInfo = getWmoWeatherInfo(hourlyCode, isDayTime);
+    if (hourlyPop < 40 && isDayTime && hTemp >= 35) {
+      wInfo = { desc: "Nắng nóng gay gắt", icon: "☀️" };
+    } else if (hourlyPop < 40 && isDayTime && hTemp >= 33) {
+      wInfo = { desc: "Nắng nóng, mây rải rác", icon: "🌤️" };
+    }
 
     hourly.push({
       time: hourStr,
-      temperature: Math.round(hourlyData.temperature_2m[i]),
-      weatherCode: hourlyData.weather_code[i],
+      temperature: hTemp,
+      weatherCode: hourlyCode,
       weatherDesc: wInfo.desc,
-      pop: hourlyData.precipitation_probability[i] || 0,
+      pop: hourlyPop,
       isDay: isDayTime,
     });
   }

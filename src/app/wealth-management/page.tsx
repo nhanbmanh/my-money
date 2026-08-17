@@ -184,7 +184,11 @@ export default function WealthManagementPage() {
         )}
 
         {activeView === "PORTFOLIO" && (
-          <InvestmentPortfolioView summary={summary} holdings={holdings} />
+          <InvestmentPortfolioView
+            summary={summary}
+            holdings={holdings}
+            snapshots={data?.snapshots || []}
+          />
         )}
 
         {activeView === "HOLDINGS" && (

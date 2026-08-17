@@ -51,13 +51,8 @@ export function InvestmentPortfolioView({ summary, holdings = [], snapshots = []
   const startOfToday = useMemo(() => getStartOfTodayVN(), []);
   const midnightTimestamp = useMemo(() => startOfToday.getTime(), [startOfToday]);
 
-  // Find 00:00 VNT Today Baseline Snapshot (or latest past snapshot before 00:00 VNT today)
+  // Find yesterday's EOD Snapshot (recorded before 00:00:00 VNT today)
   const baselineSnapshot = useMemo(() => {
-    const todaySnapshots = (snapshots || []).filter(
-      (s: any) => new Date(s.date) >= startOfToday
-    );
-    if (todaySnapshots.length > 0) return todaySnapshots[0];
-
     const pastSnapshots = (snapshots || []).filter(
       (s: any) => new Date(s.date) < startOfToday
     );
@@ -81,6 +76,9 @@ export function InvestmentPortfolioView({ summary, holdings = [], snapshots = []
     let changeVND = 0;
 
     (holdings || []).forEach((h: any) => {
+      // Exclude liquid cash (categoryType 0) from investment portfolio market PnL
+      if (h.categoryType === 0) return;
+
       const quantity = Number(h.quantity || 0);
       const currentVal = Number(h.currentValue || 0);
       const currentUnitPrice = Number(h.currentMarketPrice || h.averageCostBasis || 0);
@@ -88,12 +86,11 @@ export function InvestmentPortfolioView({ summary, holdings = [], snapshots = []
 
       let intradayChange = 0;
 
-      // Method A: Check snapshot holdings breakdown at 00:00 VNT baseline
+      // Method A: Check snapshot holdings breakdown at yesterday EOD baseline
       const snapItem = snapshotHoldingsMap[h.id] || snapshotHoldingsMap[h.assetId];
-      if (snapItem && Number(snapItem.currentMarketPrice || 0) > 0) {
-        const snapPrice = Number(snapItem.currentMarketPrice);
-        const priceDelta = currentUnitPrice - snapPrice;
-        intradayChange = Math.round(priceDelta * quantity);
+      if (snapItem) {
+        const snapVal = Number(snapItem.currentValue ?? (snapItem.quantity * snapItem.currentMarketPrice || 0));
+        intradayChange = Math.round(currentVal - snapVal);
       } else {
         // Method B: Check whether price update occurred AFTER 00:00:00 VNT today
         const holdingUpdated = h.updatedAt ? new Date(h.updatedAt).getTime() : 0;
@@ -224,22 +221,8 @@ export function InvestmentPortfolioView({ summary, holdings = [], snapshots = []
             </div>
 
             <div className="mt-2 flex items-center gap-2 text-xs font-bold">
-              <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${isProfit ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/10 text-rose-600 dark:text-rose-400"}`}>
+              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold ${isProfit ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/10 text-rose-600 dark:text-rose-400"}`}>
                 {summary.unrealizedPnLPercent >= 0 ? "+" : ""}{summary.unrealizedPnLPercent.toFixed(2)}% ROI
-              </span>
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px]",
-                  isMarketChangePositive
-                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                    : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
-                )}
-              >
-                {isMarketChangePositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                <span>{oneDayPortfolioMarketChange >= 0 ? "+" : ""}{formatVND(oneDayPortfolioMarketChange)}</span>
-              </span>
-              <span className="text-muted-foreground font-medium text-[11px]">
-                {language === "vi" ? "trong ngày (từ 00:00 VNT)" : "intraday (since 00:00 VNT)"}
               </span>
             </div>
           </CardContent>
