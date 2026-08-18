@@ -52,6 +52,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
   const isFinancePage = pathname === "/financial-management" || pathname === "/";
   const isWealthPage = pathname === "/wealth-management";
   const isNotesPage = pathname === "/notes";
+  const isDailyQuestsPage = pathname === "/daily-quests";
   const isCalendarPage = pathname === "/calendar";
 
   return (
@@ -170,6 +171,21 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
                 >
                   <PlusCircle className="h-5 w-5 sm:h-4 sm:w-4 shrink-0" />
                   <span className="hidden sm:inline">{language === "vi" ? "Thêm ghi chú" : "Add Note"}</span>
+                </Button>
+              </div>
+            )}
+
+            {/* Daily Quests Page Header Actions */}
+            {isDailyQuestsPage && (
+              <div className="flex items-center gap-2 shrink-0">
+                <NotificationsPopover />
+                <Button
+                  onClick={() => window.dispatchEvent(new CustomEvent("open-daily-quest-modal"))}
+                  className="h-9 w-9 sm:w-auto p-0 sm:px-3.5 text-xs font-bold gap-1.5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white rounded-xl shadow-lg shadow-teal-500/20 transition-all border-0 cursor-pointer shrink-0 justify-center"
+                  title={language === "vi" ? "Thêm nhiệm vụ mới" : "Add new quest"}
+                >
+                  <PlusCircle className="h-5 w-5 sm:h-4 sm:w-4 shrink-0" />
+                  <span className="hidden sm:inline">{language === "vi" ? "Thêm nhiệm vụ" : "Add Quest"}</span>
                 </Button>
               </div>
             )}

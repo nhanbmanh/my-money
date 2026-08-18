@@ -51,13 +51,17 @@ export function InvestmentPortfolioView({ summary, holdings = [], snapshots = []
   const startOfToday = useMemo(() => getStartOfTodayVN(), []);
   const midnightTimestamp = useMemo(() => startOfToday.getTime(), [startOfToday]);
 
-  // Find yesterday's EOD Snapshot (recorded before 00:00:00 VNT today)
-  const baselineSnapshot = useMemo(() => {
-    const pastSnapshots = (snapshots || []).filter(
-      (s: any) => new Date(s.date) < startOfToday
-    );
-    return pastSnapshots.length > 0 ? pastSnapshots[pastSnapshots.length - 1] : null;
+  const todaySnapshot = useMemo(() => {
+    const list = (snapshots || []).filter((s: any) => new Date(s.date) >= startOfToday);
+    return list.length > 0 ? list[0] : null;
   }, [snapshots, startOfToday]);
+
+  const yesterdaySnapshot = useMemo(() => {
+    const list = (snapshots || []).filter((s: any) => new Date(s.date) < startOfToday);
+    return list.length > 0 ? list[list.length - 1] : null;
+  }, [snapshots, startOfToday]);
+
+  const baselineSnapshot = todaySnapshot || yesterdaySnapshot;
 
   // Calculate intraday market valuation change for portfolio holdings relative to 00:00 VNT today baseline
   const { oneDayPortfolioMarketChange, portfolioMarketChangePercent } = useMemo(() => {
@@ -86,11 +90,17 @@ export function InvestmentPortfolioView({ summary, holdings = [], snapshots = []
 
       let intradayChange = 0;
 
-      // Method A: Check snapshot holdings breakdown at yesterday EOD baseline
+      // Method A: Check snapshot holdings breakdown at 00:00 VNT baseline
       const snapItem = snapshotHoldingsMap[h.id] || snapshotHoldingsMap[h.assetId];
       if (snapItem) {
-        const snapVal = Number(snapItem.currentValue ?? (snapItem.quantity * snapItem.currentMarketPrice || 0));
-        intradayChange = Math.round(currentVal - snapVal);
+        const snapPrice = Number(snapItem.currentMarketPrice || 0);
+        if (snapPrice > 0) {
+          const priceDelta = currentUnitPrice - snapPrice;
+          intradayChange = Math.round(priceDelta * quantity);
+        } else {
+          const snapVal = Number(snapItem.currentValue || 0);
+          intradayChange = Math.round(currentVal - snapVal);
+        }
       } else {
         // Method B: Check whether price update occurred AFTER 00:00:00 VNT today
         const holdingUpdated = h.updatedAt ? new Date(h.updatedAt).getTime() : 0;

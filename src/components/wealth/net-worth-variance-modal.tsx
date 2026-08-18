@@ -91,12 +91,15 @@ export function NetWorthVarianceModal({
     };
   }, [cashFlows, startOfToday]);
 
-  // 3. Find yesterday's EOD Snapshot (recorded before 00:00:00 today)
+  const todaySnapshot = useMemo(() => {
+    const list = (snapshots || []).filter((s: any) => new Date(s.date) >= startOfToday);
+    return list.length > 0 ? list[0] : null;
+  }, [snapshots, startOfToday]);
+
+  // 3. Yesterday's Snapshot (recorded before 00:00:00 VNT today)
   const yesterdaySnapshot = useMemo(() => {
-    const pastSnapshots = (snapshots || []).filter(
-      (s: any) => new Date(s.date) < startOfToday
-    );
-    return pastSnapshots.length > 0 ? pastSnapshots[pastSnapshots.length - 1] : null;
+    const list = (snapshots || []).filter((s: any) => new Date(s.date) < startOfToday);
+    return list.length > 0 ? list[list.length - 1] : null;
   }, [snapshots, startOfToday]);
 
   const currentNetWorth = Number(summary?.netWorth || 0);
@@ -164,8 +167,9 @@ export function NetWorthVarianceModal({
   const allHoldingItems = useMemo(() => {
     const midnightTimestamp = startOfToday.getTime();
 
-    // Baseline Snapshot MUST ALWAYS BE yesterdaySnapshot (EOD snapshot before 00:00 VNT today)
-    const baselineSnapshot = yesterdaySnapshot;
+    // Baseline snapshot for intraday change (since 00:00 VNT today) is todaySnapshot
+    // Fallback to yesterdaySnapshot if todaySnapshot does not exist yet
+    const baselineSnapshot = todaySnapshot || yesterdaySnapshot;
 
     let snapshotHoldingsMap: Record<string, any> = {};
     if (baselineSnapshot && baselineSnapshot.breakdownJson) {
@@ -191,15 +195,18 @@ export function NetWorthVarianceModal({
       // Method A: Check snapshot holdings breakdown at 00:00 VNT baseline
       const snapItem = snapshotHoldingsMap[h.id] || snapshotHoldingsMap[h.assetId];
       if (snapItem) {
-        const snapVal = Number(snapItem.currentValue ?? (snapItem.quantity * snapItem.currentMarketPrice || 0));
-        let diff = currentVal - snapVal;
-
-        // If this is Liquid Cash (categoryType 0), subtract today's cashflow so cashflow isn't double-counted as market change
-        if (h.categoryType === 0) {
-          diff = diff - todayNetCashFlow;
+        const snapPrice = Number(snapItem.currentMarketPrice || 0);
+        if (snapPrice > 0) {
+          const priceDelta = currentUnitPrice - snapPrice;
+          oneDayChange = Math.round(priceDelta * quantity);
+        } else {
+          const snapVal = Number(snapItem.currentValue || 0);
+          let diff = currentVal - snapVal;
+          if (h.categoryType === 0) {
+            diff = diff - todayNetCashFlow;
+          }
+          oneDayChange = Math.round(diff);
         }
-
-        oneDayChange = Math.round(diff);
       } else {
         // Method B: Check whether price update occurred AFTER 00:00:00 VNT today
         const holdingUpdated = h.updatedAt ? new Date(h.updatedAt).getTime() : 0;
@@ -217,6 +224,7 @@ export function NetWorthVarianceModal({
             oneDayChange = Math.round(currentVal - currentVal / (1 + change24hPercent / 100));
           }
         } else {
+          // If price did NOT update after 00:00:00 VNT today
           oneDayChange = 0;
         }
       }

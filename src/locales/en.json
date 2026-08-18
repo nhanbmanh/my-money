@@ -48,6 +48,8 @@
     "wealthDesc": "Assets, Stocks & Liabilities",
     "notes": "Notes",
     "notesDesc": "Personal notes & ideas",
+    "dailyQuests": "Daily Quests",
+    "dailyQuestsDesc": "Recurring tasks & checklists",
     "calendar": "Calendar",
     "calendarDesc": "Plans & schedules",
     "weather": "Weather Forecast",

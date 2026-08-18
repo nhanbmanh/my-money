@@ -37,6 +37,7 @@ model User {
   // Note & Calendar Relations
   notes         Note[]
   calendarPlans CalendarPlan[]
+  dailyQuests   DailyQuest[]
 
   @@map("users")
 }
@@ -293,4 +294,36 @@ model CalendarPlan {
 
   @@index([userId, date])
   @@map("calendar_plans")
+}
+
+// --------------------------------------------------------
+// DAILY QUEST APP MODELS
+// --------------------------------------------------------
+
+model DailyQuest {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  items     DailyQuestItem[]
+
+  @@index([userId, createdAt])
+  @@map("daily_quests")
+}
+
+model DailyQuestItem {
+  id            String     @id @default(uuid())
+  questId       String
+  quest         DailyQuest @relation(fields: [questId], references: [id], onDelete: Cascade)
+  title         String
+  isDone        Boolean    @default(false)
+  lastCheckedAt DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([questId])
+  @@map("daily_quest_items")
 }

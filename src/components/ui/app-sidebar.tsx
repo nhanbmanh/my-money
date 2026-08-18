@@ -30,6 +30,7 @@ import {
   Globe,
   NotebookPen,
   CalendarDays,
+  CheckSquare,
 } from "lucide-react";
 import { useTheme, ThemeMode } from "@/components/theme-provider";
 import { useLanguage } from "@/components/language-provider";
@@ -59,6 +60,12 @@ export function AppSidebar() {
       label: t("nav.notes"),
       icon: NotebookPen,
       iconColor: "text-purple-600 dark:text-purple-400",
+    },
+    {
+      href: "/daily-quests",
+      label: t("nav.dailyQuests"),
+      icon: CheckSquare,
+      iconColor: "text-teal-600 dark:text-teal-400",
     },
     {
       href: "/calendar",
