@@ -163,13 +163,10 @@ export function NetWorthVarianceModal({
     };
   }, [yesterdaySnapshot, currentNetWorth, todayNetCashFlow, holdings]);
 
-  // 5. Map holdings and filter items with actual intraday market variance (since 00:00 VNT today)
+  // 5. Map holdings and filter items with actual intraday market variance (since yesterday EOD snapshot)
   const allHoldingItems = useMemo(() => {
-    const midnightTimestamp = startOfToday.getTime();
-
-    // Baseline snapshot for intraday change (since 00:00 VNT today) is todaySnapshot
-    // Fallback to yesterdaySnapshot if todaySnapshot does not exist yet
-    const baselineSnapshot = todaySnapshot || yesterdaySnapshot;
+    // Baseline Snapshot MUST ALWAYS BE yesterdaySnapshot (EOD snapshot before 00:00 VNT today)
+    const baselineSnapshot = yesterdaySnapshot;
 
     let snapshotHoldingsMap: Record<string, any> = {};
     if (baselineSnapshot && baselineSnapshot.breakdownJson) {
@@ -192,7 +189,7 @@ export function NetWorthVarianceModal({
 
       let oneDayChange = 0;
 
-      // Method A: Check snapshot holdings breakdown at 00:00 VNT baseline
+      // Method A: Check snapshot holdings breakdown at yesterday EOD baseline
       const snapItem = snapshotHoldingsMap[h.id] || snapshotHoldingsMap[h.assetId];
       if (snapItem) {
         const snapPrice = Number(snapItem.currentMarketPrice || 0);
@@ -208,14 +205,8 @@ export function NetWorthVarianceModal({
           oneDayChange = Math.round(diff);
         }
       } else {
-        // Method B: Check whether price update occurred AFTER 00:00:00 VNT today
-        const holdingUpdated = h.updatedAt ? new Date(h.updatedAt).getTime() : 0;
-        const assetUpdated = h.asset?.updatedAt ? new Date(h.asset?.updatedAt).getTime() : 0;
-        const lastUpdated = Math.max(holdingUpdated, assetUpdated);
-
-        const isUpdatedToday = lastUpdated >= midnightTimestamp;
-
-        if (isUpdatedToday && change24hPercent !== 0 && currentUnitPrice > 0) {
+        // Method B: Calculate price change from 24h market price change percentage
+        if (change24hPercent !== 0 && currentUnitPrice > 0) {
           const previousUnitPrice = currentUnitPrice / (1 + change24hPercent / 100);
           const navDeltaPerUnit = currentUnitPrice - previousUnitPrice;
           if (quantity > 0) {
@@ -224,7 +215,6 @@ export function NetWorthVarianceModal({
             oneDayChange = Math.round(currentVal - currentVal / (1 + change24hPercent / 100));
           }
         } else {
-          // If price did NOT update after 00:00:00 VNT today
           oneDayChange = 0;
         }
       }

@@ -13,6 +13,7 @@ export type CurrentWeather = {
   feelsLike: number;
   humidity: number;
   windSpeed: number;
+  windGusts?: number;
   pressure: number;
   weatherCode: number;
   weatherDesc: string;
@@ -40,7 +41,19 @@ export type DailyForecastItem = {
   weatherCode: number;
   weatherDesc: string;
   popMax: number; // Max rain chance %
+  rainSum?: number; // Total daily rainfall mm
   uvMax: number;
+};
+
+export type SevereAlertLevel = "warning" | "danger" | "critical";
+
+export type SevereAlert = {
+  id: string;
+  level: SevereAlertLevel;
+  title: string;
+  description: string;
+  advice: string[];
+  metrics: { label: string; value: string }[];
 };
 
 export type WeatherData = {
@@ -48,7 +61,265 @@ export type WeatherData = {
   current: CurrentWeather;
   hourly: HourlyForecastItem[];
   daily: DailyForecastItem[];
+  severeAlert?: SevereAlert | null;
 };
+
+export function checkSevereWeatherAlerts(
+  current: CurrentWeather,
+  locationName: string,
+  lang: "vi" | "en" = "vi"
+): SevereAlert | null {
+  const code = current.weatherCode;
+  const wind = current.windSpeed;
+  const gusts = current.windGusts || wind;
+  const rain = current.rain;
+  const temp = current.temperature;
+  const uv = current.uvIndex;
+  const pressure = current.pressure;
+
+  const isCoastalLocation =
+    /đà nẵng|nha trang|hải phòng|quảng ninh|vũng tàu|phú quốc|phan thiết|quy nhơn|huế|quảng nam|quảng ngãi|thanh hóa|nam định|thái bình|kiên giang|bạc liêu|cà mau/i.test(
+      locationName
+    );
+
+  // 1. TYPHOON / TROPICAL CYCLONE (🌀 Bão / Áp Thấp Nhiệt Đới Cực Mạnh)
+  if (wind >= 55 || (gusts >= 70 && pressure <= 998) || (wind >= 40 && pressure <= 992)) {
+    return {
+      id: "TYPHOON_CYCLONE",
+      level: "critical",
+      title: lang === "vi" ? "🌀 CẢNH BÁO BÃO / ÁP THẤP NHIỆT ĐỚI NGUY HIỂM" : "🌀 TYPHOON & TROPICAL STORM WARNING",
+      description:
+        lang === "vi"
+          ? `Bão / Áp thấp nhiệt đới đang càn quét khu vực ${locationName} với sức gió ${wind} km/h (gió giật ${gusts} km/h), khí áp giảm sâu (${pressure} hPa).`
+          : `Typhoon / Tropical storm is striking ${locationName} with wind speeds of ${wind} km/h (gusts ${gusts} km/h), surface pressure ${pressure} hPa.`,
+      advice:
+        lang === "vi"
+          ? [
+              "Gia cố nhà cửa, chốt chặn toàn bộ hệ thống cửa sổ, mái tôn.",
+              "Tuyệt đối KHÔNG ra khỏi nhà khi tâm bão đang quét qua.",
+              "Dự trữ nước sạch, lương thực khô, đèn pin và sạc dự phòng.",
+              "Sẵn sàng sơ tán theo hướng dẫn của chính quyền địa phương nếu ở vùng thấp trũng.",
+            ]
+          : [
+              "Secure all windows, doors, and roofing structures.",
+              "Do NOT step outdoors while the storm eye passes.",
+              "Store clean water, dry food, flashlights, and power banks.",
+              "Be ready to evacuate if ordered by local authorities.",
+            ],
+      metrics: [
+        { label: lang === "vi" ? "Tốc độ gió" : "Wind Speed", value: `${wind} km/h` },
+        { label: lang === "vi" ? "Gió giật" : "Wind Gusts", value: `${gusts} km/h` },
+        { label: lang === "vi" ? "Khí áp" : "Pressure", value: `${pressure} hPa` },
+      ],
+    };
+  }
+
+  // 2. TORNADO / WHIRLWIND (🌪️ Lốc Xoáy & Vòng Xoáy Dông Cực Mạnh)
+  if (gusts >= 80 || (code === 99 && gusts >= 65)) {
+    return {
+      id: "TORNADO_WHIRLWIND",
+      level: "critical",
+      title: lang === "vi" ? "🌪️ CẢNH BÁO LỐC XOÁY & DÔNG LỐC CỰC MẠNH" : "🌪️ SEVERE TORNADO & WHIRLWIND WARNING",
+      description:
+        lang === "vi"
+          ? `Phát hiện vòi rồng / dông lốc xoáy cực mạnh với gió giật ${gusts} km/h tại ${locationName}. Nguy cơ quật ngã cây cối và cuốn trôi vật thể.`
+          : `Severe tornado / whirlwind detected with gusts of ${gusts} km/h at ${locationName}. Extreme risk of structural damage.`,
+      advice:
+        lang === "vi"
+          ? [
+              "Tìm nơi trú ẩn kiên cố ngay lập tức (phòng kín không cửa sổ, tầng hầm hoặc góc tường chắc chắn).",
+              "Tránh xa cửa kính, cửa sổ gỗ và khu vực ban công.",
+              "Nằm áp sát xuống sàn nhà và dùng chăn/gối bảo vệ đầu.",
+            ]
+          : [
+              "Seek shelter immediately in an interior room without windows.",
+              "Stay away from glass windows and balconies.",
+              "Protect your head and neck with arms and pillows.",
+            ],
+      metrics: [
+        { label: lang === "vi" ? "Gió giật xoáy" : "Tornado Gusts", value: `${gusts} km/h` },
+        { label: lang === "vi" ? "Trạng thái" : "Status", value: current.weatherDesc },
+      ],
+    };
+  }
+
+  // 3. TSUNAMI / COASTAL STORM SURGE (🌊 Sóng Thần / Sóng Lớn Bờ Biển)
+  if (isCoastalLocation && (wind >= 50 || pressure <= 990 || (rain >= 20 && wind >= 35))) {
+    return {
+      id: "TSUNAMI_COASTAL_SURGE",
+      level: "critical",
+      title: lang === "vi" ? "🌊 CẢNH BÁO SÓNG LỚN BỜ BIỂN & NGUY CƠ SÓNG THẦN" : "🌊 TSUNAMI & SEVERE STORM SURGE WARNING",
+      description:
+        lang === "vi"
+          ? `Vùng biển ven bờ ${locationName} có dông bão lớn, sóng biển dâng cao và nguy cơ tràn đê bờ biển.`
+          : `Coastal area of ${locationName} is facing dangerous storm surge, high waves, and sea inundation risk.`,
+      advice:
+        lang === "vi"
+          ? [
+              "Rời khỏi bãi biển và khu vực ven bờ ngay lập tức.",
+              "Cấm tuyệt đối các tàu thuyền nhỏ và hoạt động bơi lội ven biển.",
+              "Di chuyển lên khu vực địa hình cao cách xa bờ biển ít nhất 500m.",
+            ]
+          : [
+              "Evacuate beaches and coastal waterfront areas immediately.",
+              "Prohibit all small vessels and swimming activities.",
+              "Move to high ground at least 500m away from shoreline.",
+            ],
+      metrics: [
+        { label: lang === "vi" ? "Gió biển" : "Coastal Wind", value: `${wind} km/h` },
+        { label: lang === "vi" ? "Khí áp" : "Pressure", value: `${pressure} hPa` },
+      ],
+    };
+  }
+
+  // 4. Severe Thunderstorm / Hail / Heavy Lightning (Code 96, 99 or 95 with rain/wind)
+  if (code === 96 || code === 99 || (code === 95 && (rain >= 5 || wind >= 30))) {
+    return {
+      id: "SEVERE_THUNDERSTORM_HAIL",
+      level: "critical",
+      title: lang === "vi" ? "⚡ CẢNH BÁO MƯA DÔNG LỚN & MƯA ĐÁ" : "⚡ SEVERE THUNDERSTORM & HAIL WARNING",
+      description:
+        lang === "vi"
+          ? `Khu vực ${locationName} đang xuất hiện dông lốc mạnh, sấm chớp dữ dội và có nguy cơ mưa đá.`
+          : `Area ${locationName} is experiencing severe thunderstorm, heavy lightning and potential hail.`,
+      advice:
+        lang === "vi"
+          ? [
+              "Hạn chế tối đa việc di chuyển ngoài đường lúc này.",
+              "Tránh xa các cây lớn, cột điện, bảng quảng cáo và vật thể cao.",
+              "Rút các thiết bị điện đắt tiền khỏi ổ cắm để phòng sét đánh.",
+              "Gửi xe vào khu vực có mái che an toàn đề phòng mưa đá gây vỡ kính.",
+            ]
+          : [
+              "Avoid traveling outdoors at this time.",
+              "Stay away from tall trees, power lines, and billboards.",
+              "Unplug high-value electronic devices to prevent power surges.",
+            ],
+      metrics: [
+        { label: lang === "vi" ? "Trạng thái" : "Status", value: current.weatherDesc },
+        { label: lang === "vi" ? "Gió thổi" : "Wind Speed", value: `${wind} km/h` },
+        { label: lang === "vi" ? "Nhiệt độ" : "Temperature", value: `${temp}°C` },
+      ],
+    };
+  }
+
+  // 2. High Wind / Gale / Storm Gusts (windSpeed >= 45 km/h)
+  if (wind >= 45) {
+    return {
+      id: "HIGH_WIND_GALE",
+      level: "danger",
+      title: lang === "vi" ? "💨 CẢNH BÁO GIÓ GIẬT MẠNH (CẤP 6 - CẤP 8)" : "💨 HIGH WIND & GALE WARNING",
+      description:
+        lang === "vi"
+          ? `Gió tại ${locationName} đang thổi rất mạnh (${wind} km/h), có thể làm gãy cành cây và bật mái tôn.`
+          : `Wind speed at ${locationName} is very high (${wind} km/h), capable of snapping tree branches and damaging structures.`,
+      advice:
+        lang === "vi"
+          ? [
+              "Chốt chặt toàn bộ cửa sổ và cửa ra vào nhà.",
+              "Di chuyển chậu cây, đồ đạc trên ban công vào trong nhà.",
+              "Chú ý quan sát cây xanh gãy đổ và vật cản khi lái xe.",
+            ]
+          : [
+              "Secure all windows and doors.",
+              "Move balcony furniture and potted plants indoors.",
+              "Watch for falling tree branches while driving.",
+            ],
+      metrics: [
+        { label: lang === "vi" ? "Tốc độ gió" : "Wind Speed", value: `${wind} km/h` },
+        { label: lang === "vi" ? "Thời tiết" : "Condition", value: current.weatherDesc },
+      ],
+    };
+  }
+
+  // 3. Torrential Downpour & Flood Risk (rain >= 15 mm/h or code 65, 82)
+  if (rain >= 15 || code === 65 || code === 82) {
+    return {
+      id: "TORRENTIAL_RAIN_FLOOD",
+      level: "danger",
+      title: lang === "vi" ? "🌧️ CẢNH BÁO MƯA XỐI XẢ & NGUY CƠ NGẬP LỤT" : "🌧️ TORRENTIAL DOWNPOUR & FLOOD WARNING",
+      description:
+        lang === "vi"
+          ? `Mưa đang trút xuống rất to tại ${locationName}. Cảnh báo nguy cơ ngập cục bộ tại các tuyến đường thấp trũng.`
+          : `Heavy torrential downpour at ${locationName}. High risk of localized urban flooding.`,
+      advice:
+        lang === "vi"
+          ? [
+              "Tránh di chuyển vào các tuyến đường hầm hoặc điểm ngập sâu.",
+              "Di chuyển xe cộ lên vị trí cao nếu đỗ ở khu vực hay ngập.",
+              "Chú ý quan sát các nắp cống bị trôi hoặc vũng nước sâu.",
+            ]
+          : [
+              "Avoid driving through flooded underpasses or low-lying streets.",
+              "Move vehicles to higher ground.",
+              "Be alert for open manholes and deep puddles.",
+            ],
+      metrics: [
+        { label: lang === "vi" ? "Lượng mưa" : "Rainfall", value: `${rain} mm` },
+        { label: lang === "vi" ? "Tốc độ gió" : "Wind", value: `${wind} km/h` },
+      ],
+    };
+  }
+
+  // 4. Extreme Heatwave (temperature >= 38°C)
+  if (temp >= 38) {
+    return {
+      id: "EXTREME_HEATWAVE",
+      level: "warning",
+      title: lang === "vi" ? "🌡️ CẢNH BÁO NẮNG NÓNG GAY GẮT CỰC ĐOAN" : "🌡️ EXTREME HEATWAVE WARNING",
+      description:
+        lang === "vi"
+          ? `Nhiệt độ ngoài trời tại ${locationName} đã lên tới ${temp}°C. Nguy cơ cao bị sốc nhiệt và kiệt sức.`
+          : `Outdoor temperature at ${locationName} has reached ${temp}°C. High risk of heat stroke and exhaustion.`,
+      advice:
+        lang === "vi"
+          ? [
+              "Hạn chế các hoạt động thể lực ngoài trời trong khung giờ 11h - 15h.",
+              "Uống đủ nước và bổ sung điện giải liên tục.",
+              "Không để trẻ em hoặc thú cưng trong xe ô tô đỗ ngoài trời.",
+            ]
+          : [
+              "Limit outdoor physical activities between 11 AM and 3 PM.",
+              "Stay hydrated with water and electrolytes.",
+              "Never leave children or pets inside parked cars.",
+            ],
+      metrics: [
+        { label: lang === "vi" ? "Nhiệt độ" : "Temperature", value: `${temp}°C` },
+        { label: lang === "vi" ? "Cảm giác như" : "Feels Like", value: `${current.feelsLike}°C` },
+      ],
+    };
+  }
+
+  // 5. Dangerous Extreme UV Index (uvIndex >= 10)
+  if (uv >= 10) {
+    return {
+      id: "EXTREME_UV_RADIATION",
+      level: "warning",
+      title: lang === "vi" ? "☀️ CẢNH BÁO TIA UV NGUY HẠI CẤP ĐỘ CAO" : "☀️ DANGEROUS UV RADIATION WARNING",
+      description:
+        lang === "vi"
+          ? `Chỉ số tia UV tại ${locationName} đang ở mức cực kỳ nguy hại (${uv}/12). Có thể gây bỏng da và tổn hại mắt.`
+          : `UV Index at ${locationName} is extremely high (${uv}/12). Potential risk of skin burn and eye damage.`,
+      advice:
+        lang === "vi"
+          ? [
+              "Thoa kem chống nắng SPF 50+ trước khi ra ngoài 20 phút.",
+              "Đeo kính râm chống tia UV và mặc quần áo dài tay bảo vệ.",
+              "Tìm bóng râm khi ở ngoài trời.",
+            ]
+          : [
+              "Apply SPF 50+ sunscreen 20 minutes before going outside.",
+              "Wear UV-blocking sunglasses and protective long sleeves.",
+            ],
+      metrics: [
+        { label: lang === "vi" ? "Chỉ số UV" : "UV Index", value: `${uv} / 12 (Rất cao)` },
+        { label: lang === "vi" ? "Nhiệt độ" : "Temperature", value: `${temp}°C` },
+      ],
+    };
+  }
+
+  return null;
+}
 
 export function getRefinedDailyWeatherInfo(
   code: number,
@@ -61,50 +332,90 @@ export function getRefinedDailyWeatherInfo(
   const pMax = popMax ?? 0;
   const tMax = tempMax ?? 28;
 
-  // 1. Dry or negligible rain (< 2.0mm total rainfall or < 40% probability)
-  const isDry = rSum < 2.0 || pMax < 40;
-
-  if (isDry) {
-    if (tMax >= 35) {
-      return { desc: lang === "vi" ? "Nắng nóng gay gắt" : "Very Hot & Sunny", icon: "☀️" };
+  // WMO Thunderstorm Weather Codes (95, 96, 99) — Common in tropical afternoon convective storms
+  if (code === 95 || code === 96 || code === 99) {
+    if (tMax >= 32 && pMax < 75) {
+      return {
+        desc: lang === "vi" ? "Nắng nóng, chiều tối có thể có mưa dông" : "Hot & Sunny, Evening Thunderstorm",
+        icon: "🌤️",
+      };
     }
-    if (tMax >= 33) {
-      return { desc: lang === "vi" ? "Nắng nóng, mây rải rác" : "Hot & Partly Cloudy", icon: "🌤️" };
-    }
-    if (code === 0 || code === 1) {
-      return { desc: lang === "vi" ? "Trời quang, nắng đẹp" : "Sunny & Clear", icon: "☀️" };
-    }
-    if (code === 2) {
-      return { desc: lang === "vi" ? "Nắng nhẹ, có mây" : "Partly Cloudy", icon: "🌤️" };
-    }
-    if (code === 3) {
-      return { desc: lang === "vi" ? "Nhiều mây, âm u" : "Cloudy", icon: "⛅" };
+    if (tMax >= 31) {
+      return {
+        desc: lang === "vi" ? "Nắng oi nóng, chiều tối có mưa dông" : "Hot & Humid, Evening Thunderstorm",
+        icon: "⛈️",
+      };
     }
     return {
-      desc: tMax >= 31
-        ? (lang === "vi" ? "Nắng nóng, ít mây" : "Hot & Mostly Sunny")
-        : (lang === "vi" ? "Nắng nhẹ, khô ráo" : "Dry & Pleasant"),
-      icon: tMax >= 31 ? "☀️" : "🌤️",
+      desc: lang === "vi" ? "Mưa dông, sấm chớp" : "Thunderstorm",
+      icon: "⛈️",
     };
   }
 
-  // 2. Light / Moderate rain (2.0mm <= rSum < 8.0mm or pMax < 65%)
-  if (rSum < 8.0 || pMax < 65) {
-    if (code === 95 || code === 96 || code === 99) {
-      return { desc: lang === "vi" ? "Chiều tối có thể có mưa dông rải rác" : "Scattered Evening Showers", icon: "⛈️" };
-    }
-    return { desc: lang === "vi" ? "Có lúc có mưa rào rải rác" : "Scattered Showers", icon: "🌦️" };
+  // WMO Heavy Rain Weather Codes (63, 65, 81, 82) OR High Rain Probability (>= 75%) OR Significant Rain Sum (>= 5.0mm)
+  if (code === 63 || code === 65 || code === 81 || code === 82 || pMax >= 75 || rSum >= 5.0) {
+    return {
+      desc: lang === "vi" ? "Mưa rào nặng hạt" : "Heavy Rain Showers",
+      icon: "🌧️",
+    };
   }
 
-  // 3. True Heavy Rain / Thunderstorm (rSum >= 8.0mm AND pMax >= 65%)
-  if (code === 95) {
-    return { desc: lang === "vi" ? "Mưa dông, sấm chớp" : "Thunderstorm", icon: "⛈️" };
-  }
-  if (code === 96 || code === 99) {
-    return { desc: lang === "vi" ? "Mưa dông lớn, sấm chớp" : "Heavy Thunderstorm", icon: "⛈️" };
+  // Moderate Rain / Rain Showers (code 51..61, 80 OR popMax >= 50% OR rainSum >= 2.0mm)
+  if ((code >= 51 && code <= 62) || code === 80 || pMax >= 50 || rSum >= 2.0) {
+    return {
+      desc: lang === "vi" ? "Có lúc có mưa rào" : "Scattered Showers",
+      icon: "🌧️",
+    };
   }
 
-  return getWmoWeatherInfo(code, true, lang);
+  // Light Rain Chance (popMax >= 30% OR rainSum >= 0.5mm)
+  if (pMax >= 30 || rSum >= 0.5) {
+    return {
+      desc: lang === "vi" ? "Chiều tối có thể có mưa rải rác" : "Chance of Rain",
+      icon: "🌦️",
+    };
+  }
+
+  // Dry / Sunny / Hot Days (popMax < 30% AND rainSum < 0.5mm AND code < 50)
+  if (tMax >= 35) {
+    return {
+      desc: lang === "vi" ? "Nắng nóng gay gắt" : "Very Hot & Sunny",
+      icon: "☀️",
+    };
+  }
+
+  if (tMax >= 33) {
+    return {
+      desc: lang === "vi" ? "Nắng nóng, mây rải rác" : "Hot & Partly Cloudy",
+      icon: "🌤️",
+    };
+  }
+
+  if (code === 0 || code === 1) {
+    return {
+      desc: lang === "vi" ? "Trời quang, nắng đẹp" : "Sunny & Clear",
+      icon: "☀️",
+    };
+  }
+
+  if (code === 2) {
+    return {
+      desc: lang === "vi" ? "Nắng nhẹ, có mây" : "Partly Cloudy",
+      icon: "🌤️",
+    };
+  }
+
+  if (code === 3) {
+    return {
+      desc: lang === "vi" ? "Nhiều mây, âm u" : "Overcast",
+      icon: "☁️",
+    };
+  }
+
+  return {
+    desc: lang === "vi" ? "Trời khô ráo, nắng nhẹ" : "Dry & Clear",
+    icon: tMax >= 31 ? "☀️" : "🌤️",
+  };
 }
 
 export function getWmoWeatherInfo(code: number, isDay = true, lang: "vi" | "en" = "vi"): { desc: string; icon: string } {
@@ -113,9 +424,9 @@ export function getWmoWeatherInfo(code: number, isDay = true, lang: "vi" | "en" 
       case 0:
         return { desc: isDay ? "Clear sky" : "Clear night", icon: isDay ? "☀️" : "🌙" };
       case 1:
-        return { desc: "Mainly clear", icon: isDay ? "🌤️" : "🌙" };
+        return { desc: isDay ? "Mainly clear" : "Clear night", icon: isDay ? "🌤️" : "🌙" };
       case 2:
-        return { desc: "Partly cloudy", icon: "⛅" };
+        return { desc: "Partly cloudy", icon: isDay ? "⛅" : "☁️" };
       case 3:
         return { desc: "Overcast", icon: "☁️" };
       case 45:
@@ -124,7 +435,7 @@ export function getWmoWeatherInfo(code: number, isDay = true, lang: "vi" | "en" 
       case 51:
       case 53:
       case 55:
-        return { desc: "Light drizzle", icon: "🌦️" };
+        return { desc: "Light drizzle", icon: isDay ? "🌦️" : "🌧️" };
       case 56:
       case 57:
         return { desc: "Freezing drizzle", icon: "🌧️" };
@@ -154,7 +465,7 @@ export function getWmoWeatherInfo(code: number, isDay = true, lang: "vi" | "en" 
       case 99:
         return { desc: "Heavy thunderstorm", icon: "⛈️" };
       default:
-        return { desc: "Fair weather", icon: "⛅" };
+        return { desc: "Fair weather", icon: isDay ? "⛅" : "☁️" };
     }
   }
 
@@ -162,9 +473,9 @@ export function getWmoWeatherInfo(code: number, isDay = true, lang: "vi" | "en" 
     case 0:
       return { desc: isDay ? "Trời quang, nắng đẹp" : "Đêm quang mây", icon: isDay ? "☀️" : "🌙" };
     case 1:
-      return { desc: "Nắng rải rác", icon: isDay ? "🌤️" : "🌙" };
+      return { desc: isDay ? "Nắng rải rác" : "Đêm ít mây", icon: isDay ? "🌤️" : "🌙" };
     case 2:
-      return { desc: "Có mây", icon: "⛅" };
+      return { desc: "Có mây", icon: isDay ? "⛅" : "☁️" };
     case 3:
       return { desc: "Nhiều mây, âm u", icon: "☁️" };
     case 45:
@@ -173,7 +484,7 @@ export function getWmoWeatherInfo(code: number, isDay = true, lang: "vi" | "en" 
     case 51:
     case 53:
     case 55:
-      return { desc: "Mưa phun nhẹ", icon: "🌦️" };
+      return { desc: "Mưa phun nhẹ", icon: isDay ? "🌦️" : "🌧️" };
     case 56:
     case 57:
       return { desc: "Mưa phùn lạnh", icon: "🌧️" };
@@ -203,7 +514,7 @@ export function getWmoWeatherInfo(code: number, isDay = true, lang: "vi" | "en" 
     case 99:
       return { desc: "Mưa dông lớn, sấm chớp", icon: "⛈️" };
     default:
-      return { desc: "Thời tiết bình thường", icon: "⛅" };
+      return { desc: "Thời tiết bình thường", icon: isDay ? "⛅" : "☁️" };
   }
 }
 
@@ -495,9 +806,12 @@ export async function fetchWeatherData(
       weatherCode: dailyData.weather_code[i],
       weatherDesc: wInfo.desc,
       popMax,
+      rainSum,
       uvMax: Math.round(dailyData.uv_index_max?.[i] || 5),
     });
   }
+
+  const severeAlert = checkSevereWeatherAlerts(current, resolvedLocationName);
 
   return {
     location: {
@@ -508,5 +822,6 @@ export async function fetchWeatherData(
     current,
     hourly,
     daily,
+    severeAlert,
   };
 }

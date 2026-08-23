@@ -35,6 +35,7 @@ import {
   DialogDescription,
   DialogClose,
 } from "@/components/ui/dialog";
+import { SevereWeatherAlertModal } from "@/components/severe-weather-alert-modal";
 import {
   fetchWeatherData,
   searchLocations,
@@ -43,6 +44,7 @@ import {
   detectLocationByIp,
   WeatherData,
   WeatherLocation,
+  SevereAlert,
 } from "@/lib/weather-service";
 import {
   fetchAirVisualFullData,
@@ -161,8 +163,10 @@ export function WeatherDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Summary Dialog State
+  // Summary Dialog & Severe Alert States
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [severeAlertOpen, setSevereAlertOpen] = useState(false);
+  const [activeAlert, setActiveAlert] = useState<SevereAlert | null>(null);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -180,6 +184,15 @@ export function WeatherDashboard() {
       ]);
       setWeatherData(data);
       setAirVisualFullData(avFullData);
+
+      // Auto popup real-time severe weather alert modal if active
+      if (data.severeAlert) {
+        setActiveAlert(data.severeAlert);
+        setSevereAlertOpen(true);
+      } else {
+        setActiveAlert(null);
+        setSevereAlertOpen(false);
+      }
     } catch (err: any) {
       if (!isSilent) setError(err?.message || "Không thể tải dữ liệu thời tiết");
     } finally {
@@ -630,6 +643,35 @@ export function WeatherDashboard() {
         </div>
       ) : weatherData && weatherTheme ? (
         <>
+          {/* PERSISTENT SEVERE WEATHER ALERT BANNER (If Active) */}
+          {weatherData.severeAlert && (
+            <div
+              onClick={() => {
+                setActiveAlert(weatherData.severeAlert || null);
+                setSevereAlertOpen(true);
+              }}
+              className="p-4 rounded-3xl bg-gradient-to-r from-rose-950/90 via-red-900/90 to-rose-950/90 border-2 border-rose-500/80 text-white flex items-center justify-between gap-3 shadow-xl cursor-pointer hover:scale-[1.005] transition-all"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <ShieldAlert className="h-7 w-7 text-rose-400 animate-bounce shrink-0" />
+                <div className="min-w-0">
+                  <h4 className="text-sm font-black text-white flex items-center gap-2 flex-wrap">
+                    <span>{weatherData.severeAlert.title}</span>
+                    <Badge className="bg-rose-500 text-white text-[10px] px-1.5 py-0 font-extrabold uppercase">
+                      REALTIME ALERT
+                    </Badge>
+                  </h4>
+                  <p className="text-xs text-rose-200 font-medium truncate max-w-2xl mt-0.5">
+                    {weatherData.severeAlert.description}
+                  </p>
+                </div>
+              </div>
+              <Button size="sm" className="bg-white text-rose-700 hover:bg-rose-100 font-black text-xs shrink-0 rounded-xl cursor-pointer">
+                {language === "vi" ? "Xem Chi Tiết" : "View Alert"}
+              </Button>
+            </div>
+          )}
+
           {/* SECTION 2: AIRVISUAL REAL-TIME HERO CARD */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between px-1">
@@ -854,17 +896,17 @@ export function WeatherDashboard() {
                       </div>
 
                       <div className="flex items-center justify-between gap-3 pt-1">
-                        <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
                           <span className="text-3xl shrink-0">
-                            {getRefinedDailyWeatherInfo(day.weatherCode, undefined, day.popMax, day.tempMax, language).icon}
+                            {getRefinedDailyWeatherInfo(day.weatherCode, day.rainSum, day.popMax, day.tempMax, language).icon}
                           </span>
-                          <span className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">
-                            {getRefinedDailyWeatherInfo(day.weatherCode, undefined, day.popMax, day.tempMax, language).desc}
+                          <span className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200 leading-snug whitespace-normal">
+                            {getRefinedDailyWeatherInfo(day.weatherCode, day.rainSum, day.popMax, day.tempMax, language).desc}
                           </span>
                         </div>
 
-                        <div className="text-lg font-black text-slate-900 dark:text-white shrink-0">
-                          <span className="text-slate-400 font-bold text-base mr-2">{day.tempMin}°</span>
+                        <div className="text-base sm:text-lg font-black text-slate-900 dark:text-white shrink-0">
+                          <span className="text-slate-400 font-bold text-xs sm:text-base mr-1.5">{day.tempMin}°</span>
                           <span>{day.tempMax}°C</span>
                         </div>
                       </div>
@@ -880,7 +922,7 @@ export function WeatherDashboard() {
                       className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50/70 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs font-semibold gap-3 hover:bg-sky-50/60 dark:hover:bg-slate-800 transition-colors"
                     >
                       {/* Day Name */}
-                      <div className="w-28 font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                      <div className="w-28 font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5 shrink-0">
                         <span>{idx === 0 ? (language === "vi" ? "Hôm nay" : "Today") : day.dayName}</span>
                         {idx === 0 && (
                           <Badge className="bg-sky-500 text-white text-[9px] px-1.5 py-0 rounded-md">
@@ -892,17 +934,17 @@ export function WeatherDashboard() {
                       {/* Weather Icon & Desc */}
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <span className="text-xl shrink-0">
-                          {getRefinedDailyWeatherInfo(day.weatherCode, undefined, day.popMax, day.tempMax, language).icon}
+                          {getRefinedDailyWeatherInfo(day.weatherCode, day.rainSum, day.popMax, day.tempMax, language).icon}
                         </span>
-                        <span className="truncate text-slate-600 dark:text-slate-300 font-medium">
-                          {getRefinedDailyWeatherInfo(day.weatherCode, undefined, day.popMax, day.tempMax, language).desc}
+                        <span className="text-slate-600 dark:text-slate-300 font-medium leading-snug whitespace-normal">
+                          {getRefinedDailyWeatherInfo(day.weatherCode, day.rainSum, day.popMax, day.tempMax, language).desc}
                         </span>
                       </div>
 
                       {/* Rain Chance % */}
-                      <div className="w-16 text-right shrink-0">
+                      <div className="w-20 text-right shrink-0">
                         {day.popMax > 0 ? (
-                          <span className="text-sky-600 dark:text-sky-400 font-bold bg-sky-500/10 px-2 py-0.5 rounded-md">
+                          <span className="whitespace-nowrap inline-flex items-center gap-1 text-sky-600 dark:text-sky-400 font-bold bg-sky-500/10 px-2 py-0.5 rounded-md">
                             💧 {day.popMax}%
                           </span>
                         ) : (
@@ -1094,6 +1136,15 @@ export function WeatherDashboard() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Realtime Severe Weather Alert Modal */}
+      <SevereWeatherAlertModal
+        isOpen={severeAlertOpen}
+        onClose={() => setSevereAlertOpen(false)}
+        alert={activeAlert}
+        locationName={weatherData?.location.name || (language === "vi" ? "Vị trí của bạn" : "Your location")}
+        language={language}
+      />
     </div>
   );
 }

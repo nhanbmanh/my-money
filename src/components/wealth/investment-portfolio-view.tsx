@@ -61,9 +61,9 @@ export function InvestmentPortfolioView({ summary, holdings = [], snapshots = []
     return list.length > 0 ? list[list.length - 1] : null;
   }, [snapshots, startOfToday]);
 
-  const baselineSnapshot = todaySnapshot || yesterdaySnapshot;
+  const baselineSnapshot = yesterdaySnapshot;
 
-  // Calculate intraday market valuation change for portfolio holdings relative to 00:00 VNT today baseline
+  // Calculate intraday market valuation change for portfolio holdings relative to yesterday EOD baseline
   const { oneDayPortfolioMarketChange, portfolioMarketChangePercent } = useMemo(() => {
     let snapshotHoldingsMap: Record<string, any> = {};
     if (baselineSnapshot && baselineSnapshot.breakdownJson) {
@@ -102,14 +102,8 @@ export function InvestmentPortfolioView({ summary, holdings = [], snapshots = []
           intradayChange = Math.round(currentVal - snapVal);
         }
       } else {
-        // Method B: Check whether price update occurred AFTER 00:00:00 VNT today
-        const holdingUpdated = h.updatedAt ? new Date(h.updatedAt).getTime() : 0;
-        const assetUpdated = h.asset?.updatedAt ? new Date(h.asset?.updatedAt).getTime() : 0;
-        const lastUpdated = Math.max(holdingUpdated, assetUpdated);
-
-        const isUpdatedToday = lastUpdated >= midnightTimestamp;
-
-        if (isUpdatedToday && change24hPercent !== 0 && currentUnitPrice > 0) {
+        // Method B: Calculate price change from 24h market price change percentage
+        if (change24hPercent !== 0 && currentUnitPrice > 0) {
           const previousUnitPrice = currentUnitPrice / (1 + change24hPercent / 100);
           const navDeltaPerUnit = currentUnitPrice - previousUnitPrice;
           if (quantity > 0) {
@@ -118,7 +112,6 @@ export function InvestmentPortfolioView({ summary, holdings = [], snapshots = []
             intradayChange = Math.round(currentVal - currentVal / (1 + change24hPercent / 100));
           }
         } else {
-          // If price did NOT update after 00:00:00 VNT today
           intradayChange = 0;
         }
       }
