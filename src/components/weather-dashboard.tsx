@@ -185,10 +185,16 @@ export function WeatherDashboard() {
       setWeatherData(data);
       setAirVisualFullData(avFullData);
 
-      // Auto popup real-time severe weather alert modal if active
+      // Auto popup real-time severe weather alert modal if active AND not previously dismissed in session
       if (data.severeAlert) {
         setActiveAlert(data.severeAlert);
-        setSevereAlertOpen(true);
+        const dismissedKey = `dismissed_alert_${data.severeAlert.id}`;
+        const isDismissed = typeof window !== "undefined" && sessionStorage.getItem(dismissedKey) === "true";
+        if (!isDismissed) {
+          setSevereAlertOpen(true);
+        } else {
+          setSevereAlertOpen(false);
+        }
       } else {
         setActiveAlert(null);
         setSevereAlertOpen(false);
@@ -1140,7 +1146,12 @@ export function WeatherDashboard() {
       {/* Realtime Severe Weather Alert Modal */}
       <SevereWeatherAlertModal
         isOpen={severeAlertOpen}
-        onClose={() => setSevereAlertOpen(false)}
+        onClose={() => {
+          if (activeAlert?.id && typeof window !== "undefined") {
+            sessionStorage.setItem(`dismissed_alert_${activeAlert.id}`, "true");
+          }
+          setSevereAlertOpen(false);
+        }}
         alert={activeAlert}
         locationName={weatherData?.location.name || (language === "vi" ? "Vị trí của bạn" : "Your location")}
         language={language}

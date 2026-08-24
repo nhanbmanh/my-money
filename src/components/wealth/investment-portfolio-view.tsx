@@ -90,26 +90,33 @@ export function InvestmentPortfolioView({ summary, holdings = [], snapshots = []
 
       let intradayChange = 0;
 
-      // Method A: Check snapshot holdings breakdown at 00:00 VNT baseline
-      const snapItem = snapshotHoldingsMap[h.id] || snapshotHoldingsMap[h.assetId];
-      if (snapItem) {
-        const snapPrice = Number(snapItem.currentMarketPrice || 0);
-        if (snapPrice > 0) {
-          const priceDelta = currentUnitPrice - snapPrice;
-          intradayChange = Math.round(priceDelta * quantity);
+      // Method A: Check 24h market price change percentage (Guarantees 100% sign and quantity math alignment)
+      if (change24hPercent !== 0 && currentUnitPrice > 0) {
+        const previousUnitPrice = currentUnitPrice / (1 + change24hPercent / 100);
+        const navDeltaPerUnit = currentUnitPrice - previousUnitPrice;
+        if (quantity > 0) {
+          intradayChange = Math.round(navDeltaPerUnit * quantity);
         } else {
-          const snapVal = Number(snapItem.currentValue || 0);
-          intradayChange = Math.round(currentVal - snapVal);
+          intradayChange = Math.round(currentVal - currentVal / (1 + change24hPercent / 100));
+        }
+
+        // Sanity Check: Ensure sign of VND change strictly matches change24hPercent sign
+        if (change24hPercent > 0 && intradayChange < 0) {
+          intradayChange = Math.abs(intradayChange);
+        } else if (change24hPercent < 0 && intradayChange > 0) {
+          intradayChange = -Math.abs(intradayChange);
         }
       } else {
-        // Method B: Calculate price change from 24h market price change percentage
-        if (change24hPercent !== 0 && currentUnitPrice > 0) {
-          const previousUnitPrice = currentUnitPrice / (1 + change24hPercent / 100);
-          const navDeltaPerUnit = currentUnitPrice - previousUnitPrice;
-          if (quantity > 0) {
-            intradayChange = Math.round(navDeltaPerUnit * quantity);
+        // Method B: Fallback to snapshot baseline if no live 24h ticker change is available
+        const snapItem = snapshotHoldingsMap[h.id] || snapshotHoldingsMap[h.assetId];
+        if (snapItem) {
+          const snapPrice = Number(snapItem.currentMarketPrice || 0);
+          if (snapPrice > 0 && currentUnitPrice > 0) {
+            const priceDelta = currentUnitPrice - snapPrice;
+            intradayChange = Math.round(priceDelta * quantity);
           } else {
-            intradayChange = Math.round(currentVal - currentVal / (1 + change24hPercent / 100));
+            const snapVal = Number(snapItem.currentValue || 0);
+            intradayChange = Math.round(currentVal - snapVal);
           }
         } else {
           intradayChange = 0;

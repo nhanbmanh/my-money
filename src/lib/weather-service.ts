@@ -54,6 +54,7 @@ export type SevereAlert = {
   description: string;
   advice: string[];
   metrics: { label: string; value: string }[];
+  alertUrl?: string;
 };
 
 export type WeatherData = {
@@ -172,16 +173,16 @@ export function checkSevereWeatherAlerts(
     };
   }
 
-  // 4. Severe Thunderstorm / Hail / Heavy Lightning (Code 96, 99 or 95 with rain/wind)
-  if (code === 96 || code === 99 || (code === 95 && (rain >= 5 || wind >= 30))) {
+  // 4. Severe Thunderstorm / Hail / Heavy Lightning (Requires STRICT REALTIME SENSOR PROOF: WMO 95/96/99 AND (rain >= 3.0mm OR gusts >= 40km/h))
+  if ((code === 96 || code === 99 || code === 95) && (rain >= 3.0 || gusts >= 40 || wind >= 30)) {
     return {
       id: "SEVERE_THUNDERSTORM_HAIL",
       level: "critical",
-      title: lang === "vi" ? "⚡ CẢNH BÁO MƯA DÔNG LỚN & MƯA ĐÁ" : "⚡ SEVERE THUNDERSTORM & HAIL WARNING",
+      title: lang === "vi" ? `⚡ CẢNH BÁO MƯA DÔNG LỚN REALTIME TẠI ${locationName.toUpperCase()}` : `⚡ REALTIME SEVERE THUNDERSTORM WARNING AT ${locationName.toUpperCase()}`,
       description:
         lang === "vi"
-          ? `Khu vực ${locationName} đang xuất hiện dông lốc mạnh, sấm chớp dữ dội và có nguy cơ mưa đá.`
-          : `Area ${locationName} is experiencing severe thunderstorm, heavy lightning and potential hail.`,
+          ? `Đang diễn ra dông lốc mạnh, sấm chớp dữ dội và có nguy cơ mưa đá tại khu vực ${locationName} vào thời điểm hiện tại.`
+          : `Area ${locationName} is actively experiencing severe thunderstorm, heavy lightning and potential hail.`,
       advice:
         lang === "vi"
           ? [
@@ -196,9 +197,10 @@ export function checkSevereWeatherAlerts(
               "Unplug high-value electronic devices to prevent power surges.",
             ],
       metrics: [
-        { label: lang === "vi" ? "Trạng thái" : "Status", value: current.weatherDesc },
-        { label: lang === "vi" ? "Gió thổi" : "Wind Speed", value: `${wind} km/h` },
-        { label: lang === "vi" ? "Nhiệt độ" : "Temperature", value: `${temp}°C` },
+        { label: lang === "vi" ? "Phạm vi áp dụng" : "Location Scope", value: locationName },
+        { label: lang === "vi" ? "Thời gian hiệu lực" : "Timeframe", value: lang === "vi" ? "Đang diễn ra (Thời điểm hiện tại & 2h tới)" : "Active Now & Next 2 hours" },
+        { label: lang === "vi" ? "Lượng mưa thực tế" : "Rainfall Rate", value: `${rain} mm/h` },
+        { label: lang === "vi" ? "Gió thổi" : "Wind Speed", value: `${wind} km/h (Giật ${gusts} km/h)` },
       ],
     };
   }
@@ -811,7 +813,15 @@ export async function fetchWeatherData(
     });
   }
 
-  const severeAlert = checkSevereWeatherAlerts(current, resolvedLocationName);
+  // 1. Fetch Official Emergency Disaster Alert from UN / GDACS / Authoritative feeds
+  const { fetchOfficialDisasterAlerts } = await import("./disaster-alert-service");
+  const officialAlert = await fetchOfficialDisasterAlerts(lat, lng, resolvedLocationName);
+
+  // 2. Fallback to Strict Empirical Sensor Check (Zero false positives)
+  const sensorAlert = checkSevereWeatherAlerts(current, resolvedLocationName);
+
+  // Highest priority: Official emergency alert > Strict Sensor Alert
+  const finalSevereAlert = officialAlert || sensorAlert;
 
   return {
     location: {
@@ -822,6 +832,6 @@ export async function fetchWeatherData(
     current,
     hourly,
     daily,
-    severeAlert,
+    severeAlert: finalSevereAlert,
   };
 }

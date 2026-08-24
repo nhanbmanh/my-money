@@ -339,6 +339,31 @@ export function AssetManagementTable({
     }
   };
 
+  const getAssetUnitLabel = (h: any) => {
+    const metaUnit = (h.asset?.metadata as Record<string, any>)?.unit;
+    if (metaUnit) return metaUnit;
+
+    const symbol = (h.asset?.symbolOrTicker || "").toUpperCase().trim();
+
+    if (["DCDS", "VESAF", "E1VFVN30", "FUEVFVND"].includes(symbol) || h.asset?.assetClass === "CCQ") {
+      return "CCQ";
+    }
+
+    if (["SJC", "PNJ", "GOLD9999", "DOJI"].includes(symbol) || h.asset?.assetClass === "GOLD") {
+      return "Chỉ";
+    }
+
+    if (["BTC", "ETH", "SOL", "USDT", "BNB"].includes(symbol) || h.asset?.assetClass === "CRYPTO") {
+      return symbol;
+    }
+
+    if (h.categoryType === 1 || h.asset?.isMarketDriven || h.asset?.assetClass === "STOCKS") {
+      return "Cổ phiếu";
+    }
+
+    return null;
+  };
+
   const sellTransactions = (transactions || []).filter((t) => t.transactionType === "SELL");
 
   return (
@@ -421,7 +446,7 @@ export function AssetManagementTable({
               const isGrowth = h.categoryType === 1 || h.asset.isMarketDriven;
               const pnl = (h.currentMarketPrice - h.averageCostBasis) * h.quantity;
               const isProfit = pnl >= 0;
-              const unitLabel = (h.asset?.metadata as Record<string, any>)?.unit;
+              const unitLabel = getAssetUnitLabel(h);
 
               return (
                 <div
@@ -575,9 +600,9 @@ export function AssetManagementTable({
 
                       <TableCell className="text-xs font-bold text-right">
                         <span>{h.quantity.toLocaleString("vi-VN", { maximumFractionDigits: 6 })}</span>
-                        {(h.asset?.metadata as Record<string, any>)?.unit && (
+                        {getAssetUnitLabel(h) && (
                           <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-md ml-1">
-                            {(h.asset?.metadata as Record<string, any>)?.unit}
+                            {getAssetUnitLabel(h)}
                           </span>
                         )}
                       </TableCell>

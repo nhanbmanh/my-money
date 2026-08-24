@@ -126,7 +126,17 @@ export function SevereWeatherAlertModal({
         </div>
 
         {/* Footer */}
-        <div className="p-3.5 sm:p-5 bg-slate-950/90 border-t border-slate-800 shrink-0">
+        <div className="p-3.5 sm:p-5 bg-slate-950/90 border-t border-slate-800 shrink-0 space-y-2">
+          {alert.alertUrl && (
+            <a
+              href={alert.alertUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full bg-slate-800 hover:bg-slate-700 text-sky-300 border border-sky-500/30 font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors"
+            >
+              <span>{language === "vi" ? "🌐 Xem Bản Tin Thiên Tai Gốc (VNDMS / NCHMF)" : "🌐 View Official Disaster Bulletin (VNDMS)"}</span>
+            </a>
+          )}
           <Button
             onClick={onClose}
             className="w-full bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-extrabold text-xs sm:text-sm py-2.5 sm:py-3 rounded-2xl shadow-lg shadow-rose-900/40 flex items-center justify-center gap-2 cursor-pointer"

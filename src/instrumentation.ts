@@ -50,13 +50,39 @@ export async function register() {
         // 3. Record Daily Asset Snapshots & send daily email report for all users in Vietnam Time
         const { buildAndSendDailySnapshotEmail } = await import("@/lib/daily-snapshot-email");
         const users = await prisma.user.findMany({ select: { id: true, email: true } });
+        const { fetchClosingPriceDetailsForSymbol } = await import("@/lib/market-ticker-service");
+
         for (const user of users) {
           try {
             // Fetch holdings with asset info
-            const holdings = await prisma.holding.findMany({
+            const rawHoldings = await prisma.holding.findMany({
               where: { userId: user.id },
               include: { asset: true },
             });
+
+            // Enrich with live market closing prices
+            const holdings = await Promise.all(
+              rawHoldings.map(async (h) => {
+                let currentMarketPrice = 0;
+                let currentValue = h.quantity * h.averageCostBasis;
+
+                if (h.asset.isMarketDriven || h.categoryType === 1) {
+                  const details = await fetchClosingPriceDetailsForSymbol(
+                    h.asset.symbolOrTicker,
+                    h.averageCostBasis
+                  );
+                  currentMarketPrice = details.price || h.averageCostBasis;
+                  currentValue = h.quantity * currentMarketPrice;
+                }
+
+                return {
+                  ...h,
+                  currentMarketPrice,
+                  currentValue,
+                };
+              })
+            );
+
             const totalAssets = holdings.reduce((sum, h) => sum + (h.currentValue || 0), 0);
             const totalInvestable = holdings.reduce(
               (sum, h) => sum + (h.investableFlag ? (h.currentValue || 0) : 0),
@@ -76,7 +102,7 @@ export async function register() {
               name: h.asset?.assetName || "",
               quantity: h.quantity,
               averageCostBasis: h.averageCostBasis,
-              currentMarketPrice: h.quantity > 0 ? h.currentValue / h.quantity : h.averageCostBasis,
+              currentMarketPrice: h.currentMarketPrice,
               currentValue: h.currentValue,
               categoryType: h.categoryType,
             }));
