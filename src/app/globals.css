@@ -275,3 +275,15 @@ th {
   font-weight: 700 !important;
 }
 
+/* Hide Next.js Dev Indicator Badge ("N" logo overlay) */
+nextjs-portal,
+[data-nextjs-toast],
+[data-next-badge],
+div[class*="nextjs-toast"],
+div[class*="nextjs-portal"] {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+

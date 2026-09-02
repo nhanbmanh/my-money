@@ -325,9 +325,11 @@ export function AppSidebar() {
               <p className="truncate text-xs font-bold text-sidebar-foreground">
                 {session?.user?.name}
               </p>
-              <p className="truncate text-[11px] text-muted-foreground font-medium">
-                {t("common.account")}
-              </p>
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-medium">
+                <span className="truncate">{t("common.account")}</span>
+                <span className="opacity-40">•</span>
+                <span className="font-mono text-[10px] font-extrabold text-sky-500/90 dark:text-sky-400/90">v1.0.0</span>
+              </div>
             </div>
           </div>
 
