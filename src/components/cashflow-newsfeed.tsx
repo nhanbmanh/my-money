@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { format, isToday, isYesterday } from "date-fns";
 import {
   Clock,
@@ -139,7 +139,7 @@ export function CashFlowNewsfeed({
         setTotal(totalCount);
         setItems((prev) => {
           const combined = append ? [...prev, ...newItems] : newItems;
-          setHasMore(combined.length < totalCount);
+          setHasMore(combined.length < totalCount && newItems.length > 0);
           return combined;
         });
       } catch {
@@ -166,19 +166,83 @@ export function CashFlowNewsfeed({
   // Fetch page 1 ONLY when filter parameters or refreshKey change
   useEffect(() => {
     setPage(1);
+    pageRef.current = 1;
     fetchFeed(1, false);
   }, [fetchFeed, refreshKey]);
 
-  // Infinite Scroll Handler
+  // IntersectionObserver for seamless Infinite Scroll across window/container scroll
+  const observerRef = useRef<HTMLDivElement | null>(null);
+  const loadingRef = useRef(false);
+  const pageRef = useRef(page);
+  const hasMoreRef = useRef(hasMore);
+
+  useEffect(() => {
+    loadingRef.current = loading || loadingMore;
+  }, [loading, loadingMore]);
+
+  useEffect(() => {
+    pageRef.current = page;
+  }, [page]);
+
+  useEffect(() => {
+    hasMoreRef.current = hasMore;
+  }, [hasMore]);
+
+  useEffect(() => {
+    const el = observerRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const first = entries[0];
+        if (first.isIntersecting && hasMoreRef.current && !loadingRef.current) {
+          const nextPage = pageRef.current + 1;
+          pageRef.current = nextPage;
+          setPage(nextPage);
+          fetchFeed(nextPage, true);
+        }
+      },
+      {
+        root: null,
+        rootMargin: "300px",
+        threshold: 0.1,
+      }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fetchFeed, items.length, hasMore, loading, loadingMore]);
+
+  // Window Scroll Fallback (for non-XL / mobile where body/window scrolls instead of inner container)
+  useEffect(() => {
+    const handleWindowScroll = () => {
+      if (!hasMoreRef.current || loadingRef.current) return;
+      const scrollHeight = document.documentElement.scrollHeight;
+      const scrollTop = window.scrollY || document.documentElement.scrollTop;
+      const clientHeight = window.innerHeight;
+      if (scrollHeight - scrollTop - clientHeight <= 300) {
+        const nextPage = pageRef.current + 1;
+        pageRef.current = nextPage;
+        setPage(nextPage);
+        fetchFeed(nextPage, true);
+      }
+    };
+
+    window.addEventListener("scroll", handleWindowScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleWindowScroll);
+  }, [fetchFeed]);
+
+  // Fallback Container Scroll Handler
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
-    const bottomThreshold = 150;
+    const bottomThreshold = 200;
     const isBottom =
       target.scrollHeight - target.scrollTop - target.clientHeight <=
       bottomThreshold;
 
-    if (isBottom && hasMore && !loading && !loadingMore) {
-      const nextPage = page + 1;
+    if (isBottom && hasMoreRef.current && !loadingRef.current) {
+      const nextPage = pageRef.current + 1;
+      pageRef.current = nextPage;
       setPage(nextPage);
       fetchFeed(nextPage, true);
     }
@@ -444,15 +508,22 @@ export function CashFlowNewsfeed({
               );
             })}
 
-            {/* Bottom Infinite Scroll Loading Indicator / End Indicator */}
-            {loadingMore && (
-              <div className="flex items-center justify-center py-4 gap-2 text-xs font-semibold text-sky-600 dark:text-sky-400">
-                <Spinner className="h-4 w-4 text-sky-500" />
-                <span>
-                  {language === "vi"
-                    ? "Đang tải thêm giao dịch..."
-                    : "Loading more transactions..."}
-                </span>
+            {/* Sentinel Element for IntersectionObserver Infinite Scroll */}
+            {hasMore && (
+              <div
+                ref={observerRef}
+                className="h-10 w-full flex items-center justify-center py-2 shrink-0"
+              >
+                {loadingMore && (
+                  <div className="flex items-center justify-center gap-2 text-xs font-semibold text-sky-600 dark:text-sky-400">
+                    <Spinner className="h-4 w-4 text-sky-500" />
+                    <span>
+                      {language === "vi"
+                        ? "Đang tải thêm giao dịch..."
+                        : "Loading more transactions..."}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 

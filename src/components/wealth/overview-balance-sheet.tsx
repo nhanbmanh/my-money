@@ -21,6 +21,7 @@ import {
   TooltipContent,
 } from "@/components/ui/tooltip";
 import { MetricHelpInfo } from "@/components/wealth/metric-help-info";
+import { ChartPointDetailModal } from "@/components/wealth/chart-point-detail-modal";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -42,6 +43,7 @@ import {
 } from "@/lib/asset-category-types";
 
 import { NetWorthVarianceModal } from "@/components/wealth/net-worth-variance-modal";
+import { getStartOfTodayVN } from "@/lib/date-utils";
 
 interface OverviewProps {
   summary: any;
@@ -75,89 +77,181 @@ export function OverviewBalanceSheet({
   const { t, language } = useLanguage();
   const [timeframe, setTimeframe] = useState<"DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY">("DAILY");
   const [varianceModalOpen, setVarianceModalOpen] = useState(false);
+  const [selectedChartPoint, setSelectedChartPoint] = useState<any>(null);
+  const [pointModalOpen, setPointModalOpen] = useState(false);
 
   // Format currency helper
   const formatVND = (val: number) => {
     return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(val);
   };
 
-  // Dynamic snapshot data calculated by selected timeframe
-  const chartData = useMemo(() => {
-    const currentNetWorth = summary?.netWorth || 0;
-    const currentAssets = summary?.totalAssets || 0;
-    const currentLiabilities = summary?.totalLiabilities || 0;
-    const now = new Date();
+  // Precompute 24h market PnL change logged today (Day T vs T-1 closing price)
+  const rawMarketChange = useMemo(() => {
+    const startOfToday = getStartOfTodayVN();
+    const pastSnapshots = (snapshots || []).filter(
+      (s: any) => new Date(s.date) < startOfToday
+    );
+    const yesterdaySnapshot = pastSnapshots.length > 0 ? pastSnapshots[pastSnapshots.length - 1] : null;
 
-    if (snapshots && snapshots.length > 0) {
-      if (timeframe === "WEEKLY") {
-        const map = new Map<string, any>();
-        snapshots.forEach((s) => {
-          const d = new Date(s.date);
-          const key = `Tuần ${getWeekNumber(d)}`;
-          map.set(key, {
-            date: key,
-            "Giá trị gia sản (Ròng)": s.netWorthValue,
-            "Tổng tài sản": s.totalAssetsValue,
-            "Tổng nợ": s.totalLiabilitiesValue
-          });
+    let snapshotHoldingsMap: Record<string, any> = {};
+    if (yesterdaySnapshot && yesterdaySnapshot.breakdownJson) {
+      const json = yesterdaySnapshot.breakdownJson;
+      const list = Array.isArray(json) ? json : json.holdings || [];
+      if (Array.isArray(list)) {
+        list.forEach((item: any) => {
+          if (item.id) snapshotHoldingsMap[item.id] = item;
+          if (item.assetId) snapshotHoldingsMap[item.assetId] = item;
         });
-        return Array.from(map.values());
       }
-
-      if (timeframe === "MONTHLY") {
-        const map = new Map<string, any>();
-        snapshots.forEach((s) => {
-          const d = new Date(s.date);
-          const key = `T${d.getMonth() + 1}/${d.getFullYear()}`;
-          map.set(key, {
-            date: key,
-            "Giá trị gia sản (Ròng)": s.netWorthValue,
-            "Tổng tài sản": s.totalAssetsValue,
-            "Tổng nợ": s.totalLiabilitiesValue
-          });
-        });
-        return Array.from(map.values());
-      }
-
-      if (timeframe === "YEARLY") {
-        const map = new Map<string, any>();
-        snapshots.forEach((s) => {
-          const d = new Date(s.date);
-          const key = `Năm ${d.getFullYear()}`;
-          map.set(key, {
-            date: key,
-            "Giá trị gia sản (Ròng)": s.netWorthValue,
-            "Tổng tài sản": s.totalAssetsValue,
-            "Tổng nợ": s.totalLiabilitiesValue
-          });
-        });
-        return Array.from(map.values());
-      }
-
-      return snapshots.map((s) => ({
-        date: new Date(s.date).toLocaleDateString("vi-VN", { month: "numeric", day: "numeric" }),
-        "Giá trị gia sản (Ròng)": s.netWorthValue,
-        "Tổng tài sản": s.totalAssetsValue,
-        "Tổng nợ": s.totalLiabilitiesValue
-      }));
     }
+
+    let sum = 0;
+    (holdings || []).forEach((h: any) => {
+      if (h.categoryType === 0 || h.asset?.symbolOrTicker === "CASH_VND") return;
+
+      const quantity = Number(h.quantity || 0);
+      const currentVal = Number(h.currentValue || 0);
+      const currentUnitPrice = Number(h.currentMarketPrice || h.averageCostBasis || 0);
+      const snapItem = snapshotHoldingsMap[h.id] || snapshotHoldingsMap[h.assetId];
+
+      if (snapItem) {
+        const yesterdayPrice = Number(snapItem.currentMarketPrice || snapItem.averageCostBasis || 0);
+        if (yesterdayPrice > 0 && currentUnitPrice > 0) {
+          const priceDelta = currentUnitPrice - yesterdayPrice;
+          sum += Math.round(priceDelta * quantity);
+        } else {
+          const snapVal = Number(snapItem.currentValue || 0);
+          sum += Math.round(currentVal - snapVal);
+        }
+      } else {
+        const change24hPercent = Number(h.change24h || 0);
+        if (change24hPercent !== 0 && currentUnitPrice > 0) {
+          const previousUnitPrice = currentUnitPrice / (1 + change24hPercent / 100);
+          const navDeltaPerUnit = currentUnitPrice - previousUnitPrice;
+          sum += Math.round(navDeltaPerUnit * quantity);
+        }
+      }
+    });
+
+    return sum;
+  }, [holdings, snapshots]);
+
+  // Dynamic timeframe chart data computed strictly via user formula: Net Worth Date X = A + B + C
+  // A = Liquid Cash Today - CashFlows logged strictly after Date X
+  // B = Sum(Quantity of Growth Asset * Closing Price at Date X)
+  // C = Other Assets - Total Liabilities
+  const chartData = useMemo(() => {
+    const now = new Date();
+    const startOfToday = getStartOfTodayVN();
+
+    // 1. Separate holdings into Growth Assets (B), Liquid Assets (A), and Other Assets (C)
+    const currentLiquid = Number(summary?.totalInvestableAssets || 0);
+    const growthHoldings = (holdings || []).filter(
+      (h: any) => h.categoryType === 1 || (h.asset && h.asset.isMarketDriven)
+    );
+    const otherAssetsValue = (holdings || [])
+      .filter((h: any) => h.categoryType > 1)
+      .reduce((sum: number, h: any) => sum + (Number(h.currentValue) || 0), 0);
+
+    const totalLiabilities = Number(summary?.totalLiabilities || 0);
+    const C = otherAssetsValue - totalLiabilities; // Other Assets - Debt
+
+    // Helper to calculate A, B, C for any date targetEOD
+    const calculatePointAtEOD = (targetEOD: Date, dateLabel: string) => {
+      // A = Liquid Cash - Net CashFlows strictly AFTER targetEOD
+      let netCashFlowAfter = 0;
+      (cashFlows || []).forEach((cf: any) => {
+        const cfTime = new Date(cf.datetime || cf.createdAt);
+        if (cfTime > targetEOD) {
+          if (cf.cashType === "Income") netCashFlowAfter += Number(cf.amountOfMoney || 0);
+          else netCashFlowAfter -= Number(cf.amountOfMoney || 0);
+        }
+      });
+      const A = currentLiquid - netCashFlowAfter;
+
+      // B = Sum(Quantity of Growth Asset * Closing Price at Date X)
+      let B = 0;
+      const growthItems: any[] = [];
+
+      growthHoldings.forEach((h: any) => {
+        const qty = Number(h.quantity || 0);
+        const currentUnitPrice = Number(h.currentMarketPrice || h.averageCostBasis || 0);
+
+        let priceAtX = currentUnitPrice;
+        if (targetEOD < startOfToday) {
+          const pastSnapshots = (snapshots || []).filter(
+            (s: any) => new Date(s.date) < startOfToday
+          );
+          const yesterdaySnapshot = pastSnapshots.length > 0 ? pastSnapshots[pastSnapshots.length - 1] : null;
+
+          if (yesterdaySnapshot && yesterdaySnapshot.breakdownJson) {
+            const list = Array.isArray(yesterdaySnapshot.breakdownJson)
+              ? yesterdaySnapshot.breakdownJson
+              : yesterdaySnapshot.breakdownJson.holdings || [];
+            const snapItem = list.find((item: any) => item.id === h.id || item.assetId === h.assetId);
+            if (snapItem) {
+              priceAtX = Number(snapItem.currentMarketPrice || snapItem.averageCostBasis || currentUnitPrice);
+            }
+          }
+        }
+        const totalValueAtX = qty * priceAtX;
+        B += totalValueAtX;
+
+        growthItems.push({
+          id: h.id,
+          name: h.asset?.assetName || h.asset?.symbolOrTicker || "Tài sản đầu tư",
+          symbol: h.asset?.symbolOrTicker || "",
+          quantity: qty,
+          priceAtX,
+          totalValueAtX,
+        });
+      });
+
+      const dayNetWorth = A + B + C;
+      const dayAssets = A + B + otherAssetsValue;
+
+      const formattedDate = targetEOD.toLocaleDateString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+
+      return {
+        netWorth: Math.round(dayNetWorth),
+        assets: Math.round(dayAssets),
+        liabilities: Math.round(totalLiabilities),
+        pointDetails: {
+          dateLabel,
+          formattedDate,
+          netWorth: Math.round(dayNetWorth),
+          totalAssets: Math.round(dayAssets),
+          totalLiabilities: Math.round(totalLiabilities),
+          A: Math.round(A),
+          B: Math.round(B),
+          C: Math.round(C),
+          growthItems,
+          otherAssetsValue: Math.round(otherAssetsValue),
+          netCashFlowAfter: Math.round(netCashFlowAfter),
+        },
+      };
+    };
 
     if (timeframe === "DAILY") {
       const daysCount = 7;
       return Array.from({ length: daysCount }).map((_, i) => {
         const d = new Date(now);
         d.setDate(d.getDate() - (daysCount - 1 - i));
-        const factor = 1 - (daysCount - 1 - i) * 0.006;
-        const isToday = i === daysCount - 1;
-        const label = isToday
-          ? "Hôm nay"
-          : d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+        d.setHours(23, 59, 59, 999);
+
+        const label = d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+        const point = calculatePointAtEOD(d, label);
 
         return {
           date: label,
-          "Giá trị gia sản (Ròng)": Math.round(currentNetWorth * factor),
-          "Tổng tài sản": Math.round(currentAssets * factor),
-          "Tổng nợ": Math.round(currentLiabilities)
+          "Giá trị gia sản (Ròng)": point.netWorth,
+          "Tổng tài sản": point.assets,
+          "Tổng nợ": point.liabilities,
+          pointDetails: point.pointDetails,
         };
       });
     }
@@ -167,16 +261,28 @@ export function OverviewBalanceSheet({
       return Array.from({ length: weeksCount }).map((_, i) => {
         const d = new Date(now);
         d.setDate(d.getDate() - (weeksCount - 1 - i) * 7);
-        const factor = 1 - (weeksCount - 1 - i) * 0.015;
-        const weekNum = getWeekNumber(d);
+
+        // Find Sunday EOD (end of week)
+        const sunday = new Date(d);
+        const dayOfWeek = sunday.getDay();
+        const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+        sunday.setDate(sunday.getDate() + daysUntilSunday);
+        sunday.setHours(23, 59, 59, 999);
+
+        // Cap at current time if Sunday is in the future
+        const targetEOD = sunday > now ? now : sunday;
+
+        const weekNum = getWeekNumber(targetEOD);
         const isThisWeek = i === weeksCount - 1;
         const label = isThisWeek ? "Tuần này" : `Tuần ${weekNum}`;
+        const point = calculatePointAtEOD(targetEOD, label);
 
         return {
           date: label,
-          "Giá trị gia sản (Ròng)": Math.round(currentNetWorth * factor),
-          "Tổng tài sản": Math.round(currentAssets * factor),
-          "Tổng nợ": Math.round(currentLiabilities)
+          "Giá trị gia sản (Ròng)": point.netWorth,
+          "Tổng tài sản": point.assets,
+          "Tổng nợ": point.liabilities,
+          pointDetails: point.pointDetails,
         };
       });
     }
@@ -184,16 +290,21 @@ export function OverviewBalanceSheet({
     if (timeframe === "MONTHLY") {
       const monthsCount = 6;
       return Array.from({ length: monthsCount }).map((_, i) => {
-        const d = new Date(now.getFullYear(), now.getMonth() - (monthsCount - 1 - i), 1);
-        const factor = 1 - (monthsCount - 1 - i) * 0.035;
+        const targetMonthIndex = now.getMonth() - (monthsCount - 1 - i);
+        const targetYear = now.getFullYear();
+        const endOfMonth = new Date(targetYear, targetMonthIndex + 1, 0, 23, 59, 59, 999);
+        const targetEOD = endOfMonth > now ? now : endOfMonth;
+
         const isThisMonth = i === monthsCount - 1;
-        const label = isThisMonth ? "Tháng này" : `Tháng ${d.getMonth() + 1}`;
+        const label = isThisMonth ? "Tháng này" : `T${endOfMonth.getMonth() + 1}/${endOfMonth.getFullYear()}`;
+        const point = calculatePointAtEOD(targetEOD, label);
 
         return {
           date: label,
-          "Giá trị gia sản (Ròng)": Math.round(currentNetWorth * factor),
-          "Tổng tài sản": Math.round(currentAssets * factor),
-          "Tổng nợ": Math.round(currentLiabilities)
+          "Giá trị gia sản (Ròng)": point.netWorth,
+          "Tổng tài sản": point.assets,
+          "Tổng nợ": point.liabilities,
+          pointDetails: point.pointDetails,
         };
       });
     }
@@ -203,90 +314,42 @@ export function OverviewBalanceSheet({
       const currentYear = now.getFullYear();
       return Array.from({ length: yearsCount }).map((_, i) => {
         const year = currentYear - (yearsCount - 1 - i);
-        const factor = 1 - (yearsCount - 1 - i) * 0.12;
+        const endOfYear = new Date(year, 11, 31, 23, 59, 59, 999);
+        const targetEOD = endOfYear > now ? now : endOfYear;
+
+        const label = `Năm ${year}`;
+        const point = calculatePointAtEOD(targetEOD, label);
 
         return {
-          date: `Năm ${year}`,
-          "Giá trị gia sản (Ròng)": Math.round(currentNetWorth * factor),
-          "Tổng tài sản": Math.round(currentAssets * factor),
-          "Tổng nợ": Math.round(currentLiabilities)
+          date: label,
+          "Giá trị gia sản (Ròng)": point.netWorth,
+          "Tổng tài sản": point.assets,
+          "Tổng nợ": point.liabilities,
+          pointDetails: point.pointDetails,
         };
       });
     }
 
     return [];
-  }, [timeframe, snapshots, summary]);
+  }, [timeframe, summary, holdings, cashFlows, snapshots]);
 
-  // 1-day Net Worth Variance Calculation (100% mathematically balanced vs Yesterday EOD Snapshot)
+  // 1-day Net Worth Variance Calculation (100% synchronized with NetWorthVarianceModal via Day T vs T-1 closing price)
   const { previousNetWorth, netWorthChangeAmount, netWorthChangePercent, isPositive } = useMemo(() => {
     const currentNetWorth = Number(summary?.netWorth || 0);
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
 
-    // 1. Calculate today's cashflows logged TODAY (since local 00:00:00)
-    let cashFlowToday = 0;
+    const startOfToday = getStartOfTodayVN();
+    let todayNetCashFlow = 0;
     (cashFlows || []).forEach((cf: any) => {
       const cfDate = new Date(cf.datetime || cf.createdAt);
       if (cfDate >= startOfToday) {
         const amt = Number(cf.amountOfMoney || 0);
-        if (cf.cashType === "Income") cashFlowToday += amt;
-        else cashFlowToday -= amt;
+        if (cf.cashType === "Income") todayNetCashFlow += amt;
+        else todayNetCashFlow -= amt;
       }
     });
 
-    // 2. Find yesterday's EOD Snapshot (recorded before 00:00:00 today)
-    const pastSnapshots = (snapshots || []).filter(
-      (s: any) => new Date(s.date) < startOfToday
-    );
-    const yesterdaySnapshot = pastSnapshots.length > 0 ? pastSnapshots[pastSnapshots.length - 1] : null;
-
-    let prevNetWorth = 0;
-    let totalChangeAmount = 0;
-
-    if (yesterdaySnapshot) {
-      let holdingsSum = 0;
-      if (yesterdaySnapshot.breakdownJson) {
-        const json = yesterdaySnapshot.breakdownJson;
-        const list = Array.isArray(json) ? json : json.holdings || [];
-        if (Array.isArray(list) && list.length > 0) {
-          list.forEach((item: any) => {
-            holdingsSum += Number(item.currentValue ?? (item.quantity * item.currentMarketPrice || 0));
-          });
-        }
-      }
-
-      if (holdingsSum > 0) {
-        prevNetWorth = holdingsSum - Number(yesterdaySnapshot.totalLiabilitiesValue || 0);
-      } else if (yesterdaySnapshot.netWorthValue !== undefined && yesterdaySnapshot.netWorthValue > 0) {
-        prevNetWorth = Number(yesterdaySnapshot.netWorthValue);
-      }
-    }
-
-    if (prevNetWorth > 0) {
-      totalChangeAmount = currentNetWorth - prevNetWorth;
-    } else {
-      // Fallback if no past snapshot exists
-      let marketChangeToday = 0;
-      (holdings || []).forEach((h: any) => {
-        const quantity = Number(h.quantity || 0);
-        const currentVal = Number(h.currentValue || 0);
-        const currentUnitPrice = Number(h.currentMarketPrice || h.averageCostBasis || 0);
-        const change24hPercent = Number(h.change24h || 0);
-
-        if (change24hPercent !== 0 && currentUnitPrice > 0) {
-          const previousUnitPrice = currentUnitPrice / (1 + change24hPercent / 100);
-          const navDeltaPerUnit = currentUnitPrice - previousUnitPrice;
-          if (quantity > 0) {
-            marketChangeToday += Math.round(navDeltaPerUnit * quantity);
-          } else {
-            marketChangeToday += Math.round(currentVal - currentVal / (1 + change24hPercent / 100));
-          }
-        }
-      });
-
-      totalChangeAmount = marketChangeToday + cashFlowToday;
-      prevNetWorth = currentNetWorth - totalChangeAmount;
-    }
+    const totalChangeAmount = rawMarketChange + todayNetCashFlow;
+    const prevNetWorth = currentNetWorth - totalChangeAmount;
 
     const rawPercent = prevNetWorth > 0 ? (totalChangeAmount / prevNetWorth) * 100 : 0;
     const changePercent = Math.abs(rawPercent) < 0.01 ? 0 : rawPercent;
@@ -297,7 +360,7 @@ export function OverviewBalanceSheet({
       netWorthChangePercent: changePercent,
       isPositive: totalChangeAmount >= 0,
     };
-  }, [summary, holdings, cashFlows, snapshots]);
+  }, [summary, cashFlows, rawMarketChange]);
 
   const compareLabel = useMemo(() => {
     switch (timeframe) {
@@ -530,9 +593,28 @@ export function OverviewBalanceSheet({
           </div>
         </CardHeader>
         <CardContent>
-          <div className="h-72 w-full pt-4">
+          <div className="flex items-center justify-between text-xs text-sky-400 font-medium px-1 pb-2">
+            <span className="flex items-center gap-1">
+              <Info className="h-3.5 w-3.5 text-sky-400 shrink-0" />
+              Bấm vào bất kỳ điểm dữ liệu nào trên biểu đồ để xem bóc tách NAV chi tiết (A + B + C)
+            </span>
+          </div>
+          <div className="h-72 w-full pt-2">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <AreaChart
+                data={chartData}
+                margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                onClick={(e: any) => {
+                  if (e && e.activePayload && e.activePayload[0]) {
+                    const payload = e.activePayload[0].payload;
+                    if (payload.pointDetails) {
+                      setSelectedChartPoint(payload.pointDetails);
+                      setPointModalOpen(true);
+                    }
+                  }
+                }}
+                className="cursor-pointer"
+              >
                 <defs>
                   <linearGradient id="netWorthGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#0284c7" stopOpacity={0.4} />
@@ -685,6 +767,13 @@ export function OverviewBalanceSheet({
         transactions={transactions}
         cashFlows={cashFlows}
         snapshots={snapshots}
+      />
+
+      {/* Chart Point Detail Modal */}
+      <ChartPointDetailModal
+        open={pointModalOpen}
+        onOpenChange={setPointModalOpen}
+        pointData={selectedChartPoint}
       />
     </div>
   );

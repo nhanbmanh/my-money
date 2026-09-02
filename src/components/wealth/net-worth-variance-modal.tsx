@@ -104,68 +104,8 @@ export function NetWorthVarianceModal({
 
   const currentNetWorth = Number(summary?.netWorth || 0);
 
-  // 4. Absolute Snapshot-Based Net Worth Reconciliation & Market Variance Calculation
-  const { previousNetWorth, netWorthChangeAmount, portfolioMarketChange } = useMemo(() => {
-    let prev = 0;
-    if (yesterdaySnapshot) {
-      let holdingsSum = 0;
-      if (yesterdaySnapshot.breakdownJson) {
-        const json = yesterdaySnapshot.breakdownJson;
-        const list = Array.isArray(json) ? json : json.holdings || [];
-        if (Array.isArray(list) && list.length > 0) {
-          list.forEach((item: any) => {
-            holdingsSum += Number(item.currentValue ?? (item.quantity * item.currentMarketPrice || 0));
-          });
-        }
-      }
-      if (holdingsSum > 0) {
-        prev = holdingsSum - Number(yesterdaySnapshot.totalLiabilitiesValue || 0);
-      } else if (yesterdaySnapshot.netWorthValue !== undefined && yesterdaySnapshot.netWorthValue > 0) {
-        prev = Number(yesterdaySnapshot.netWorthValue);
-      }
-    }
-
-    if (prev > 0) {
-      const totalChange = currentNetWorth - prev;
-      const marketChange = totalChange - todayNetCashFlow;
-      return {
-        previousNetWorth: prev,
-        netWorthChangeAmount: totalChange,
-        portfolioMarketChange: marketChange,
-      };
-    }
-
-    // Fallback if no yesterday snapshot exists
-    let rawMarketChange = 0;
-    (holdings || []).forEach((h: any) => {
-      const quantity = Number(h.quantity || 0);
-      const currentVal = Number(h.currentValue || 0);
-      const currentUnitPrice = Number(h.currentMarketPrice || h.averageCostBasis || 0);
-      const change24hPercent = Number(h.change24h || 0);
-
-      if (change24hPercent !== 0 && currentUnitPrice > 0) {
-        const previousUnitPrice = currentUnitPrice / (1 + change24hPercent / 100);
-        const navDeltaPerUnit = currentUnitPrice - previousUnitPrice;
-        if (quantity > 0) {
-          rawMarketChange += Math.round(navDeltaPerUnit * quantity);
-        } else {
-          rawMarketChange += Math.round(currentVal - currentVal / (1 + change24hPercent / 100));
-        }
-      }
-    });
-
-    const totalChange = rawMarketChange + todayNetCashFlow;
-    const fallbackPrev = currentNetWorth - totalChange;
-    return {
-      previousNetWorth: fallbackPrev,
-      netWorthChangeAmount: totalChange,
-      portfolioMarketChange: rawMarketChange,
-    };
-  }, [yesterdaySnapshot, currentNetWorth, todayNetCashFlow, holdings]);
-
-  // 5. Map holdings and filter items with actual intraday market variance (since yesterday EOD snapshot)
+  // 4. Map holdings and calculate actual 24h market price variance (Day T vs Day T-1 closing price)
   const allHoldingItems = useMemo(() => {
-    // Baseline Snapshot MUST ALWAYS BE yesterdaySnapshot (EOD snapshot before 00:00 VNT today)
     const baselineSnapshot = yesterdaySnapshot;
 
     let snapshotHoldingsMap: Record<string, any> = {};
@@ -185,44 +125,32 @@ export function NetWorthVarianceModal({
       const currentVal = Number(h.currentValue || 0);
       const currentUnitPrice = Number(h.currentMarketPrice || h.averageCostBasis || 0);
       const catCfg = getCategoryConfig(h.categoryType ?? 0);
-      const change24hPercent = Number(h.change24h || 0);
+      const snapItem = snapshotHoldingsMap[h.id] || snapshotHoldingsMap[h.assetId];
 
       let oneDayChange = 0;
+      let oneDayChangePercent = 0;
 
-      // Method A: Check 24h market price change percentage (Guarantees 100% sign and quantity math alignment)
-      if (change24hPercent !== 0 && currentUnitPrice > 0) {
-        const previousUnitPrice = currentUnitPrice / (1 + change24hPercent / 100);
-        const navDeltaPerUnit = currentUnitPrice - previousUnitPrice;
-        if (quantity > 0) {
-          oneDayChange = Math.round(navDeltaPerUnit * quantity);
+      if (snapItem) {
+        const yesterdayPrice = Number(snapItem.currentMarketPrice || snapItem.averageCostBasis || 0);
+        if (yesterdayPrice > 0 && currentUnitPrice > 0) {
+          const priceDelta = currentUnitPrice - yesterdayPrice;
+          oneDayChange = Math.round(priceDelta * quantity);
+          oneDayChangePercent = (priceDelta / yesterdayPrice) * 100;
         } else {
-          oneDayChange = Math.round(currentVal - currentVal / (1 + change24hPercent / 100));
-        }
-
-        // Sanity Check: Ensure sign of VND change strictly matches change24hPercent sign
-        if (change24hPercent > 0 && oneDayChange < 0) {
-          oneDayChange = Math.abs(oneDayChange);
-        } else if (change24hPercent < 0 && oneDayChange > 0) {
-          oneDayChange = -Math.abs(oneDayChange);
+          const snapVal = Number(snapItem.currentValue || 0);
+          let diff = currentVal - snapVal;
+          if (h.categoryType === 0) diff -= todayNetCashFlow;
+          oneDayChange = Math.round(diff);
+          oneDayChangePercent = snapVal > 0 ? (diff / snapVal) * 100 : 0;
         }
       } else {
-        // Method B: Fallback to snapshot baseline if no live 24h ticker change is available
-        const snapItem = snapshotHoldingsMap[h.id] || snapshotHoldingsMap[h.assetId];
-        if (snapItem) {
-          const snapPrice = Number(snapItem.currentMarketPrice || 0);
-          if (snapPrice > 0 && currentUnitPrice > 0) {
-            const priceDelta = currentUnitPrice - snapPrice;
-            oneDayChange = Math.round(priceDelta * quantity);
-          } else {
-            const snapVal = Number(snapItem.currentValue || 0);
-            let diff = currentVal - snapVal;
-            if (h.categoryType === 0) {
-              diff = diff - todayNetCashFlow;
-            }
-            oneDayChange = Math.round(diff);
-          }
-        } else {
-          oneDayChange = 0;
+        // Fallback to 24h ticker change if no yesterday snapshot item exists for this holding
+        const change24hPercent = Number(h.change24h || 0);
+        if (change24hPercent !== 0 && currentUnitPrice > 0) {
+          const previousUnitPrice = currentUnitPrice / (1 + change24hPercent / 100);
+          const navDeltaPerUnit = currentUnitPrice - previousUnitPrice;
+          oneDayChange = Math.round(navDeltaPerUnit * quantity);
+          oneDayChangePercent = change24hPercent;
         }
       }
 
@@ -233,10 +161,10 @@ export function NetWorthVarianceModal({
         categoryType: h.categoryType,
         catCfg,
         oneDayChange,
-        change24hPercent,
+        change24hPercent: oneDayChangePercent,
       };
     });
-  }, [holdings, startOfToday, yesterdaySnapshot, todayNetCashFlow]);
+  }, [holdings, yesterdaySnapshot, todayNetCashFlow]);
 
   // Filter ONLY market-driven investment items (categoryType !== 0) to avoid double-counting cashflows
   const portfolioAttribution = useMemo(() => {
@@ -248,6 +176,18 @@ export function NetWorthVarianceModal({
   const sumPortfolioAttribution = useMemo(() => {
     return portfolioAttribution.reduce((sum, item) => sum + item.oneDayChange, 0);
   }, [portfolioAttribution]);
+
+  // 5. Absolute Net Worth Reconciliation
+  const { previousNetWorth, netWorthChangeAmount, portfolioMarketChange } = useMemo(() => {
+    const totalChange = sumPortfolioAttribution + todayNetCashFlow;
+    const prev = currentNetWorth - totalChange;
+
+    return {
+      previousNetWorth: prev,
+      netWorthChangeAmount: totalChange,
+      portfolioMarketChange: sumPortfolioAttribution,
+    };
+  }, [currentNetWorth, todayNetCashFlow, sumPortfolioAttribution]);
 
   const rawChangePercent = previousNetWorth > 0 ? (netWorthChangeAmount / previousNetWorth) * 100 : 0;
   const netWorthChangePercent = Math.abs(rawChangePercent) < 0.01 ? 0 : rawChangePercent;

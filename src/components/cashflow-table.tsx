@@ -19,6 +19,7 @@ import {
   PanelLeftOpen,
   AlertTriangle,
   RefreshCw,
+  Bookmark,
 } from "lucide-react";
 import { checkIsIncomplete, getMissingFields } from "@/lib/incomplete-checker";
 import { Button } from "@/components/ui/button";
@@ -69,6 +70,7 @@ import { DashboardSummaryCards } from "@/components/dashboard-summary-cards";
 import { DashboardAnalytics, CashFlowChartFilters } from "@/components/dashboard-analytics";
 import { CashFlowNewsfeed } from "@/components/cashflow-newsfeed";
 import { FinancialInsights } from "@/components/financial-insights";
+import { CashFlowTemplateTable } from "@/components/cashflow-template-table";
 import { BudgetModal } from "@/components/budget-modal";
 import { CashFlowChartModal } from "@/components/cashflow-chart-modal";
 import { CashFlowModal } from "@/components/cashflow-modal";
@@ -592,7 +594,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
 
               {/* Dedicated Non-Scrollable Responsive Tabs Bar */}
               <div className="flex-1 min-w-0 py-0.5">
-                <TabsList className="grid grid-cols-4 gap-1 w-full bg-slate-100 dark:bg-slate-800 p-1.5 rounded-xl h-auto">
+                <TabsList className="grid grid-cols-5 gap-1 w-full bg-slate-100 dark:bg-slate-800 p-1.5 rounded-xl h-auto">
                   <TabsTrigger
                     value="newsfeed"
                     className="text-xs font-bold gap-1.5 px-2 sm:px-3.5 py-1.5 rounded-lg justify-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-xs transition-all text-sky-600 dark:text-sky-400"
@@ -624,6 +626,14 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                   >
                     <Sparkles className="h-4 w-4 text-emerald-500 shrink-0" />
                     <span className="hidden sm:inline truncate">{t("financial.tabBudget")}</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="template"
+                    className="text-xs font-bold gap-1.5 px-2 sm:px-3.5 py-1.5 rounded-lg justify-center data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-xs transition-all text-amber-600 dark:text-amber-400"
+                    title={language === "vi" ? "Mẫu Khai Báo" : "Templates"}
+                  >
+                    <Bookmark className="h-4 w-4 text-amber-500 shrink-0" />
+                    <span className="hidden sm:inline truncate">{language === "vi" ? "Mẫu Khai Báo" : "Templates"}</span>
                   </TabsTrigger>
                 </TabsList>
               </div>
@@ -1005,6 +1015,21 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                 onOpenBudgetModal={() => setBudgetModalOpen(true)}
                 budgetsUpdatedKey={budgetsUpdatedKey}
                 onMutationNeeded={handleMutationSuccess}
+              />
+            </TabsContent>
+
+            {/* TAB 5: TRANSACTION TEMPLATES TABLE */}
+            <TabsContent value="template" className="mt-0 flex-1 min-h-0 flex flex-col">
+              <CashFlowTemplateTable
+                refreshKey={combinedRefreshKey}
+                onUseTemplate={(tpl) => {
+                  window.dispatchEvent(
+                    new CustomEvent("open-cashflow-modal-template", {
+                      detail: { template: tpl },
+                    })
+                  );
+                  window.dispatchEvent(new CustomEvent("open-cashflow-modal"));
+                }}
               />
             </TabsContent>
           </Tabs>

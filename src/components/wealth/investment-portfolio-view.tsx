@@ -63,7 +63,7 @@ export function InvestmentPortfolioView({ summary, holdings = [], snapshots = []
 
   const baselineSnapshot = yesterdaySnapshot;
 
-  // Calculate intraday market valuation change for portfolio holdings relative to yesterday EOD baseline
+  // Calculate intraday market valuation change for portfolio holdings (Day T vs Day T-1 closing price)
   const { oneDayPortfolioMarketChange, portfolioMarketChangePercent } = useMemo(() => {
     let snapshotHoldingsMap: Record<string, any> = {};
     if (baselineSnapshot && baselineSnapshot.breakdownJson) {
@@ -86,40 +86,25 @@ export function InvestmentPortfolioView({ summary, holdings = [], snapshots = []
       const quantity = Number(h.quantity || 0);
       const currentVal = Number(h.currentValue || 0);
       const currentUnitPrice = Number(h.currentMarketPrice || h.averageCostBasis || 0);
-      const change24hPercent = Number(h.change24h || 0);
+      const snapItem = snapshotHoldingsMap[h.id] || snapshotHoldingsMap[h.assetId];
 
       let intradayChange = 0;
 
-      // Method A: Check 24h market price change percentage (Guarantees 100% sign and quantity math alignment)
-      if (change24hPercent !== 0 && currentUnitPrice > 0) {
-        const previousUnitPrice = currentUnitPrice / (1 + change24hPercent / 100);
-        const navDeltaPerUnit = currentUnitPrice - previousUnitPrice;
-        if (quantity > 0) {
-          intradayChange = Math.round(navDeltaPerUnit * quantity);
+      if (snapItem) {
+        const yesterdayPrice = Number(snapItem.currentMarketPrice || snapItem.averageCostBasis || 0);
+        if (yesterdayPrice > 0 && currentUnitPrice > 0) {
+          const priceDelta = currentUnitPrice - yesterdayPrice;
+          intradayChange = Math.round(priceDelta * quantity);
         } else {
-          intradayChange = Math.round(currentVal - currentVal / (1 + change24hPercent / 100));
-        }
-
-        // Sanity Check: Ensure sign of VND change strictly matches change24hPercent sign
-        if (change24hPercent > 0 && intradayChange < 0) {
-          intradayChange = Math.abs(intradayChange);
-        } else if (change24hPercent < 0 && intradayChange > 0) {
-          intradayChange = -Math.abs(intradayChange);
+          const snapVal = Number(snapItem.currentValue || 0);
+          intradayChange = Math.round(currentVal - snapVal);
         }
       } else {
-        // Method B: Fallback to snapshot baseline if no live 24h ticker change is available
-        const snapItem = snapshotHoldingsMap[h.id] || snapshotHoldingsMap[h.assetId];
-        if (snapItem) {
-          const snapPrice = Number(snapItem.currentMarketPrice || 0);
-          if (snapPrice > 0 && currentUnitPrice > 0) {
-            const priceDelta = currentUnitPrice - snapPrice;
-            intradayChange = Math.round(priceDelta * quantity);
-          } else {
-            const snapVal = Number(snapItem.currentValue || 0);
-            intradayChange = Math.round(currentVal - snapVal);
-          }
-        } else {
-          intradayChange = 0;
+        const change24hPercent = Number(h.change24h || 0);
+        if (change24hPercent !== 0 && currentUnitPrice > 0) {
+          const previousUnitPrice = currentUnitPrice / (1 + change24hPercent / 100);
+          const navDeltaPerUnit = currentUnitPrice - previousUnitPrice;
+          intradayChange = Math.round(navDeltaPerUnit * quantity);
         }
       }
 
@@ -134,7 +119,7 @@ export function InvestmentPortfolioView({ summary, holdings = [], snapshots = []
       oneDayPortfolioMarketChange: changeVND,
       portfolioMarketChangePercent: percent,
     };
-  }, [holdings, summary, baselineSnapshot, midnightTimestamp]);
+  }, [holdings, summary, baselineSnapshot]);
 
   const isMarketChangePositive = oneDayPortfolioMarketChange >= 0;
 

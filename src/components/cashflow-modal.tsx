@@ -13,6 +13,7 @@ import {
   RotateCcw,
   Sparkles,
   FileText,
+  Bookmark,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +57,20 @@ type CashFlowData = {
   primaryCategoryId: string | null;
   secondaryCategories: Array<{
     secondaryCategoryId?: string;
+    secondaryCategory: Category;
+  }>;
+};
+
+type CashFlowTemplate = {
+  id: string;
+  templateName: string;
+  title: string;
+  description: string | null;
+  cashType: "Income" | "Expense";
+  amountOfMoney: number;
+  sourceId: string | null;
+  primaryCategoryId: string | null;
+  secondaryCategories: Array<{
     secondaryCategory: Category;
   }>;
 };
@@ -107,10 +122,18 @@ export function CashFlowModal({
   const [secondaryCategories, setSecondaryCategories] = useState<Category[]>(
     [],
   );
+  const [templates, setTemplates] = useState<CashFlowTemplate[]>([]);
 
   const [showAddSource, setShowAddSource] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [showAddSecondary, setShowAddSecondary] = useState(false);
+
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [saveTemplateLoadingMode, setSaveTemplateLoadingMode] = useState<
+    "update" | "create" | null
+  >(null);
+  const [saveTemplateSuccess, setSaveTemplateSuccess] = useState(false);
 
   const [newSource, setNewSource] = useState("");
   const [newCategory, setNewCategory] = useState("");
@@ -121,11 +144,108 @@ export function CashFlowModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+
+  // Auto-fill templateName with current transaction title (form.title)
+  useEffect(() => {
+    if (!selectedTemplateId && form.title.trim()) {
+      setTemplateName(form.title.trim());
+    }
+  }, [form.title, selectedTemplateId]);
+
+  const fetchTemplates = async () => {
+    try {
+      const res = await fetch("/api/cashflow-template");
+      if (res.ok) {
+        const data = await res.json();
+        setTemplates(Array.isArray(data) ? data : []);
+      }
+    } catch {
+      setTemplates([]);
+    }
+  };
+
+  const applyTemplate = (tpl: CashFlowTemplate) => {
+    setSelectedTemplateId(tpl.id);
+    setTemplateName(tpl.templateName);
+    setForm({
+      title: tpl.title || "",
+      description: tpl.description || "",
+      cashType: tpl.cashType,
+      amountOfMoney: formatMoneyInput(tpl.amountOfMoney),
+      sourceId: tpl.sourceId || "",
+      primaryCategoryId: tpl.primaryCategoryId || "",
+    });
+    setSecondaryCategoryIds(
+      tpl.secondaryCategories.map((s) => s.secondaryCategory.id)
+    );
+  };
+
+  const handleSaveTemplate = async (isUpdate = false) => {
+    if (!templateName.trim()) return;
+    const mode = isUpdate && selectedTemplateId ? "update" : "create";
+    setSaveTemplateLoadingMode(mode);
+    try {
+      const payload = {
+        templateName: templateName.trim(),
+        title: form.title,
+        description: form.description || null,
+        cashType: form.cashType,
+        amountOfMoney: parseMoneyInput(form.amountOfMoney),
+        sourceId: form.sourceId || null,
+        primaryCategoryId: form.primaryCategoryId || null,
+        secondaryCategoryIds,
+      };
+
+      const url =
+        mode === "update"
+          ? `/api/cashflow-template/${selectedTemplateId}`
+          : "/api/cashflow-template";
+      const method = mode === "update" ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        setSaveTemplateSuccess(true);
+        setTimeout(() => setSaveTemplateSuccess(false), 3000);
+        setSaveTemplateOpen(false);
+        fetchTemplates();
+        window.dispatchEvent(new CustomEvent("refresh-templates"));
+      }
+    } catch {
+      // ignore
+    } finally {
+      setSaveTemplateLoadingMode(null);
+    }
+  };
+
+  useEffect(() => {
+    const handleOpenWithTemplate = (e: CustomEvent) => {
+      if (e.detail?.template) {
+        applyTemplate(e.detail.template);
+      }
+    };
+    window.addEventListener(
+      "open-cashflow-modal-template",
+      handleOpenWithTemplate as EventListener
+    );
+    return () => {
+      window.removeEventListener(
+        "open-cashflow-modal-template",
+        handleOpenWithTemplate as EventListener
+      );
+    };
+  }, []);
+
   useEffect(() => {
     if (!open) return;
     fetchSources();
     fetchCategories();
     fetchSecondaryCategories();
+    fetchTemplates();
 
     if (editData) {
       setForm({
@@ -365,6 +485,39 @@ export function CashFlowModal({
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
           {/* Scrollable Form Body */}
           <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            {/* TEMPLATE QUICK SELECTOR */}
+            {!isEdit && (
+              <div className="flex items-center gap-2 p-2.5 px-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-900/60 rounded-2xl shadow-2xs">
+                <Bookmark className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span className="text-xs font-bold text-amber-800 dark:text-amber-300 whitespace-nowrap">
+                  {language === "vi" ? "Chọn mẫu nhanh:" : "Quick Template:"}
+                </span>
+                <Select
+                  onValueChange={(tplId) => {
+                    const found = templates.find((t) => t.id === tplId);
+                    if (found) applyTemplate(found);
+                  }}
+                >
+                  <SelectTrigger className="h-8 text-xs bg-white dark:bg-slate-900 border-amber-300/80 dark:border-amber-800 text-slate-800 dark:text-slate-200 rounded-xl flex-1 font-medium">
+                    <SelectValue placeholder={language === "vi" ? "-- Chọn mẫu đã lưu --" : "-- Select saved template --"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templates.length === 0 ? (
+                      <SelectItem value="empty" disabled className="text-xs text-slate-400">
+                        {language === "vi" ? "Chưa có mẫu nào" : "No templates saved"}
+                      </SelectItem>
+                    ) : (
+                      templates.map((tpl) => (
+                        <SelectItem key={tpl.id} value={tpl.id} className="text-xs font-semibold">
+                          ✨ {tpl.templateName} ({tpl.amountOfMoney > 0 ? `${tpl.amountOfMoney.toLocaleString("vi-VN")} ₫` : tpl.title || "Mẫu"})
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             {/* SECTION 1: LOẠI GIAO DỊCH & SỐ TIỀN */}
             <div
               className={cn(
@@ -801,20 +954,114 @@ export function CashFlowModal({
           </div>
 
           {/* Fixed Footer Actions */}
-          <div className="p-4 px-5 border-t border-slate-100 dark:border-slate-800 shrink-0 bg-white dark:bg-slate-900 flex gap-3 z-10">
-            <Button
-              type="button"
-              variant="outline"
-              className="flex-1 h-10 text-xs font-bold rounded-xl border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
-              onClick={() => onOpenChange(false)}
-            >
-              {t("common.cancel")}
-            </Button>
+          <div className="p-4 px-5 border-t border-slate-100 dark:border-slate-800 shrink-0 bg-white dark:bg-slate-900 flex flex-col gap-2.5 z-10">
+            <div className="flex items-center gap-2.5 w-full">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1 h-10 text-xs font-bold rounded-xl border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+                onClick={() => onOpenChange(false)}
+              >
+                {t("common.cancel")}
+              </Button>
+
+              {!isEdit && (
+                <Popover
+                  open={saveTemplateOpen}
+                  onOpenChange={(open) => {
+                    setSaveTemplateOpen(open);
+                    if (open && form.title.trim() && !templateName.trim()) {
+                      setTemplateName(form.title.trim());
+                    }
+                  }}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1 h-10 text-xs font-bold rounded-xl border-amber-300 dark:border-amber-800/80 text-amber-700 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-950/30 hover:bg-amber-100/60 dark:hover:bg-amber-900/40 cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <Bookmark className="h-3.5 w-3.5" />
+                      {saveTemplateSuccess ? (
+                        <span className="text-emerald-600 dark:text-emerald-400">✓ {language === "vi" ? "Đã Lưu!" : "Saved!"}</span>
+                      ) : (
+                        (language === "vi" ? "Lưu Mẫu" : "Save Template")
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="center" className="w-80 p-4 space-y-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-50">
+                    <div className="flex items-center gap-2">
+                      <Bookmark className="h-4 w-4 text-amber-500" />
+                      <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                        {language === "vi" ? "Lưu Form Thành Mẫu Giao Dịch" : "Save Form as Template"}
+                      </h4>
+                    </div>
+                    <p className="text-[11px] text-slate-400 font-medium">
+                      {language === "vi"
+                        ? "Nhập tên cho mẫu này để chọn nhanh trong các lần khai báo sau."
+                        : "Enter a name for this template for fast selection later."}
+                    </p>
+                    <div className="space-y-1">
+                      <Label className="text-[11px] font-semibold">{language === "vi" ? "Tên Mẫu *" : "Template Name *"}</Label>
+                      <Input
+                        value={templateName}
+                        onChange={(e) => setTemplateName(e.target.value)}
+                        placeholder={form.title || (language === "vi" ? "VD: Ăn sáng cố định..." : "E.g. Daily breakfast...")}
+                        className="h-8 text-xs bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                        onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleSaveTemplate())}
+                      />
+                    </div>
+                    <div className="flex justify-end gap-1.5 pt-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSaveTemplateOpen(false)}
+                        className="h-7 text-xs"
+                      >
+                        {t("common.cancel")}
+                      </Button>
+                      {selectedTemplateId && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={!!saveTemplateLoadingMode || !templateName.trim()}
+                          onClick={() => handleSaveTemplate(true)}
+                          className="h-7 text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white rounded-lg px-2.5"
+                        >
+                          {saveTemplateLoadingMode === "update" ? (
+                            <Spinner className="h-3 w-3" />
+                          ) : (
+                            language === "vi" ? "Cập Nhật" : "Update"
+                          )}
+                        </Button>
+                      )}
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={!!saveTemplateLoadingMode || !templateName.trim()}
+                        onClick={() => handleSaveTemplate(false)}
+                        className="h-7 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-lg px-3"
+                      >
+                        {saveTemplateLoadingMode === "create" ? (
+                          <Spinner className="h-3 w-3" />
+                        ) : selectedTemplateId ? (
+                          language === "vi" ? "Lưu Mới" : "Save New"
+                        ) : (
+                          language === "vi" ? "Lưu Mẫu" : "Save"
+                        )}
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
+
             <Button
               type="submit"
               disabled={loading}
               className={cn(
-                "flex-1 h-10 text-xs font-bold rounded-xl text-white shadow-md transition-all cursor-pointer",
+                "w-full h-11 text-xs font-bold rounded-xl text-white shadow-md transition-all cursor-pointer",
                 form.cashType === "Income"
                   ? "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-emerald-600/20"
                   : "bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 shadow-rose-600/20",

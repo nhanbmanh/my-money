@@ -27,6 +27,7 @@ model User {
   categories          Category[]
   secondaryCategories SecondaryCategory[]
   cashFlows           CashFlow[]
+  cashFlowTemplates   CashFlowTemplate[]
 
   // Wealth Management Relations
   holdings           Holding[]
@@ -64,6 +65,7 @@ model Source {
   updatedAt  DateTime   @updatedAt
 
   cashFlows  CashFlow[]
+  cashFlowTemplates CashFlowTemplate[]
 
   @@map("sources")
 }
@@ -78,6 +80,7 @@ model Category {
   updatedAt    DateTime   @updatedAt
 
   cashFlows    CashFlow[]
+  cashFlowTemplates CashFlowTemplate[]
 
   @@map("categories")
 }
@@ -93,6 +96,7 @@ model SecondaryCategory {
   updatedAt    DateTime   @updatedAt
 
   cashFlowSecondaryCategories CashFlowSecondaryCategory[]
+  cashFlowTemplateSecondaryCategories CashFlowTemplateSecondaryCategory[]
 
   @@map("secondary_categories")
 }
@@ -130,6 +134,39 @@ model CashFlowSecondaryCategory {
 
   @@unique([cashFlowId, secondaryCategoryId])
   @@map("cash_flow_secondary_categories")
+}
+
+model CashFlowTemplate {
+  id                String    @id @default(uuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  templateName      String
+  sourceId          String?
+  source            Source?   @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  primaryCategoryId String?
+  primaryCategory   Category? @relation(fields: [primaryCategoryId], references: [id], onDelete: SetNull)
+  title             String
+  cashType          CashType  @default(Expense)
+  amountOfMoney     Float     @default(0)
+  description       String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  secondaryCategories CashFlowTemplateSecondaryCategory[]
+
+  @@index([userId])
+  @@map("cash_flow_templates")
+}
+
+model CashFlowTemplateSecondaryCategory {
+  id                  String            @id @default(uuid())
+  templateId          String
+  template            CashFlowTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  secondaryCategoryId String
+  secondaryCategory   SecondaryCategory @relation(fields: [secondaryCategoryId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, secondaryCategoryId])
+  @@map("cash_flow_template_secondary_categories")
 }
 
 enum CashType {

@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { fetchClosingPriceDetailsForSymbol } from "@/lib/market-ticker-service";
 import { ASSET_CATEGORY_TYPES } from "@/lib/asset-category-types";
-import { getOrCreateLiquidHolding, recordDailyAssetSnapshot } from "@/lib/wealth-service";
+import { getOrCreateLiquidHolding, recordDailyAssetSnapshot, getWealthTimeSeriesAndSnapshots } from "@/lib/wealth-service";
 
 export async function GET() {
   try {
@@ -134,7 +134,7 @@ export async function GET() {
       updatedAt: h.updatedAt || h.asset?.updatedAt,
     }));
 
-    // 4. Record daily asset snapshot asynchronously in background so response is non-blocking
+    // 4. Record daily asset snapshot asynchronously & generate continuous time-series
     recordDailyAssetSnapshot(userId, {
       totalAssets,
       totalLiabilities,
@@ -145,6 +145,18 @@ export async function GET() {
         holdings: holdingsSnapshot,
       },
     }).catch((err) => console.error("Async snapshot error:", err));
+
+    const continuousSnapshots = await getWealthTimeSeriesAndSnapshots(
+      userId,
+      {
+        totalAssets,
+        totalLiabilities,
+        netWorth,
+        totalInvestableAssets,
+        holdingsSnapshot,
+      },
+      30
+    );
 
     return NextResponse.json({
       success: true,
@@ -163,7 +175,7 @@ export async function GET() {
       liabilities,
       transactions,
       cashFlows,
-      snapshots,
+      snapshots: continuousSnapshots.length > 0 ? continuousSnapshots : snapshots,
     });
   } catch (error) {
     console.error("GET /api/wealth Error:", error);
