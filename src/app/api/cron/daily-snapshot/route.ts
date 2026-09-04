@@ -106,19 +106,7 @@ export async function GET(request: Request) {
           updatedAt: h.updatedAt || h.asset?.updatedAt,
         }));
 
-        // 4. Record daily asset snapshot in PostgreSQL
-        await recordDailyAssetSnapshot(userId, {
-          totalAssets,
-          totalLiabilities,
-          netWorth,
-          totalInvestableAssets,
-          breakdownJson: {
-            byCategory: breakdownList,
-            holdings: holdingsSnapshot,
-          },
-        });
-
-        // 5. Send automated daily snapshot email report to user
+        // Send automated daily snapshot email report to user
         const emailResult = await buildAndSendDailySnapshotEmail({
           userId,
           userEmail: user.email,

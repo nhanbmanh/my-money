@@ -103,9 +103,9 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r bg-sidebar">
-      <SidebarHeader className="border-b border-sidebar-border px-4 py-4 group-data-[collapsible=icon]:px-2">
+      <SidebarHeader className="border-b border-sidebar-border px-4 py-4 group-data-[collapsible=icon]:px-0">
         <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-sky-500 via-blue-600 to-emerald-500 text-white shadow-lg shadow-sky-500/20">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-sky-500 via-blue-600 to-emerald-500 text-white shadow-lg shadow-sky-500/20">
             <Layers className="h-5 w-5 text-white" />
           </div>
           <div className="group-data-[collapsible=icon]:hidden">
@@ -121,7 +121,7 @@ export function AppSidebar() {
 
       <SidebarContent className="gap-4">
         {/* Navigation Group */}
-        <SidebarGroup>
+        <SidebarGroup className="group-data-[collapsible=icon]:px-0">
           <SidebarGroupLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
             {t("nav.navigation")}
           </SidebarGroupLabel>
@@ -133,17 +133,20 @@ export function AppSidebar() {
                 pathname === item.href || (item.href === "/financial-management" && pathname === "/");
 
               return (
-                <SidebarMenuItem key={item.href}>
+                <SidebarMenuItem
+                  key={item.href}
+                  className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center"
+                >
                   <SidebarMenuButton
                     asChild
                     isActive={isActive}
-                    className="h-10 text-xs font-semibold rounded-xl"
+                    className="h-10 text-xs font-semibold rounded-xl group-data-[collapsible=icon]:!size-9 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center"
                   >
                     <Link
                       href={item.href}
-                      className="flex items-center justify-between gap-2.5 w-full group/link"
+                      className="flex items-center justify-between gap-2.5 w-full group/link group-data-[collapsible=icon]:justify-center"
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex items-center gap-2.5 min-w-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
                         <item.icon className={cn("h-4 w-4 shrink-0", item.iconColor)} />
                         <span className="group-data-[collapsible=icon]:hidden truncate">
                           {item.label}
@@ -186,59 +189,7 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {/* Settings Group: Language & Theme */}
-        <SidebarGroup>
-          {/* 
-          // Temporarily hidden language toggle switcher for current release
-          <SidebarGroupLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-            {t("nav.language")}
-          </SidebarGroupLabel>
-          <div className="px-2 group-data-[collapsible=icon]:px-0 mb-3">
-            <div className="group-data-[collapsible=icon]:hidden grid grid-cols-2 p-1 bg-muted rounded-xl border border-sidebar-border gap-0.5">
-              <button
-                type="button"
-                onClick={() => setLanguage("vi")}
-                className={cn(
-                  "flex items-center justify-center py-1.5 px-1 rounded-lg text-[11px] font-bold transition-all gap-1.5 cursor-pointer",
-                  language === "vi"
-                    ? "bg-background text-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-                title="Tiếng Việt"
-              >
-                <span>🇻🇳</span>
-                <span>Tiếng Việt</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setLanguage("en")}
-                className={cn(
-                  "flex items-center justify-center py-1.5 px-1 rounded-lg text-[11px] font-bold transition-all gap-1.5 cursor-pointer",
-                  language === "en"
-                    ? "bg-background text-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-                title="English"
-              >
-                <span>🇬🇧</span>
-                <span>English</span>
-              </button>
-            </div>
-
-            <div className="hidden group-data-[collapsible=icon]:flex justify-center">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleLanguage}
-                className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground font-extrabold text-xs cursor-pointer"
-                title={`Language: ${language.toUpperCase()}`}
-              >
-                {language.toUpperCase()}
-              </Button>
-            </div>
-          </div>
-          */}
-
+        <SidebarGroup className="group-data-[collapsible=icon]:px-0">
           <SidebarGroupLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
             {t("nav.themeMode")}
           </SidebarGroupLabel>
@@ -315,7 +266,7 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border px-3 py-3 group-data-[collapsible=icon]:px-2">
+      <SidebarFooter className="border-t border-sidebar-border px-3 py-3 group-data-[collapsible=icon]:px-0">
         <div className="flex items-center justify-between gap-2 group-data-[collapsible=icon]:justify-center">
           <div className="flex min-w-0 items-center gap-2 group-data-[collapsible=icon]:hidden">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground">

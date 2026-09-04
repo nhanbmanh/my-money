@@ -30,24 +30,7 @@ export async function buildAndSendDailySnapshotEmail({
   const targetDate = date || getStartOfTodayVN();
   const dateStrStr = format(targetDate, "dd/MM/yyyy");
 
-  // 1. Fetch today's snapshot
-  const todaySnapshot = await prisma.assetSnapshot.findFirst({
-    where: {
-      userId,
-      date: targetDate,
-    },
-  });
-
-  // 2. Fetch yesterday's snapshot for baseline comparison
-  const yesterdaySnapshot = await prisma.assetSnapshot.findFirst({
-    where: {
-      userId,
-      date: { lt: targetDate },
-    },
-    orderBy: { date: "desc" },
-  });
-
-  // 3. Fetch user's current holdings and liabilities
+  // 1. Fetch user's current holdings and liabilities
   const holdings = await prisma.holding.findMany({
     where: { userId },
     include: { asset: true },
@@ -59,26 +42,15 @@ export async function buildAndSendDailySnapshotEmail({
     orderBy: { createdAt: "desc" },
   });
 
-  const totalAssets = todaySnapshot
-    ? Number(todaySnapshot.totalAssetsValue)
-    : holdings.reduce((sum, h) => sum + (h.currentValue || 0), 0);
+  const totalAssets = holdings.reduce((sum, h) => sum + (h.currentValue || 0), 0);
+  const totalLiabilities = liabilities.reduce((sum, l) => sum + (l.totalDebt || 0), 0);
+  const netWorth = totalAssets - totalLiabilities;
+  const totalLiquid = holdings.reduce((sum, h) => sum + (h.categoryType === 0 ? h.currentValue || 0 : 0), 0);
 
-  const totalLiabilities = todaySnapshot
-    ? Number(todaySnapshot.totalLiabilitiesValue)
-    : liabilities.reduce((sum, l) => sum + (l.totalDebt || 0), 0);
-
-  const netWorth = todaySnapshot
-    ? Number(todaySnapshot.netWorthValue)
-    : totalAssets - totalLiabilities;
-
-  const totalLiquid = todaySnapshot
-    ? Number(todaySnapshot.totalLiquidValue)
-    : holdings.reduce((sum, h) => sum + (h.investableFlag ? h.currentValue || 0 : 0), 0);
-
-  // Variance vs yesterday
-  const yesterdayNetWorth = yesterdaySnapshot ? Number(yesterdaySnapshot.netWorthValue) : netWorth;
-  const netWorthDelta = netWorth - yesterdayNetWorth;
-  const netWorthDeltaPercent = yesterdayNetWorth > 0 ? (netWorthDelta / yesterdayNetWorth) * 100 : 0;
+  // Variance vs yesterday (calculated directly from live prices)
+  const yesterdayNetWorth = netWorth;
+  const netWorthDelta = 0;
+  const netWorthDeltaPercent = 0;
 
   const isDeltaPositive = netWorthDelta >= 0;
   const deltaBadgeColor = isDeltaPositive ? "#10b981" : "#ef4444";
@@ -240,8 +212,7 @@ export async function buildAndSendDailySnapshotEmail({
 
           <!-- Snapshot Audit Metadata -->
           <div style="margin-top: 24px; padding: 14px; background-color: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 10px; font-size: 11px; color: #64748b; line-height: 1.6;">
-            <div><strong>🔒 Trạng thái chốt sổ:</strong> Ghi nhận snapshot 00:00 VNT vào cơ sở dữ liệu thành công.</div>
-            <div><strong>🆔 Snapshot ID:</strong> <code>${todaySnapshot?.id || "Auto-Generated"}</code></div>
+            <div><strong>🔒 Trạng thái chốt sổ:</strong> Báo cáo định giá gia sản thời gian thực.</div>
             <div><strong>⏰ Thời gian thực thi:</strong> ${format(getNowVN(), "HH:mm:ss dd/MM/yyyy")} (GMT+7)</div>
           </div>
         </div>

@@ -87,54 +87,22 @@ export function OverviewBalanceSheet({
 
   // Precompute 24h market PnL change logged today (Day T vs T-1 closing price)
   const rawMarketChange = useMemo(() => {
-    const startOfToday = getStartOfTodayVN();
-    const pastSnapshots = (snapshots || []).filter(
-      (s: any) => new Date(s.date) < startOfToday
-    );
-    const yesterdaySnapshot = pastSnapshots.length > 0 ? pastSnapshots[pastSnapshots.length - 1] : null;
-
-    let snapshotHoldingsMap: Record<string, any> = {};
-    if (yesterdaySnapshot && yesterdaySnapshot.breakdownJson) {
-      const json = yesterdaySnapshot.breakdownJson;
-      const list = Array.isArray(json) ? json : json.holdings || [];
-      if (Array.isArray(list)) {
-        list.forEach((item: any) => {
-          if (item.id) snapshotHoldingsMap[item.id] = item;
-          if (item.assetId) snapshotHoldingsMap[item.assetId] = item;
-        });
-      }
-    }
-
     let sum = 0;
     (holdings || []).forEach((h: any) => {
       if (h.categoryType === 0 || h.asset?.symbolOrTicker === "CASH_VND") return;
 
       const quantity = Number(h.quantity || 0);
-      const currentVal = Number(h.currentValue || 0);
       const currentUnitPrice = Number(h.currentMarketPrice || h.averageCostBasis || 0);
-      const snapItem = snapshotHoldingsMap[h.id] || snapshotHoldingsMap[h.assetId];
+      const yesterdayUnitPrice = Number(h.yesterdayPrice || currentUnitPrice);
 
-      if (snapItem) {
-        const yesterdayPrice = Number(snapItem.currentMarketPrice || snapItem.averageCostBasis || 0);
-        if (yesterdayPrice > 0 && currentUnitPrice > 0) {
-          const priceDelta = currentUnitPrice - yesterdayPrice;
-          sum += Math.round(priceDelta * quantity);
-        } else {
-          const snapVal = Number(snapItem.currentValue || 0);
-          sum += Math.round(currentVal - snapVal);
-        }
-      } else {
-        const change24hPercent = Number(h.change24h || 0);
-        if (change24hPercent !== 0 && currentUnitPrice > 0) {
-          const previousUnitPrice = currentUnitPrice / (1 + change24hPercent / 100);
-          const navDeltaPerUnit = currentUnitPrice - previousUnitPrice;
-          sum += Math.round(navDeltaPerUnit * quantity);
-        }
+      if (yesterdayUnitPrice > 0 && currentUnitPrice > 0) {
+        const priceDelta = currentUnitPrice - yesterdayUnitPrice;
+        sum += Math.round(priceDelta * quantity);
       }
     });
 
     return sum;
-  }, [holdings, snapshots]);
+  }, [holdings]);
 
   // Dynamic timeframe chart data computed strictly via user formula: Net Worth Date X = A + B + C
   // A = Liquid Cash Today - CashFlows logged strictly after Date X
@@ -179,19 +147,15 @@ export function OverviewBalanceSheet({
 
         let priceAtX = currentUnitPrice;
         if (targetEOD < startOfToday) {
-          const pastSnapshots = (snapshots || []).filter(
-            (s: any) => new Date(s.date) < startOfToday
-          );
-          const yesterdaySnapshot = pastSnapshots.length > 0 ? pastSnapshots[pastSnapshots.length - 1] : null;
+          const yyyy = targetEOD.getFullYear();
+          const mm = String(targetEOD.getMonth() + 1).padStart(2, "0");
+          const dd = String(targetEOD.getDate()).padStart(2, "0");
+          const dateKey = `${yyyy}-${mm}-${dd}`;
 
-          if (yesterdaySnapshot && yesterdaySnapshot.breakdownJson) {
-            const list = Array.isArray(yesterdaySnapshot.breakdownJson)
-              ? yesterdaySnapshot.breakdownJson
-              : yesterdaySnapshot.breakdownJson.holdings || [];
-            const snapItem = list.find((item: any) => item.id === h.id || item.assetId === h.assetId);
-            if (snapItem) {
-              priceAtX = Number(snapItem.currentMarketPrice || snapItem.averageCostBasis || currentUnitPrice);
-            }
+          if (h.historyMap && h.historyMap[dateKey]) {
+            priceAtX = Number(h.historyMap[dateKey]);
+          } else {
+            priceAtX = Number(h.yesterdayPrice || currentUnitPrice);
           }
         }
         const totalValueAtX = qty * priceAtX;
@@ -332,6 +296,26 @@ export function OverviewBalanceSheet({
 
     return [];
   }, [timeframe, summary, holdings, cashFlows, snapshots]);
+
+  // Dynamic YAxis domain for optimal chart scaling (zooms into fluctuations instead of starting at 0)
+  const yDomain = useMemo(() => {
+    if (!chartData || chartData.length === 0) return ["auto", "auto"];
+    const values = chartData
+      .map((d: any) => Number(d["Giá trị gia sản (Ròng)"] || 0))
+      .filter((v: number) => v > 0);
+
+    if (values.length === 0) return ["auto", "auto"];
+
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const diff = max - min;
+
+    const padding = diff > 0 ? diff * 0.2 : min * 0.01;
+    const domainMin = Math.max(0, Math.floor(min - padding));
+    const domainMax = Math.ceil(max + padding);
+
+    return [domainMin, domainMax];
+  }, [chartData]);
 
   // 1-day Net Worth Variance Calculation (100% synchronized with NetWorthVarianceModal via Day T vs T-1 closing price)
   const { previousNetWorth, netWorthChangeAmount, netWorthChangePercent, isPositive } = useMemo(() => {
@@ -624,10 +608,16 @@ export function OverviewBalanceSheet({
                 <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
                 <XAxis dataKey="date" tickLine={false} style={{ fontSize: "12px" }} />
                 <YAxis
+                  domain={yDomain}
                   tickLine={false}
                   axisLine={false}
                   style={{ fontSize: "11px" }}
-                  tickFormatter={(val) => `${(val / 1e9).toFixed(1)}B`}
+                  tickFormatter={(val) => {
+                    if (val >= 1e9) return `${(val / 1e9).toFixed(2)}B`;
+                    if (val >= 1e6) return `${(val / 1e6).toFixed(1)}M`;
+                    if (val >= 1e3) return `${(val / 1e3).toFixed(0)}k`;
+                    return `${val}`;
+                  }}
                 />
                 <RechartsTooltip
                   formatter={(value: any) => [formatVND(Number(value)), ""]}

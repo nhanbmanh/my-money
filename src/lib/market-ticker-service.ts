@@ -45,7 +45,16 @@ export const BASE_POPULAR_TICKERS: MarketTicker[] = [
 ];
 
 // Memory cache for fetched prices (15 seconds short cache for fresh realtime market data)
-const priceCache: Record<string, { price: number; change24h?: number; timestamp: number }> = {};
+const priceCache: Record<
+  string,
+  {
+    price: number;
+    change24h?: number;
+    yesterdayPrice?: number;
+    historyMap?: Record<string, number>;
+    timestamp: number;
+  }
+> = {};
 const CACHE_TTL_MS = 15 * 1000; // 15 seconds short cache
 
 /**
@@ -65,12 +74,24 @@ async function fetchWithTimeout(url: string, options: any = {}, timeoutMs = 4000
   }
 }
 
-export async function fetchLivePriceFromPublicAPIs(symbol: string): Promise<{ price: number; change24h?: number } | null> {
+export async function fetchLivePriceFromPublicAPIs(
+  symbol: string
+): Promise<{
+  price: number;
+  change24h?: number;
+  yesterdayPrice?: number;
+  historyMap?: Record<string, number>;
+} | null> {
   const cleanSymbol = symbol.toUpperCase().trim();
 
   // Check cache
   if (priceCache[cleanSymbol] && Date.now() - priceCache[cleanSymbol].timestamp < CACHE_TTL_MS) {
-    return { price: priceCache[cleanSymbol].price, change24h: priceCache[cleanSymbol].change24h };
+    return {
+      price: priceCache[cleanSymbol].price,
+      change24h: priceCache[cleanSymbol].change24h,
+      yesterdayPrice: priceCache[cleanSymbol].yesterdayPrice,
+      historyMap: priceCache[cleanSymbol].historyMap,
+    };
   }
 
   try {
@@ -80,46 +101,126 @@ export async function fetchLivePriceFromPublicAPIs(symbol: string): Promise<{ pr
       ETH: "ethereum",
       SOL: "solana",
       USDT: "tether",
-      BNB: "binancecoin"
+      BNB: "binancecoin",
     };
 
     if (cryptoMap[cleanSymbol]) {
       const id = cryptoMap[cleanSymbol];
-      const res = await fetchWithTimeout(`https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=vnd&include_24hr_change=true`, {
-        next: { revalidate: 300 }
-      });
+      const res = await fetchWithTimeout(
+        `https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=vnd&include_24hr_change=true`,
+        {
+          next: { revalidate: 300 },
+        }
+      );
       if (res.ok) {
         const data = await res.json();
         if (data[id]?.vnd) {
           const price = Math.round(data[id].vnd);
-          const change24h = data[id].vnd_24h_change !== undefined ? Number(data[id].vnd_24h_change.toFixed(2)) : undefined;
-          priceCache[cleanSymbol] = { price, change24h, timestamp: Date.now() };
-          return { price, change24h };
+          const change24h =
+            data[id].vnd_24h_change !== undefined ? Number(data[id].vnd_24h_change.toFixed(2)) : undefined;
+          let yesterdayPrice = price;
+          if (change24h !== undefined && change24h !== 0) {
+            yesterdayPrice = Math.round(price / (1 + change24h / 100));
+          }
+          priceCache[cleanSymbol] = { price, change24h, yesterdayPrice, timestamp: Date.now() };
+          return { price, change24h, yesterdayPrice };
         }
       }
     }
 
-    // 2. Check Vietnam Stock & ETF via Yahoo Finance API
-    if (!cleanSymbol.includes(".") && cleanSymbol.length <= 8 && !["SJC", "PNJ", "GOLD9999", "DOJI", "XAUUSD", "SILVER", "PLATINUM", "COPPER", "DCDS", "VESAF"].includes(cleanSymbol)) {
+    // 2. Check Vietnam Stock & ETF via Yahoo Finance API (with 1mo history for exact EOD closes)
+    if (
+      !cleanSymbol.includes(".") &&
+      cleanSymbol.length <= 8 &&
+      !["SJC", "PNJ", "GOLD9999", "DOJI", "XAUUSD", "SILVER", "PLATINUM", "COPPER", "DCDS", "VESAF"].includes(
+        cleanSymbol
+      )
+    ) {
       const yahooSymbol = `${cleanSymbol}.VN`;
-      const res = await fetchWithTimeout(`https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}`, {
-        headers: { "User-Agent": "Mozilla/5.0" },
-        next: { revalidate: 300 }
-      });
+      const res = await fetchWithTimeout(
+        `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?range=1mo&interval=1d`,
+        {
+          headers: { "User-Agent": "Mozilla/5.0" },
+          next: { revalidate: 300 },
+        }
+      );
 
       if (res.ok) {
         const data = await res.json();
-        const meta = data?.chart?.result?.[0]?.meta;
+        const result = data?.chart?.result?.[0];
+        const meta = result?.meta;
+
         if (meta?.regularMarketPrice && meta.regularMarketPrice > 0) {
           const price = Math.round(meta.regularMarketPrice);
+
+          // Build daily close history map and extract exact last close before today
+          const historyMap: Record<string, number> = {};
+          const timestamps = result?.timestamp || [];
+          const closes = result?.indicators?.quote?.[0]?.close || [];
+
+          const now = new Date();
+          const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+            now.getDate()
+          ).padStart(2, "0")}`;
+
+          let lastCloseBeforeToday = 0;
+          let lastKnownClose = price;
+
+          timestamps.forEach((ts: number, idx: number) => {
+            const closeVal = closes[idx];
+            if (closeVal && closeVal > 0) {
+              lastKnownClose = Math.round(closeVal);
+            }
+            if (ts && lastKnownClose > 0) {
+              const d = new Date(ts * 1000);
+              const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+                d.getDate()
+              ).padStart(2, "0")}`;
+              historyMap[dateKey] = lastKnownClose;
+
+              if (dateKey < todayKey && lastKnownClose > 0) {
+                lastCloseBeforeToday = lastKnownClose;
+              }
+            }
+          });
+
+          // Forward fill missing calendar days (weekends, holidays) in last 30 days
+          for (let i = 30; i >= 0; i--) {
+            const d = new Date(now);
+            d.setDate(d.getDate() - i);
+            const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+              d.getDate()
+            ).padStart(2, "0")}`;
+            if (!historyMap[dateKey]) {
+              const prevDate = new Date(d);
+              prevDate.setDate(prevDate.getDate() - 1);
+              const prevKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(
+                2,
+                "0"
+              )}-${String(prevDate.getDate()).padStart(2, "0")}`;
+              if (historyMap[prevKey]) {
+                historyMap[dateKey] = historyMap[prevKey];
+              }
+            }
+          }
+
+          // Use actual closing price of previous session strictly before today
+          const yesterdayPrice =
+            lastCloseBeforeToday > 0
+              ? lastCloseBeforeToday
+              : meta.chartPreviousClose
+              ? Math.round(meta.chartPreviousClose)
+              : price;
+
           let change24h: number | undefined = undefined;
-          if (meta.chartPreviousClose && meta.chartPreviousClose > 0) {
-            change24h = Number((((price - meta.chartPreviousClose) / meta.chartPreviousClose) * 100).toFixed(2));
+          if (yesterdayPrice > 0 && yesterdayPrice !== price) {
+            change24h = Number((((price - yesterdayPrice) / yesterdayPrice) * 100).toFixed(2));
           } else if (meta.regularMarketChangePercent !== undefined) {
             change24h = Number(Number(meta.regularMarketChangePercent).toFixed(2));
           }
-          priceCache[cleanSymbol] = { price, change24h, timestamp: Date.now() };
-          return { price, change24h };
+
+          priceCache[cleanSymbol] = { price, change24h, yesterdayPrice, historyMap, timestamp: Date.now() };
+          return { price, change24h, yesterdayPrice, historyMap };
         }
       }
     }
@@ -129,43 +230,52 @@ export async function fetchLivePriceFromPublicAPIs(symbol: string): Promise<{ pr
       try {
         const tthhRes = await fetchWithTimeout("https://www.thitruonghanghoa.com/", {
           headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
-          next: { revalidate: 300 }
+          next: { revalidate: 300 },
         });
         if (tthhRes.ok) {
           const htmlText = await tthhRes.text();
-          
+
           if (cleanSymbol === "XAUUSD" || cleanSymbol === "GOLD") {
-            const m = htmlText.match(/Vàng[\s\S]*?GOLD\s*\/\s*XAU\s*USD[\s\S]*?([\d.]+)\s*VNĐ\s*\/\s*lượng[\s\S]*?([+-]?[\d.]+)\%/i);
+            const m = htmlText.match(
+              /Vàng[\s\S]*?GOLD\s*\/\s*XAU\s*USD[\s\S]*?([\d.]+)\s*VNĐ\s*\/\s*lượng[\s\S]*?([+-]?[\d.]+)\%/i
+            );
             if (m) {
               const lượngPrice = Math.round(parseFloat(m[1].replace(/\./g, "")));
               const change24h = parseFloat(m[2]);
+              const yesterdayPrice = change24h ? Math.round(lượngPrice / (1 + change24h / 100)) : lượngPrice;
               if (lượngPrice > 50000000) {
-                priceCache[cleanSymbol] = { price: lượngPrice, change24h, timestamp: Date.now() };
-                return { price: lượngPrice, change24h };
+                priceCache[cleanSymbol] = { price: lượngPrice, change24h, yesterdayPrice, timestamp: Date.now() };
+                return { price: lượngPrice, change24h, yesterdayPrice };
               }
             }
           }
 
           if (cleanSymbol === "SILVER") {
-            const m = htmlText.match(/Bạc[\s\S]*?SILVER\s*\/\s*XAG\s*USD[\s\S]*?([\d.]+)\s*VNĐ\s*\/\s*lượng[\s\S]*?([+-]?[\d.]+)\%/i);
+            const m = htmlText.match(
+              /Bạc[\s\S]*?SILVER\s*\/\s*XAG\s*USD[\s\S]*?([\d.]+)\s*VNĐ\s*\/\s*lượng[\s\S]*?([+-]?[\d.]+)\%/i
+            );
             if (m) {
               const lượngPrice = Math.round(parseFloat(m[1].replace(/\./g, "")));
               const change24h = parseFloat(m[2]);
+              const yesterdayPrice = change24h ? Math.round(lượngPrice / (1 + change24h / 100)) : lượngPrice;
               if (lượngPrice > 500000) {
-                priceCache["SILVER"] = { price: lượngPrice, change24h, timestamp: Date.now() };
-                return { price: lượngPrice, change24h };
+                priceCache["SILVER"] = { price: lượngPrice, change24h, yesterdayPrice, timestamp: Date.now() };
+                return { price: lượngPrice, change24h, yesterdayPrice };
               }
             }
           }
 
           if (cleanSymbol === "PLATINUM") {
-            const m = htmlText.match(/Bạch kim[\s\S]*?PLATINUM[\s\S]*?([\d.]+)\s*VNĐ\s*\/\s*lượng[\s\S]*?([+-]?[\d.]+)\%/i);
+            const m = htmlText.match(
+              /Bạch kim[\s\S]*?PLATINUM[\s\S]*?([\d.]+)\s*VNĐ\s*\/\s*lượng[\s\S]*?([+-]?[\d.]+)\%/i
+            );
             if (m) {
               const lượngPrice = Math.round(parseFloat(m[1].replace(/\./g, "")));
               const change24h = parseFloat(m[2]);
+              const yesterdayPrice = change24h ? Math.round(lượngPrice / (1 + change24h / 100)) : lượngPrice;
               if (lượngPrice > 10000000) {
-                priceCache["PLATINUM"] = { price: lượngPrice, change24h, timestamp: Date.now() };
-                return { price: lượngPrice, change24h };
+                priceCache["PLATINUM"] = { price: lượngPrice, change24h, yesterdayPrice, timestamp: Date.now() };
+                return { price: lượngPrice, change24h, yesterdayPrice };
               }
             }
           }
@@ -177,7 +287,7 @@ export async function fetchLivePriceFromPublicAPIs(symbol: string): Promise<{ pr
       try {
         const gvRes = await fetchWithTimeout("https://giavang.org/", {
           headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
-          next: { revalidate: 300 }
+          next: { revalidate: 300 },
         });
         if (gvRes.ok) {
           const htmlText = await gvRes.text();
@@ -188,8 +298,8 @@ export async function fetchLivePriceFromPublicAPIs(symbol: string): Promise<{ pr
             const valStr = miengMatch[1];
             const priceLượng = Math.round(parseFloat(valStr.replace(/\./g, "")) * 1000);
             if (priceLượng > 50000000) {
-              priceCache["SJC"] = { price: priceLượng, change24h: 0.35, timestamp: Date.now() };
-              return { price: priceLượng, change24h: 0.35 };
+              priceCache["SJC"] = { price: priceLượng, change24h: 0.35, yesterdayPrice: Math.round(priceLượng / 1.0035), timestamp: Date.now() };
+              return { price: priceLượng, change24h: 0.35, yesterdayPrice: Math.round(priceLượng / 1.0035) };
             }
           }
 
@@ -197,8 +307,8 @@ export async function fetchLivePriceFromPublicAPIs(symbol: string): Promise<{ pr
             const valStr = nhanMatch[1];
             const priceChỉ = Math.round((parseFloat(valStr.replace(/\./g, "")) * 1000) / 10);
             if (priceChỉ > 5000000) {
-              priceCache[cleanSymbol] = { price: priceChỉ, change24h: 0.42, timestamp: Date.now() };
-              return { price: priceChỉ, change24h: 0.42 };
+              priceCache[cleanSymbol] = { price: priceChỉ, change24h: 0.42, yesterdayPrice: Math.round(priceChỉ / 1.0042), timestamp: Date.now() };
+              return { price: priceChỉ, change24h: 0.42, yesterdayPrice: Math.round(priceChỉ / 1.0042) };
             }
           }
         }
@@ -209,7 +319,7 @@ export async function fetchLivePriceFromPublicAPIs(symbol: string): Promise<{ pr
       try {
         const sjcRes = await fetchWithTimeout("https://sjc.com.vn/xml/tygiavang.xml", {
           headers: { "User-Agent": "Mozilla/5.0" },
-          next: { revalidate: 300 }
+          next: { revalidate: 300 },
         });
         if (sjcRes.ok) {
           const xmlText = await sjcRes.text();
@@ -221,13 +331,13 @@ export async function fetchLivePriceFromPublicAPIs(symbol: string): Promise<{ pr
               const sjcChỉPrice = Math.round(sjcLượngPrice / 10);
 
               if (cleanSymbol === "SJC") {
-                priceCache["SJC"] = { price: sjcLượngPrice, change24h: 0.57, timestamp: Date.now() };
-                return { price: sjcLượngPrice, change24h: 0.57 };
+                priceCache["SJC"] = { price: sjcLượngPrice, change24h: 0.57, yesterdayPrice: Math.round(sjcLượngPrice / 1.0057), timestamp: Date.now() };
+                return { price: sjcLượngPrice, change24h: 0.57, yesterdayPrice: Math.round(sjcLượngPrice / 1.0057) };
               }
               if (["PNJ", "GOLD9999", "DOJI"].includes(cleanSymbol)) {
                 const nhanPrice = Math.round(sjcChỉPrice * 0.985);
-                priceCache[cleanSymbol] = { price: nhanPrice, change24h: 0.64, timestamp: Date.now() };
-                return { price: nhanPrice, change24h: 0.64 };
+                priceCache[cleanSymbol] = { price: nhanPrice, change24h: 0.64, yesterdayPrice: Math.round(nhanPrice / 1.0064), timestamp: Date.now() };
+                return { price: nhanPrice, change24h: 0.64, yesterdayPrice: Math.round(nhanPrice / 1.0064) };
               }
             }
           }
@@ -238,9 +348,9 @@ export async function fetchLivePriceFromPublicAPIs(symbol: string): Promise<{ pr
 
       if (cleanSymbol === "XAUUSD") {
         try {
-          const goldRes = await fetchWithTimeout("https://query1.finance.yahoo.com/v8/finance/chart/GC=F", {
+          const goldRes = await fetchWithTimeout("https://query1.finance.yahoo.com/v8/finance/chart/GC=F?range=1mo&interval=1d", {
             headers: { "User-Agent": "Mozilla/5.0" },
-            next: { revalidate: 300 }
+            next: { revalidate: 300 },
           });
           if (goldRes.ok) {
             const goldData = await goldRes.json();
@@ -249,8 +359,9 @@ export async function fetchLivePriceFromPublicAPIs(symbol: string): Promise<{ pr
               const usdGoldPerOz = meta.regularMarketPrice;
               const usdVndRate = 25450;
               const xauVndPerOz = Math.round(usdGoldPerOz * usdVndRate);
-              priceCache["XAUUSD"] = { price: xauVndPerOz, change24h: 1.12, timestamp: Date.now() };
-              return { price: xauVndPerOz, change24h: 1.12 };
+              const prevClose = meta.chartPreviousClose ? Math.round(meta.chartPreviousClose * usdVndRate) : xauVndPerOz;
+              priceCache["XAUUSD"] = { price: xauVndPerOz, change24h: 1.12, yesterdayPrice: prevClose, timestamp: Date.now() };
+              return { price: xauVndPerOz, change24h: 1.12, yesterdayPrice: prevClose };
             }
           }
         } catch {
@@ -262,7 +373,7 @@ export async function fetchLivePriceFromPublicAPIs(symbol: string): Promise<{ pr
     // 4. Check Vietnam Mutual Funds (CCQ) via Fmarket API
     const fundCodeMap: Record<string, string> = {
       DCDS: "VFMVF1",
-      VFMVF1: "VFMVF1"
+      VFMVF1: "VFMVF1",
     };
 
     const searchCode = fundCodeMap[cleanSymbol] || cleanSymbol;
@@ -276,24 +387,28 @@ export async function fetchLivePriceFromPublicAPIs(symbol: string): Promise<{ pr
           issuerIds: [],
           sortOrder: "DESC",
           sortField: "navTo1Month",
-          search: searchCode
+          search: searchCode,
         }),
-        next: { revalidate: 300 }
+        next: { revalidate: 300 },
       });
 
       if (fmarketRes.ok) {
         const json = await fmarketRes.json();
         const rows = json?.data?.rows || [];
-        const matched = rows.find(
-          (r: any) => r.code === searchCode || r.code === cleanSymbol
-        );
+        const matched = rows.find((r: any) => r.code === searchCode || r.code === cleanSymbol);
         if (matched?.nav && matched.nav > 0) {
           const price = Math.round(matched.nav);
-          const change24h = matched.productNavChange?.navToPrevious !== undefined
-            ? Number(matched.productNavChange.navToPrevious.toFixed(2))
-            : undefined;
-          priceCache[cleanSymbol] = { price, change24h, timestamp: Date.now() };
-          return { price, change24h };
+          const change24h =
+            matched.productNavChange?.navToPrevious !== undefined
+              ? Number(matched.productNavChange.navToPrevious.toFixed(2))
+              : undefined;
+          const yesterdayPrice = matched.productNavChange?.previousNav
+            ? Math.round(matched.productNavChange.previousNav)
+            : change24h
+            ? Math.round(price / (1 + change24h / 100))
+            : price;
+          priceCache[cleanSymbol] = { price, change24h, yesterdayPrice, timestamp: Date.now() };
+          return { price, change24h, yesterdayPrice };
         }
       }
     } catch {
@@ -313,9 +428,7 @@ export async function searchMarketTickers(query: string): Promise<MarketTicker[]
   let tickers = [...BASE_POPULAR_TICKERS];
 
   if (clean) {
-    tickers = tickers.filter(
-      (t) => t.symbol.includes(clean) || t.name.toUpperCase().includes(clean)
-    );
+    tickers = tickers.filter((t) => t.symbol.includes(clean) || t.name.toUpperCase().includes(clean));
   }
 
   // Fetch live prices and 24h change for matched top tickers in parallel
@@ -346,8 +459,8 @@ export async function searchMarketTickers(query: string): Promise<MarketTicker[]
       currentPrice: customLiveData?.price || matchedBase?.currentPrice || 10000,
       currency: "VND",
       change24h: customLiveData?.change24h !== undefined ? customLiveData.change24h : matchedBase?.change24h ?? 0.85,
-      defaultUnit: matchedBase?.defaultUnit || "Cổ phiếu"
-    }
+      defaultUnit: matchedBase?.defaultUnit || "Cổ phiếu",
+    },
   ];
 }
 
@@ -369,7 +482,7 @@ export async function fetchClosingPriceForSymbol(symbol: string, currentHoldingP
 export async function fetchClosingPriceDetailsForSymbol(
   symbol: string,
   currentHoldingPrice?: number
-): Promise<{ price: number; change24h: number }> {
+): Promise<{ price: number; change24h: number; yesterdayPrice: number; historyMap?: Record<string, number> }> {
   const clean = symbol.toUpperCase().trim();
   const liveData = await fetchLivePriceFromPublicAPIs(clean);
   const matched = BASE_POPULAR_TICKERS.find((t) => t.symbol === clean);
@@ -381,16 +494,18 @@ export async function fetchClosingPriceDetailsForSymbol(
       ? currentHoldingPrice
       : matched?.currentPrice || 10000;
 
-  let change24h =
-    liveData?.change24h !== undefined && liveData.change24h !== 0
+  const yesterdayPrice =
+    liveData?.yesterdayPrice && liveData.yesterdayPrice > 0
+      ? liveData.yesterdayPrice
+      : price;
+
+  const change24h =
+    liveData?.change24h !== undefined
       ? liveData.change24h
-      : matched?.change24h !== undefined
-      ? matched.change24h
+      : yesterdayPrice > 0 && price !== yesterdayPrice
+      ? Number((((price - yesterdayPrice) / yesterdayPrice) * 100).toFixed(2))
       : 0;
 
-  if (change24h === 0 && matched?.change24h) {
-    change24h = matched.change24h;
-  }
-
-  return { price, change24h };
+  return { price, change24h, yesterdayPrice, historyMap: liveData?.historyMap };
 }
+

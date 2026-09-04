@@ -48,35 +48,8 @@ export function InvestmentPortfolioView({ summary, holdings = [], snapshots = []
     return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(val);
   };
 
-  const startOfToday = useMemo(() => getStartOfTodayVN(), []);
-  const midnightTimestamp = useMemo(() => startOfToday.getTime(), [startOfToday]);
-
-  const todaySnapshot = useMemo(() => {
-    const list = (snapshots || []).filter((s: any) => new Date(s.date) >= startOfToday);
-    return list.length > 0 ? list[0] : null;
-  }, [snapshots, startOfToday]);
-
-  const yesterdaySnapshot = useMemo(() => {
-    const list = (snapshots || []).filter((s: any) => new Date(s.date) < startOfToday);
-    return list.length > 0 ? list[list.length - 1] : null;
-  }, [snapshots, startOfToday]);
-
-  const baselineSnapshot = yesterdaySnapshot;
-
   // Calculate intraday market valuation change for portfolio holdings (Day T vs Day T-1 closing price)
   const { oneDayPortfolioMarketChange, portfolioMarketChangePercent } = useMemo(() => {
-    let snapshotHoldingsMap: Record<string, any> = {};
-    if (baselineSnapshot && baselineSnapshot.breakdownJson) {
-      const json = baselineSnapshot.breakdownJson;
-      const list = Array.isArray(json) ? json : json.holdings || [];
-      if (Array.isArray(list)) {
-        list.forEach((item: any) => {
-          if (item.id) snapshotHoldingsMap[item.id] = item;
-          if (item.assetId) snapshotHoldingsMap[item.assetId] = item;
-        });
-      }
-    }
-
     let changeVND = 0;
 
     (holdings || []).forEach((h: any) => {
@@ -84,31 +57,13 @@ export function InvestmentPortfolioView({ summary, holdings = [], snapshots = []
       if (h.categoryType === 0) return;
 
       const quantity = Number(h.quantity || 0);
-      const currentVal = Number(h.currentValue || 0);
       const currentUnitPrice = Number(h.currentMarketPrice || h.averageCostBasis || 0);
-      const snapItem = snapshotHoldingsMap[h.id] || snapshotHoldingsMap[h.assetId];
+      const yesterdayUnitPrice = Number(h.yesterdayPrice || currentUnitPrice);
 
-      let intradayChange = 0;
-
-      if (snapItem) {
-        const yesterdayPrice = Number(snapItem.currentMarketPrice || snapItem.averageCostBasis || 0);
-        if (yesterdayPrice > 0 && currentUnitPrice > 0) {
-          const priceDelta = currentUnitPrice - yesterdayPrice;
-          intradayChange = Math.round(priceDelta * quantity);
-        } else {
-          const snapVal = Number(snapItem.currentValue || 0);
-          intradayChange = Math.round(currentVal - snapVal);
-        }
-      } else {
-        const change24hPercent = Number(h.change24h || 0);
-        if (change24hPercent !== 0 && currentUnitPrice > 0) {
-          const previousUnitPrice = currentUnitPrice / (1 + change24hPercent / 100);
-          const navDeltaPerUnit = currentUnitPrice - previousUnitPrice;
-          intradayChange = Math.round(navDeltaPerUnit * quantity);
-        }
+      if (yesterdayUnitPrice > 0 && currentUnitPrice > 0) {
+        const priceDelta = currentUnitPrice - yesterdayUnitPrice;
+        changeVND += Math.round(priceDelta * quantity);
       }
-
-      changeVND += intradayChange;
     });
 
     const marketValue = Number(summary?.totalMarketValueInvestments || 0);
@@ -119,7 +74,7 @@ export function InvestmentPortfolioView({ summary, holdings = [], snapshots = []
       oneDayPortfolioMarketChange: changeVND,
       portfolioMarketChangePercent: percent,
     };
-  }, [holdings, summary, baselineSnapshot]);
+  }, [holdings, summary]);
 
   const isMarketChangePositive = oneDayPortfolioMarketChange >= 0;
 

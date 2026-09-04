@@ -178,41 +178,12 @@ export async function recordDailyAssetSnapshot(
     breakdownJson?: any;
   }
 ) {
-  try {
-    // Normalize date to 00:00:00.000 Vietnam Time (GMT+7)
-    const today = getStartOfTodayVN();
-
-    await prisma.assetSnapshot.upsert({
-      where: {
-        userId_date: {
-          userId,
-          date: today,
-        },
-      },
-      update: {
-        totalAssetsValue: totals.totalAssets,
-        totalLiabilitiesValue: totals.totalLiabilities,
-        netWorthValue: totals.netWorth,
-        totalLiquidValue: totals.totalInvestableAssets,
-        breakdownJson: totals.breakdownJson || undefined,
-      },
-      create: {
-        userId,
-        date: today,
-        totalAssetsValue: totals.totalAssets,
-        totalLiabilitiesValue: totals.totalLiabilities,
-        netWorthValue: totals.netWorth,
-        totalLiquidValue: totals.totalInvestableAssets,
-        breakdownJson: totals.breakdownJson || undefined,
-      },
-    });
-  } catch (err) {
-    console.error("Error recording daily asset snapshot:", err);
-  }
+  // Snapshot mechanism completely removed as per user directive.
+  return;
 }
 
 /**
- * Dynamic Time-Series Generator & Backfiller.
+ * Dynamic Time-Series Generator (100% Snapshot-Free).
  * Calculates Net Worth at any past date X using the exact formula:
  * A = Liquid Cash Today - CashFlows logged strictly after Date X
  * B = Sum(Quantity of Growth Asset * Closing Price at Date X)
@@ -235,22 +206,7 @@ export async function getWealthTimeSeriesAndSnapshots(
     const startDate = new Date(today);
     startDate.setDate(startDate.getDate() - daysBack);
 
-    // 1. Fetch existing snapshots in the date range
-    const existingSnapshots = await prisma.assetSnapshot.findMany({
-      where: {
-        userId,
-        date: { gte: startDate },
-      },
-      orderBy: { date: "asc" },
-    });
-
-    const snapshotMap = new Map<string, any>();
-    existingSnapshots.forEach((s) => {
-      const dateKey = new Date(s.date).toISOString().split("T")[0];
-      snapshotMap.set(dateKey, s);
-    });
-
-    // 2. Fetch all cashFlows after startDate
+    // Fetch all cashFlows after startDate
     const cashFlows = await prisma.cashFlow.findMany({
       where: {
         userId,
@@ -264,16 +220,9 @@ export async function getWealthTimeSeriesAndSnapshots(
       orderBy: { datetime: "asc" },
     });
 
-    // 3. Separate holdings into Growth Assets (B), Liquid Assets (A), and Other Assets (C)
     const currentLiquid = currentTotals.totalInvestableAssets;
     const currentHoldings = currentTotals.holdingsSnapshot || [];
 
-    // Filter growth items (categoryType === 1 or non-cash market driven)
-    const growthHoldings = currentHoldings.filter(
-      (h) => h.categoryType === 1 || (h.asset && h.asset.isMarketDriven)
-    );
-
-    // Filter other assets (categoryType === 2, 3, 4)
     const otherAssetsValue = currentHoldings
       .filter((h) => h.categoryType > 1)
       .reduce((sum, h) => sum + (Number(h.currentValue) || 0), 0);
@@ -281,18 +230,15 @@ export async function getWealthTimeSeriesAndSnapshots(
     const totalLiabilities = currentTotals.totalLiabilities;
     const C = otherAssetsValue - totalLiabilities; // Other Assets - Debt
 
-    // 4. Build continuous daily series going from daysBack to 0 (today)
-    const continuousSnapshots: any[] = [];
-    const missingUpserts: any[] = [];
+    const continuousSeries: any[] = [];
 
     for (let i = daysBack; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
-      const dateKey = d.toISOString().split("T")[0];
 
       if (i === 0) {
-        // Today's live snapshot
-        const todaySnapshot = {
+        // Today's live data
+        continuousSeries.push({
           userId,
           date: d,
           totalAssetsValue: currentTotals.totalAssets,
@@ -300,9 +246,7 @@ export async function getWealthTimeSeriesAndSnapshots(
           netWorthValue: currentTotals.netWorth,
           totalLiquidValue: currentTotals.totalInvestableAssets,
           breakdownJson: { holdings: currentHoldings },
-        };
-        continuousSnapshots.push(todaySnapshot);
-        missingUpserts.push(todaySnapshot);
+        });
         continue;
       }
 
@@ -321,80 +265,51 @@ export async function getWealthTimeSeriesAndSnapshots(
       const A = currentLiquid - netFlowAfterDay;
 
       // B = Sum(Quantity of Growth Asset * Closing Price at Date X)
-      const existing = snapshotMap.get(dateKey);
       let B = 0;
-
-      let snapshotHoldingsMap: Record<string, any> = {};
-      if (existing && existing.breakdownJson) {
-        const json = existing.breakdownJson;
-        const list = Array.isArray(json) ? json : json.holdings || [];
-        if (Array.isArray(list)) {
-          list.forEach((item: any) => {
-            if (item.id) snapshotHoldingsMap[item.id] = item;
-            if (item.assetId) snapshotHoldingsMap[item.assetId] = item;
-          });
-        }
-      }
-
-      growthHoldings.forEach((h) => {
+      const historicalHoldingsForDateX = currentHoldings.map((h) => {
         const qty = Number(h.quantity || 0);
-        const snapItem = snapshotHoldingsMap[h.id] || snapshotHoldingsMap[h.assetId];
+        let priceAtX = Number(h.currentMarketPrice || h.averageCostBasis || 0);
 
-        // Closing price at Date X: from DB snapshot if recorded, otherwise current market price
-        const priceAtX = snapItem
-          ? Number(snapItem.currentMarketPrice || snapItem.averageCostBasis || h.currentMarketPrice || 0)
-          : Number(h.currentMarketPrice || h.averageCostBasis || 0);
+        if (i > 0) {
+          const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+            d.getDate()
+          ).padStart(2, "0")}`;
+          if (h.historyMap && h.historyMap[dateStr]) {
+            priceAtX = Number(h.historyMap[dateStr]);
+          } else {
+            priceAtX = Number(h.yesterdayPrice || h.currentMarketPrice || h.averageCostBasis || 0);
+          }
+        }
 
-        B += qty * priceAtX;
+        const valAtX = qty * priceAtX;
+        if (h.categoryType === 1 || (h.asset && h.asset.isMarketDriven)) {
+          B += valAtX;
+        }
+
+        return {
+          ...h,
+          currentMarketPrice: priceAtX,
+          currentValue: valAtX,
+        };
       });
 
-      // Net Worth at Date X = A + B + C
       const netWorthAtX = A + B + C;
       const totalAssetsAtX = A + B + otherAssetsValue;
 
-      const generatedSnapshot = {
+      continuousSeries.push({
         userId,
         date: d,
         totalAssetsValue: Math.max(0, totalAssetsAtX),
         totalLiabilitiesValue: totalLiabilities,
         netWorthValue: netWorthAtX,
         totalLiquidValue: Math.max(0, A),
-        breakdownJson: { holdings: currentHoldings, isGenerated: true },
-      };
-
-      continuousSnapshots.push(generatedSnapshot);
-      if (!existing) {
-        missingUpserts.push(generatedSnapshot);
-      }
+        breakdownJson: { holdings: historicalHoldingsForDateX, isGenerated: true },
+      });
     }
 
-    // 5. Async batch backfill missing snapshots to PostgreSQL in background
-    if (missingUpserts.length > 0) {
-      Promise.all(
-        missingUpserts.map((s) =>
-          prisma.assetSnapshot.upsert({
-            where: {
-              userId_date: {
-                userId: s.userId,
-                date: s.date,
-              },
-            },
-            update: {
-              totalAssetsValue: s.totalAssetsValue,
-              totalLiabilitiesValue: s.totalLiabilitiesValue,
-              netWorthValue: s.netWorthValue,
-              totalLiquidValue: s.totalLiquidValue,
-              breakdownJson: s.breakdownJson,
-            },
-            create: s,
-          })
-        )
-      ).catch((err) => console.error("Async backfill snapshot error:", err));
-    }
-
-    return continuousSnapshots;
-  } catch (err) {
-    console.error("Error in getWealthTimeSeriesAndSnapshots:", err);
+    return continuousSeries;
+  } catch (error) {
+    console.error("Error generating wealth time series:", error);
     return [];
   }
 }

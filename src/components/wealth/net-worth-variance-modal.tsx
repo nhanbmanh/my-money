@@ -91,80 +91,39 @@ export function NetWorthVarianceModal({
     };
   }, [cashFlows, startOfToday]);
 
-  const todaySnapshot = useMemo(() => {
-    const list = (snapshots || []).filter((s: any) => new Date(s.date) >= startOfToday);
-    return list.length > 0 ? list[0] : null;
-  }, [snapshots, startOfToday]);
-
-  // 3. Yesterday's Snapshot (recorded before 00:00:00 VNT today)
-  const yesterdaySnapshot = useMemo(() => {
-    const list = (snapshots || []).filter((s: any) => new Date(s.date) < startOfToday);
-    return list.length > 0 ? list[list.length - 1] : null;
-  }, [snapshots, startOfToday]);
-
   const currentNetWorth = Number(summary?.netWorth || 0);
 
-  // 4. Map holdings and calculate actual 24h market price variance (Day T vs Day T-1 closing price)
+  // Map holdings and calculate actual 24h market price variance (Day T vs Day T-1 closing price)
   const allHoldingItems = useMemo(() => {
-    const baselineSnapshot = yesterdaySnapshot;
-
-    let snapshotHoldingsMap: Record<string, any> = {};
-    if (baselineSnapshot && baselineSnapshot.breakdownJson) {
-      const json = baselineSnapshot.breakdownJson;
-      const list = Array.isArray(json) ? json : json.holdings || [];
-      if (Array.isArray(list)) {
-        list.forEach((item: any) => {
-          if (item.id) snapshotHoldingsMap[item.id] = item;
-          if (item.assetId) snapshotHoldingsMap[item.assetId] = item;
-        });
-      }
-    }
-
     return (holdings || []).map((h) => {
       const quantity = Number(h.quantity || 0);
-      const currentVal = Number(h.currentValue || 0);
       const currentUnitPrice = Number(h.currentMarketPrice || h.averageCostBasis || 0);
+      const yesterdayUnitPrice = Number(h.yesterdayPrice || currentUnitPrice);
       const catCfg = getCategoryConfig(h.categoryType ?? 0);
-      const snapItem = snapshotHoldingsMap[h.id] || snapshotHoldingsMap[h.assetId];
 
       let oneDayChange = 0;
       let oneDayChangePercent = 0;
 
-      if (snapItem) {
-        const yesterdayPrice = Number(snapItem.currentMarketPrice || snapItem.averageCostBasis || 0);
-        if (yesterdayPrice > 0 && currentUnitPrice > 0) {
-          const priceDelta = currentUnitPrice - yesterdayPrice;
-          oneDayChange = Math.round(priceDelta * quantity);
-          oneDayChangePercent = (priceDelta / yesterdayPrice) * 100;
-        } else {
-          const snapVal = Number(snapItem.currentValue || 0);
-          let diff = currentVal - snapVal;
-          if (h.categoryType === 0) diff -= todayNetCashFlow;
-          oneDayChange = Math.round(diff);
-          oneDayChangePercent = snapVal > 0 ? (diff / snapVal) * 100 : 0;
-        }
-      } else {
-        // Fallback to 24h ticker change if no yesterday snapshot item exists for this holding
-        const change24hPercent = Number(h.change24h || 0);
-        if (change24hPercent !== 0 && currentUnitPrice > 0) {
-          const previousUnitPrice = currentUnitPrice / (1 + change24hPercent / 100);
-          const navDeltaPerUnit = currentUnitPrice - previousUnitPrice;
-          oneDayChange = Math.round(navDeltaPerUnit * quantity);
-          oneDayChangePercent = change24hPercent;
-        }
+      if (yesterdayUnitPrice > 0 && currentUnitPrice > 0) {
+        const priceDelta = currentUnitPrice - yesterdayUnitPrice;
+        oneDayChange = Math.round(priceDelta * quantity);
+        oneDayChangePercent = (priceDelta / yesterdayUnitPrice) * 100;
       }
 
       return {
         id: h.id,
         name: h.asset?.assetName || h.asset?.symbolOrTicker || "Tài sản",
         symbol: h.asset?.symbolOrTicker || "",
+        quantity,
+        currentUnitPrice,
+        yesterdayUnitPrice,
         categoryType: h.categoryType,
         catCfg,
         oneDayChange,
         change24hPercent: oneDayChangePercent,
       };
     });
-  }, [holdings, yesterdaySnapshot, todayNetCashFlow]);
+  }, [holdings]);
 
   // Filter ONLY market-driven investment items (categoryType !== 0) to avoid double-counting cashflows
   const portfolioAttribution = useMemo(() => {
@@ -276,7 +235,7 @@ export function NetWorthVarianceModal({
                   Không có tài sản nào biến động giá trị trong kỳ này.
                 </div>
               ) : (
-                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                   {portfolioAttribution.map((item) => {
                     const isGain = item.oneDayChange >= 0;
                     return (
@@ -284,17 +243,27 @@ export function NetWorthVarianceModal({
                         key={item.id}
                         className="flex items-center justify-between text-xs py-2 px-2.5 sm:px-3 rounded-xl bg-slate-900/80 border border-slate-800/50 gap-2"
                       >
-                        <div className="flex items-center gap-1.5 sm:gap-2 truncate pr-1 min-w-0 flex-1">
-                          <span className={cn("px-1.5 py-0.5 rounded text-[9px] border font-bold shrink-0", item.catCfg.badgeBg)}>
-                            {item.catCfg.type}. {item.catCfg.shortName}
-                          </span>
-                          <span className="text-slate-100 font-extrabold text-xs shrink-0">{item.symbol}</span>
-                          <span className="text-[11px] text-slate-400 font-normal truncate max-w-[120px] sm:max-w-[180px] hidden xs:inline">
-                            ({item.name})
-                          </span>
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                            <span className={cn("px-1.5 py-0.5 rounded text-[9px] border font-bold shrink-0", item.catCfg.badgeBg)}>
+                              {item.catCfg.type}. {item.catCfg.shortName}
+                            </span>
+                            <span className="text-slate-100 font-extrabold text-xs shrink-0">{item.symbol}</span>
+                            <span className="text-[11px] text-slate-400 font-normal truncate max-w-[140px] hidden xs:inline">
+                              ({item.name})
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-[10px] text-slate-400 font-medium mt-1 flex-wrap">
+                            <span>SL: <strong className="text-slate-200">{item.quantity.toLocaleString("vi-VN")}</strong></span>
+                            <span className="text-slate-600">•</span>
+                            <span>Giá hiện tại: <strong className="text-sky-300">{formatVND(item.currentUnitPrice)}</strong></span>
+                            <span className="text-slate-600">•</span>
+                            <span>Giá chốt phiên trước: <strong className="text-slate-300">{formatVND(item.yesterdayUnitPrice)}</strong></span>
+                          </div>
                         </div>
 
-                        <div className="text-right shrink-0 ml-auto">
+                        <div className="text-right shrink-0 ml-auto self-center">
                           <div
                             className={cn(
                               "font-extrabold text-xs flex items-center justify-end gap-0.5",

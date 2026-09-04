@@ -20,7 +20,7 @@ export async function GET() {
     }
 
     // 1. Parallelize initial setup and DB queries for ultra-fast response
-    const [_, rawHoldings, liabilities, transactions, cashFlows, snapshots] = await Promise.all([
+    const [_, rawHoldings, liabilities, transactions, cashFlows] = await Promise.all([
       getOrCreateLiquidHolding(userId),
       prisma.holding.findMany({
         where: { userId },
@@ -47,10 +47,6 @@ export async function GET() {
         orderBy: { datetime: "desc" },
         take: 50,
       }),
-      prisma.assetSnapshot.findMany({
-        where: { userId },
-        orderBy: { date: "asc" },
-      }),
     ]);
 
     // 2. Enrich holdings in parallel with strict 1.2s timeout on external APIs
@@ -58,6 +54,8 @@ export async function GET() {
       rawHoldings.map(async (h) => {
         let currentMarketPrice = 0;
         let change24h = 0;
+        let yesterdayPrice = 0;
+        let historyMap: Record<string, number> | undefined = undefined;
         let currentValue = h.quantity * h.averageCostBasis;
 
         if (h.asset.isMarketDriven || h.categoryType === 1) {
@@ -67,12 +65,20 @@ export async function GET() {
           );
           currentMarketPrice = details.price || h.averageCostBasis;
           change24h = details.change24h || 0;
+          yesterdayPrice = details.yesterdayPrice || currentMarketPrice;
+          historyMap = details.historyMap;
+          currentValue = h.quantity * currentMarketPrice;
+        } else {
+          currentMarketPrice = h.averageCostBasis;
+          yesterdayPrice = h.averageCostBasis;
           currentValue = h.quantity * currentMarketPrice;
         }
 
         return {
           ...h,
           currentMarketPrice,
+          yesterdayPrice,
+          historyMap,
           change24h,
           currentValue,
         };
@@ -130,21 +136,11 @@ export async function GET() {
       categoryType: h.categoryType,
       quantity: h.quantity,
       currentMarketPrice: h.currentMarketPrice,
+      yesterdayPrice: h.yesterdayPrice,
+      historyMap: h.historyMap,
       currentValue: h.currentValue,
       updatedAt: h.updatedAt || h.asset?.updatedAt,
     }));
-
-    // 4. Record daily asset snapshot asynchronously & generate continuous time-series
-    recordDailyAssetSnapshot(userId, {
-      totalAssets,
-      totalLiabilities,
-      netWorth,
-      totalInvestableAssets,
-      breakdownJson: {
-        byCategory: breakdownList,
-        holdings: holdingsSnapshot,
-      },
-    }).catch((err) => console.error("Async snapshot error:", err));
 
     const continuousSnapshots = await getWealthTimeSeriesAndSnapshots(
       userId,
@@ -175,7 +171,7 @@ export async function GET() {
       liabilities,
       transactions,
       cashFlows,
-      snapshots: continuousSnapshots.length > 0 ? continuousSnapshots : snapshots,
+      snapshots: continuousSnapshots,
     });
   } catch (error) {
     console.error("GET /api/wealth Error:", error);
