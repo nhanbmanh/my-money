@@ -144,20 +144,45 @@ export function OverviewBalanceSheet({
       growthHoldings.forEach((h: any) => {
         const qty = Number(h.quantity || 0);
         const currentUnitPrice = Number(h.currentMarketPrice || h.averageCostBasis || 0);
+        const yesterdayUnitPrice = Number(h.yesterdayPrice || currentUnitPrice);
 
         let priceAtX = currentUnitPrice;
-        if (targetEOD < startOfToday) {
-          const yyyy = targetEOD.getFullYear();
-          const mm = String(targetEOD.getMonth() + 1).padStart(2, "0");
-          const dd = String(targetEOD.getDate()).padStart(2, "0");
-          const dateKey = `${yyyy}-${mm}-${dd}`;
 
-          if (h.historyMap && h.historyMap[dateKey]) {
+        const yyyy = targetEOD.getFullYear();
+        const mm = String(targetEOD.getMonth() + 1).padStart(2, "0");
+        const dd = String(targetEOD.getDate()).padStart(2, "0");
+        const dateKey = `${yyyy}-${mm}-${dd}`;
+
+        const yesterday = new Date(startOfToday);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(
+          yesterday.getDate()
+        ).padStart(2, "0")}`;
+
+        if (h.historyMap && Object.keys(h.historyMap).length > 0) {
+          if (h.historyMap[dateKey] !== undefined) {
             priceAtX = Number(h.historyMap[dateKey]);
           } else {
-            priceAtX = Number(h.yesterdayPrice || currentUnitPrice);
+            const sortedHistoryDates = Object.keys(h.historyMap).sort();
+            let foundPrice: number | null = null;
+            for (let k = sortedHistoryDates.length - 1; k >= 0; k--) {
+              if (sortedHistoryDates[k] <= dateKey) {
+                foundPrice = Number(h.historyMap[sortedHistoryDates[k]]);
+                break;
+              }
+            }
+            if (foundPrice !== null) {
+              priceAtX = foundPrice;
+            } else {
+              priceAtX = Number(h.historyMap[sortedHistoryDates[0]]) || currentUnitPrice;
+            }
           }
+        } else if (dateKey < yesterdayStr) {
+          priceAtX = yesterdayUnitPrice;
+        } else {
+          priceAtX = currentUnitPrice;
         }
+
         const totalValueAtX = qty * priceAtX;
         B += totalValueAtX;
 

@@ -268,17 +268,43 @@ export async function getWealthTimeSeriesAndSnapshots(
       let B = 0;
       const historicalHoldingsForDateX = currentHoldings.map((h) => {
         const qty = Number(h.quantity || 0);
-        let priceAtX = Number(h.currentMarketPrice || h.averageCostBasis || 0);
+        const currentUnitPrice = Number(h.currentMarketPrice || h.averageCostBasis || 0);
+        const yesterdayUnitPrice = Number(h.yesterdayPrice || currentUnitPrice);
 
-        if (i > 0) {
-          const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-            d.getDate()
-          ).padStart(2, "0")}`;
-          if (h.historyMap && h.historyMap[dateStr]) {
+        let priceAtX = currentUnitPrice;
+
+        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+          d.getDate()
+        ).padStart(2, "0")}`;
+
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(
+          yesterday.getDate()
+        ).padStart(2, "0")}`;
+
+        if (h.historyMap && Object.keys(h.historyMap).length > 0) {
+          if (h.historyMap[dateStr] !== undefined) {
             priceAtX = Number(h.historyMap[dateStr]);
           } else {
-            priceAtX = Number(h.yesterdayPrice || h.currentMarketPrice || h.averageCostBasis || 0);
+            const sortedHistoryDates = Object.keys(h.historyMap).sort();
+            let foundPrice: number | null = null;
+            for (let k = sortedHistoryDates.length - 1; k >= 0; k--) {
+              if (sortedHistoryDates[k] <= dateStr) {
+                foundPrice = Number(h.historyMap[sortedHistoryDates[k]]);
+                break;
+              }
+            }
+            if (foundPrice !== null) {
+              priceAtX = foundPrice;
+            } else {
+              priceAtX = Number(h.historyMap[sortedHistoryDates[0]]) || currentUnitPrice;
+            }
           }
+        } else if (dateStr < yesterdayStr) {
+          priceAtX = yesterdayUnitPrice;
+        } else {
+          priceAtX = currentUnitPrice;
         }
 
         const valAtX = qty * priceAtX;
