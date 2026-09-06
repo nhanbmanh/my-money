@@ -8,18 +8,29 @@ import { CashFlowTable } from "@/components/cashflow-table";
 export default function FinancialManagementPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editData, setEditData] = useState<any>(null);
+  const [isCopy, setIsCopy] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const handleOpenCashFlowModal = () => {
       setEditData(null);
+      setIsCopy(false);
       setModalOpen(true);
     };
 
     const handleOpenEditCashFlowModal = (e: CustomEvent) => {
       if (e.detail?.item) {
         setEditData(e.detail.item);
+        setIsCopy(false);
+        setModalOpen(true);
+      }
+    };
+
+    const handleOpenCopyCashFlowModal = (e: CustomEvent) => {
+      if (e.detail?.item) {
+        setEditData(e.detail.item);
+        setIsCopy(true);
         setModalOpen(true);
       }
     };
@@ -31,6 +42,10 @@ export default function FinancialManagementPage() {
       "open-edit-cashflow-modal",
       handleOpenEditCashFlowModal as EventListener
     );
+    window.addEventListener(
+      "open-copy-cashflow-modal",
+      handleOpenCopyCashFlowModal as EventListener
+    );
     window.addEventListener("open-settings-modal", handleOpenSettingsModal);
 
     return () => {
@@ -41,6 +56,10 @@ export default function FinancialManagementPage() {
       window.removeEventListener(
         "open-edit-cashflow-modal",
         handleOpenEditCashFlowModal as EventListener
+      );
+      window.removeEventListener(
+        "open-copy-cashflow-modal",
+        handleOpenCopyCashFlowModal as EventListener
       );
       window.removeEventListener(
         "open-settings-modal",
@@ -59,9 +78,13 @@ export default function FinancialManagementPage() {
         open={modalOpen}
         onOpenChange={(val) => {
           setModalOpen(val);
-          if (!val) setEditData(null);
+          if (!val) {
+            setEditData(null);
+            setIsCopy(false);
+          }
         }}
         editData={editData}
+        isCopy={isCopy}
         onSuccess={() => {
           setRefreshKey((k) => k + 1);
         }}

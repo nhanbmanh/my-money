@@ -7,6 +7,7 @@ import {
   Wallet,
   FolderKanban,
   Pencil,
+  Copy,
   Trash2,
   TrendingUp,
   TrendingDown,
@@ -69,6 +70,7 @@ interface CashFlowNewsfeedProps {
   isAllSelected: boolean;
   isIndeterminate: boolean;
   handleEdit: (item: CashFlowNewsfeedItem) => void;
+  handleCopy: (item: CashFlowNewsfeedItem) => void;
   handleDeleteConfirm: (ids: string[]) => void;
   onRefreshNeeded: () => void;
 }
@@ -81,6 +83,7 @@ export function CashFlowNewsfeed({
   isAllSelected,
   isIndeterminate,
   handleEdit,
+  handleCopy,
   handleDeleteConfirm,
   onRefreshNeeded,
 }: CashFlowNewsfeedProps) {
@@ -415,13 +418,14 @@ export function CashFlowNewsfeed({
                             className="w-full flex items-center gap-2 text-xs font-semibold px-2.5 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
                           >
                             <Pencil className="h-3.5 w-3.5 text-sky-500" />
-                            {t("financial.modalEditTitle")
-                              ? language === "vi"
-                                ? "Sửa giao dịch"
-                                : "Edit"
-                              : language === "vi"
-                                ? "Sửa giao dịch"
-                                : "Edit"}
+                            {language === "vi" ? "Sửa giao dịch" : "Edit"}
+                          </button>
+                          <button
+                            onClick={() => handleCopy(item)}
+                            className="w-full flex items-center gap-2 text-xs font-semibold px-2.5 py-1.5 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-950/40 text-amber-700 dark:text-amber-400 transition-colors cursor-pointer"
+                          >
+                            <Copy className="h-3.5 w-3.5 text-amber-500" />
+                            {language === "vi" ? "Sao chép" : "Copy"}
                           </button>
                           <button
                             onClick={() => handleDeleteConfirm([item.id])}

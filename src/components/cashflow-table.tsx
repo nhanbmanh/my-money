@@ -137,9 +137,10 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
   // Selection
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  // Edit modal
+  // Edit & Copy modal
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editData, setEditData] = useState<CashFlowItem | null>(null);
+  const [isCopyModal, setIsCopyModal] = useState(false);
 
   // Chart modal
   const [chartOpen, setChartOpen] = useState(false);
@@ -343,9 +344,16 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
     }
   };
 
-  // Edit handler
+  // Edit & Copy handlers
   const handleEdit = (item: CashFlowItem) => {
     setEditData(item);
+    setIsCopyModal(false);
+    setEditModalOpen(true);
+  };
+
+  const handleCopy = (item: CashFlowItem) => {
+    setEditData(item);
+    setIsCopyModal(true);
     setEditModalOpen(true);
   };
 
@@ -659,6 +667,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                 isAllSelected={isAllSelected}
                 isIndeterminate={isIndeterminate}
                 handleEdit={handleEdit}
+                handleCopy={handleCopy}
                 handleDeleteConfirm={handleDeleteConfirm}
                 onRefreshNeeded={handleMutationSuccess}
               />
@@ -984,6 +993,9 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
                             <ContextMenuItem onClick={() => handleEdit(item)}>
                               ✏️ {t("common.edit")}
                             </ContextMenuItem>
+                            <ContextMenuItem onClick={() => handleCopy(item)}>
+                              📋 {language === "vi" ? "Sao chép" : "Copy"}
+                            </ContextMenuItem>
                             <ContextMenuItem
                               className="text-red-500 focus:text-red-500"
                               onClick={() => handleDeleteConfirm([item.id])}
@@ -1045,12 +1057,19 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
         onBudgetsUpdated={() => setBudgetsUpdatedKey((k) => k + 1)}
       />
 
-      {/* Edit Modal */}
+      {/* Edit & Copy Modal */}
       <CashFlowModal
         open={editModalOpen}
-        onOpenChange={setEditModalOpen}
+        onOpenChange={(val) => {
+          setEditModalOpen(val);
+          if (!val) {
+            setEditData(null);
+            setIsCopyModal(false);
+          }
+        }}
         onSuccess={handleMutationSuccess}
         editData={editData}
+        isCopy={isCopyModal}
       />
 
       <CashFlowChartModal

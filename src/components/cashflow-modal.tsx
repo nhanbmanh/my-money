@@ -80,6 +80,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
   editData?: CashFlowData | null;
+  isCopy?: boolean;
 }
 
 const formatMoneyInput = (val: string | number): string => {
@@ -99,9 +100,10 @@ export function CashFlowModal({
   onOpenChange,
   onSuccess,
   editData,
+  isCopy = false,
 }: Props) {
   const { t, language } = useLanguage();
-  const isEdit = !!editData;
+  const isEdit = !!editData && !isCopy;
 
   const [form, setForm] = useState({
     title: "",
@@ -256,9 +258,11 @@ export function CashFlowModal({
         sourceId: editData.sourceId || "",
         primaryCategoryId: editData.primaryCategoryId || "",
       });
-      setDatetime(new Date(editData.datetime));
+      setDatetime(isCopy ? new Date() : new Date(editData.datetime));
       setSecondaryCategoryIds(
-        editData.secondaryCategories.map((s) => s.secondaryCategory.id),
+        editData.secondaryCategories
+          .map((s) => s.secondaryCategory?.id || (s as any).secondaryCategoryId)
+          .filter(Boolean),
       );
     } else {
       setForm({
@@ -272,7 +276,7 @@ export function CashFlowModal({
       setDatetime(new Date());
       setSecondaryCategoryIds([]);
     }
-  }, [open, editData]);
+  }, [open, editData, isCopy]);
 
   const fetchSources = async () => {
     try {
@@ -471,10 +475,16 @@ export function CashFlowModal({
             </div>
             <div>
               <DialogTitle className="text-base font-bold text-slate-800 dark:text-slate-100">
-                {isEdit ? t("financial.modalEditTitle") : t("financial.modalCreateTitle")}
+                {isCopy
+                  ? (language === "vi" ? "Sao chép giao dịch" : "Copy transaction")
+                  : isEdit
+                  ? t("financial.modalEditTitle")
+                  : t("financial.modalCreateTitle")}
               </DialogTitle>
               <p className="text-xs text-slate-400 font-medium mt-0.5">
-                {isEdit
+                {isCopy
+                  ? (language === "vi" ? "Tạo giao dịch mới dựa trên thông tin đã sao chép" : "Create a new transaction based on copied details")
+                  : isEdit
                   ? (language === "vi" ? "Cập nhật thông tin thu chi cá nhân" : "Update personal cashflow record")
                   : (language === "vi" ? "Ghi nhận dòng tiền thu chi cá nhân" : "Record personal cashflow transaction")}
               </p>
@@ -1072,6 +1082,8 @@ export function CashFlowModal({
                   <Spinner className="mr-2" />
                   {t("common.loading")}
                 </>
+              ) : isCopy ? (
+                (language === "vi" ? "Tạo Giao Dịch (Sao Chép)" : "Create Copied Transaction")
               ) : isEdit ? (
                 (language === "vi" ? "Lưu Thay Đổi" : "Save Changes")
               ) : (
