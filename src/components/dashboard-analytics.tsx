@@ -11,14 +11,13 @@ import {
 } from "date-fns";
 import {
   Area,
-  AreaChart,
   Bar,
   BarChart,
   Cell,
   CartesianGrid,
+  ComposedChart,
   Legend,
   Line,
-  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -150,62 +149,90 @@ export function DashboardAnalytics({
     return new Intl.NumberFormat("vi-VN", {
       style: "currency",
       currency: "VND",
+      maximumFractionDigits: 0,
     }).format(val);
   };
 
-  // 1. Trend Data (Continuous from dateFrom to dateTo)
+  // 1. Time Series Data for Trend Chart
   const timeData = useMemo(() => {
-    if (!filters.dateFrom || !filters.dateTo) return [];
+    if (!items.length) return [];
 
-    const startDate = startOfDay(parseISO(filters.dateFrom));
-    const endDate = endOfDay(parseISO(filters.dateTo));
+    let dates: Date[] = [];
+    if (filters.dateFrom && filters.dateTo) {
+      try {
+        const start = startOfDay(parseISO(filters.dateFrom));
+        const end = endOfDay(parseISO(filters.dateTo));
+        if (timeGrouping === "day") {
+          dates = eachDayOfInterval({ start, end });
+        } else {
+          dates = eachMonthOfInterval({ start, end });
+        }
+      } catch {
+        dates = [];
+      }
+    }
 
-    // Map existing records to buckets
+    if (!dates.length) {
+      const times = items.map((i) => new Date(i.datetime).getTime());
+      const start = startOfDay(new Date(Math.min(...times)));
+      const end = endOfDay(new Date(Math.max(...times)));
+      try {
+        if (timeGrouping === "day") {
+          dates = eachDayOfInterval({ start, end });
+        } else {
+          dates = eachMonthOfInterval({ start, end });
+        }
+      } catch {
+        dates = [];
+      }
+    }
+
     const incomeMap = new Map<string, number>();
     const expenseMap = new Map<string, number>();
 
     items.forEach((item) => {
-      const date = parseISO(item.datetime);
-      const isDay = timeGrouping === "day";
-      const key = format(date, isDay ? "yyyy-MM-dd" : "yyyy-MM");
+      const dt = parseISO(item.datetime);
+      const key =
+        timeGrouping === "day"
+          ? format(dt, "yyyy-MM-dd")
+          : format(dt, "yyyy-MM");
 
       if (item.cashType === "Income") {
         incomeMap.set(key, (incomeMap.get(key) || 0) + item.amountOfMoney);
       } else {
-        expenseMap.set(key, (expenseMap.get(key) || 0) + Math.abs(item.amountOfMoney));
+        expenseMap.set(
+          key,
+          (expenseMap.get(key) || 0) + Math.abs(item.amountOfMoney),
+        );
       }
     });
 
     if (timeGrouping === "day") {
-      try {
-        const days = eachDayOfInterval({ start: startDate, end: endDate });
-        return days.map((day) => {
-          const key = format(day, "yyyy-MM-dd");
-          const label = format(day, "dd/MM");
-          return {
-            label,
-            income: incomeMap.get(key) || 0,
-            expense: expenseMap.get(key) || 0,
-          };
-        });
-      } catch {
-        return [];
-      }
+      return dates.map((d) => {
+        const key = format(d, "yyyy-MM-dd");
+        const label = format(d, "dd/MM");
+        const income = incomeMap.get(key) || 0;
+        const expense = expenseMap.get(key) || 0;
+        return {
+          label,
+          income,
+          expense,
+          netFlow: income - expense,
+        };
+      });
     } else {
-      try {
-        const months = eachMonthOfInterval({ start: startDate, end: endDate });
-        return months.map((month) => {
-          const key = format(month, "yyyy-MM");
-          const label = format(month, "MM/yyyy");
-          return {
-            label,
-            income: incomeMap.get(key) || 0,
-            expense: expenseMap.get(key) || 0,
-          };
-        });
-      } catch {
-        return [];
-      }
+      return dates.map((m) => {
+        const key = format(m, "yyyy-MM");
+        const label = format(m, "MM/yyyy");
+        const income = incomeMap.get(key) || 0;
+        const expense = expenseMap.get(key) || 0;
+        return {
+          label,
+          income,
+          expense,
+          netFlow: income - expense,
+        };
+      });
     }
   }, [items, timeGrouping, filters.dateFrom, filters.dateTo]);
 
@@ -419,50 +446,60 @@ export function DashboardAnalytics({
           </div>
         ) : (
           <div>
-            {/* TAB 1: TREND (LINE CHART & BAR CHART) */}
+            {/* TAB 1: TREND (AREA + NET FLOW CHART) */}
             {activeTab === "trend" && (
-              <div className="space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
-                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    {language === "vi" ? "Gộp dữ liệu theo thời gian:" : "Group data by:"}
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <Button
-                      variant={timeGrouping === "day" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setTimeGrouping("day")}
-                      className={`text-xs h-7 px-3 rounded-md cursor-pointer ${
-                        timeGrouping === "day"
-                          ? "bg-slate-800 dark:bg-slate-100 text-white dark:text-slate-900 font-bold"
-                          : "text-slate-600 dark:text-slate-300"
-                      }`}
-                    >
-                      {language === "vi" ? "Theo Ngày" : "By Day"}
-                    </Button>
-                    <Button
-                      variant={timeGrouping === "month" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setTimeGrouping("month")}
-                      className={`text-xs h-7 px-3 rounded-md cursor-pointer ${
-                        timeGrouping === "month"
-                          ? "bg-slate-800 dark:bg-slate-100 text-white dark:text-slate-900 font-bold"
-                          : "text-slate-600 dark:text-slate-300"
-                      }`}
-                    >
-                      {language === "vi" ? "Theo Tháng" : "By Month"}
-                    </Button>
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      {language === "vi" ? "Gộp dữ liệu:" : "Group by:"}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant={timeGrouping === "day" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setTimeGrouping("day")}
+                        className={`text-xs h-7 px-3 rounded-lg cursor-pointer ${
+                          timeGrouping === "day"
+                            ? "bg-slate-800 dark:bg-slate-100 text-white dark:text-slate-900 font-bold"
+                            : "text-slate-600 dark:text-slate-300"
+                        }`}
+                      >
+                        {language === "vi" ? "Theo Ngày" : "By Day"}
+                      </Button>
+                      <Button
+                        variant={timeGrouping === "month" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setTimeGrouping("month")}
+                        className={`text-xs h-7 px-3 rounded-lg cursor-pointer ${
+                          timeGrouping === "month"
+                            ? "bg-slate-800 dark:bg-slate-100 text-white dark:text-slate-900 font-bold"
+                            : "text-slate-600 dark:text-slate-300"
+                        }`}
+                      >
+                        {language === "vi" ? "Theo Tháng" : "By Month"}
+                      </Button>
+                    </div>
                   </div>
                 </div>
 
                 <div className="h-72 w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                      data={timeData}
-                      margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.5} />
+                    <ComposedChart data={timeData} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
+                      <defs>
+                        <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                        </linearGradient>
+                        <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="#f43f5e" stopOpacity={0.0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.3} />
                       <XAxis
                         dataKey="label"
+                        minTickGap={25}
                         tick={{ fontSize: 11, fill: "#64748b" }}
                       />
                       <YAxis
@@ -478,29 +515,42 @@ export function DashboardAnalytics({
                       <Tooltip
                         formatter={(val: number) => [formatVND(val)]}
                         contentStyle={{
-                          borderRadius: "12px",
-                          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                          borderRadius: "14px",
+                          boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
                           borderColor: "#e2e8f0",
                         }}
                       />
                       <Legend verticalAlign="top" height={36} />
-                      <Line
+                      <Area
                         type="monotone"
                         dataKey="income"
                         name={language === "vi" ? "Thu nhập" : "Income"}
                         stroke="#10b981"
                         strokeWidth={2.5}
-                        dot={{ r: 3, fill: "#10b981" }}
+                        fill="url(#incomeGrad)"
+                        dot={false}
+                        activeDot={{ r: 6, strokeWidth: 2, stroke: "#ffffff" }}
                       />
-                      <Line
+                      <Area
                         type="monotone"
                         dataKey="expense"
                         name={language === "vi" ? "Chi tiêu" : "Expenses"}
                         stroke="#f43f5e"
                         strokeWidth={2.5}
-                        dot={{ r: 3, fill: "#f43f5e" }}
+                        fill="url(#expenseGrad)"
+                        dot={false}
+                        activeDot={{ r: 6, strokeWidth: 2, stroke: "#ffffff" }}
                       />
-                    </LineChart>
+                      <Line
+                        type="monotone"
+                        dataKey="netFlow"
+                        name={language === "vi" ? "Dòng tiền ròng" : "Net Flow"}
+                        stroke="#0284c7"
+                        strokeWidth={2.5}
+                        dot={false}
+                        activeDot={{ r: 6, strokeWidth: 2, stroke: "#ffffff" }}
+                      />
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </div>
               </div>

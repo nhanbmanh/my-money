@@ -206,19 +206,34 @@ export async function getWealthTimeSeriesAndSnapshots(
     const startDate = new Date(today);
     startDate.setDate(startDate.getDate() - daysBack);
 
-    // Fetch all cashFlows after startDate
-    const cashFlows = await prisma.cashFlow.findMany({
-      where: {
-        userId,
-        datetime: { gte: startDate },
-      },
-      select: {
-        datetime: true,
-        cashType: true,
-        amountOfMoney: true,
-      },
-      orderBy: { datetime: "asc" },
-    });
+    // Fetch all cashFlows and wealthTransactions after startDate
+    const [cashFlows, wealthTransactions] = await Promise.all([
+      prisma.cashFlow.findMany({
+        where: {
+          userId,
+          datetime: { gte: startDate },
+        },
+        select: {
+          datetime: true,
+          cashType: true,
+          amountOfMoney: true,
+        },
+        orderBy: { datetime: "asc" },
+      }),
+      prisma.wealthTransaction.findMany({
+        where: {
+          userId,
+          date: { gte: startDate },
+        },
+        select: {
+          date: true,
+          assetId: true,
+          transactionType: true,
+          quantity: true,
+        },
+        orderBy: { date: "asc" },
+      }),
+    ]);
 
     const currentLiquid = currentTotals.totalInvestableAssets;
     const currentHoldings = currentTotals.holdingsSnapshot || [];
@@ -264,10 +279,42 @@ export async function getWealthTimeSeriesAndSnapshots(
       });
       const A = currentLiquid - netFlowAfterDay;
 
-      // B = Sum(Quantity of Growth Asset * Closing Price at Date X)
+      // B = Sum(Quantity of Growth Asset at Date X * Closing Price at Date X)
       let B = 0;
       const historicalHoldingsForDateX = currentHoldings.map((h) => {
-        const qty = Number(h.quantity || 0);
+        const currentQty = Number(h.quantity || 0);
+
+        // Backward Quantity Revaluation: Quantity(Date X) = Current Quantity - TxDeltas(after Date X)
+        let qtyDeltaAfterDay = 0;
+        let hasTxOnOrBeforeDay = false;
+
+        wealthTransactions.forEach((tx) => {
+          if (tx.assetId === h.assetId) {
+            const txTime = new Date(tx.date);
+            if (txTime > dayEOD) {
+              const txQty = Number(tx.quantity || 0);
+              const txType = (tx.transactionType || "").toUpperCase();
+              if (txType === "BUY" || txType === "DEPOSIT" || txType === "TRANSFER_IN") {
+                qtyDeltaAfterDay += txQty;
+              } else if (txType === "SELL" || txType === "WITHDRAW" || txType === "TRANSFER_OUT") {
+                qtyDeltaAfterDay -= txQty;
+              }
+            } else {
+              hasTxOnOrBeforeDay = true;
+            }
+          }
+        });
+
+        let qtyAtX = Math.max(0, currentQty - qtyDeltaAfterDay);
+
+        // Fallback: If date X is strictly before holding creation date and user has no transactions on/before date X, qtyAtX = 0
+        if (h.createdAt && !hasTxOnOrBeforeDay) {
+          const createdAtTime = new Date(h.createdAt);
+          if (dayEOD < createdAtTime) {
+            qtyAtX = 0;
+          }
+        }
+
         const currentUnitPrice = Number(h.currentMarketPrice || h.averageCostBasis || 0);
         const yesterdayUnitPrice = Number(h.yesterdayPrice || currentUnitPrice);
 
@@ -307,13 +354,14 @@ export async function getWealthTimeSeriesAndSnapshots(
           priceAtX = currentUnitPrice;
         }
 
-        const valAtX = qty * priceAtX;
+        const valAtX = qtyAtX * priceAtX;
         if (h.categoryType === 1 || (h.asset && h.asset.isMarketDriven)) {
           B += valAtX;
         }
 
         return {
           ...h,
+          quantity: qtyAtX,
           currentMarketPrice: priceAtX,
           currentValue: valAtX,
         };

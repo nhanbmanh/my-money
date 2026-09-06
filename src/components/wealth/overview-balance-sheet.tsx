@@ -137,12 +137,44 @@ export function OverviewBalanceSheet({
       });
       const A = currentLiquid - netCashFlowAfter;
 
-      // B = Sum(Quantity of Growth Asset * Closing Price at Date X)
+      // B = Sum(Quantity of Growth Asset at Date X * Closing Price at Date X)
       let B = 0;
       const growthItems: any[] = [];
 
       growthHoldings.forEach((h: any) => {
-        const qty = Number(h.quantity || 0);
+        const currentQty = Number(h.quantity || 0);
+
+        // Backward Quantity Revaluation: Quantity(Date X) = Current Quantity - TxDeltas(after Date X)
+        let qtyDeltaAfterDay = 0;
+        let hasTxOnOrBeforeDay = false;
+
+        (transactions || []).forEach((tx: any) => {
+          if (tx.assetId === h.assetId) {
+            const txTime = new Date(tx.date || tx.createdAt);
+            if (txTime > targetEOD) {
+              const txQty = Number(tx.quantity || 0);
+              const txType = String(tx.transactionType || "").toUpperCase();
+              if (txType === "BUY" || txType === "DEPOSIT" || txType === "TRANSFER_IN") {
+                qtyDeltaAfterDay += txQty;
+              } else if (txType === "SELL" || txType === "WITHDRAW" || txType === "TRANSFER_OUT") {
+                qtyDeltaAfterDay -= txQty;
+              }
+            } else {
+              hasTxOnOrBeforeDay = true;
+            }
+          }
+        });
+
+        let qtyAtX = Math.max(0, currentQty - qtyDeltaAfterDay);
+
+        // Fallback: If targetEOD is strictly before holding creation date and user has no transactions on/before targetEOD
+        if (h.createdAt && !hasTxOnOrBeforeDay) {
+          const createdAtTime = new Date(h.createdAt);
+          if (targetEOD < createdAtTime) {
+            qtyAtX = 0;
+          }
+        }
+
         const currentUnitPrice = Number(h.currentMarketPrice || h.averageCostBasis || 0);
         const yesterdayUnitPrice = Number(h.yesterdayPrice || currentUnitPrice);
 
@@ -183,14 +215,14 @@ export function OverviewBalanceSheet({
           priceAtX = currentUnitPrice;
         }
 
-        const totalValueAtX = qty * priceAtX;
+        const totalValueAtX = qtyAtX * priceAtX;
         B += totalValueAtX;
 
         growthItems.push({
           id: h.id,
           name: h.asset?.assetName || h.asset?.symbolOrTicker || "Tài sản đầu tư",
           symbol: h.asset?.symbolOrTicker || "",
-          quantity: qty,
+          quantity: qtyAtX,
           priceAtX,
           totalValueAtX,
         });
@@ -372,17 +404,8 @@ export function OverviewBalanceSheet({
   }, [summary, cashFlows, rawMarketChange]);
 
   const compareLabel = useMemo(() => {
-    switch (timeframe) {
-      case "WEEKLY":
-        return language === "vi" ? "so với tuần trước" : "vs last week";
-      case "MONTHLY":
-        return language === "vi" ? "so với tháng trước" : "vs last month";
-      case "YEARLY":
-        return language === "vi" ? "so với năm trước" : "vs last year";
-      default:
-        return language === "vi" ? "so với hôm qua" : "vs yesterday";
-    }
-  }, [timeframe, language]);
+    return language === "vi" ? "so với hôm qua" : "vs yesterday";
+  }, [language]);
 
   const timeframeSubtitle = useMemo(() => {
     switch (timeframe) {
@@ -465,7 +488,7 @@ export function OverviewBalanceSheet({
                 >
                   {isPositive ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
                   <span>{netWorthChangeAmount >= 0 ? "+" : ""}{formatVND(netWorthChangeAmount)}</span>
-                  <span className="opacity-90">({netWorthChangePercent >= 0 ? "+" : ""}{netWorthChangePercent.toFixed(1)}%)</span>
+                  <span className="opacity-90">({netWorthChangePercent >= 0 ? "+" : ""}{netWorthChangePercent.toFixed(2)}%)</span>
                 </span>
                 <span className="text-muted-foreground font-medium text-[11px]">{compareLabel}</span>
               </div>

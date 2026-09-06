@@ -176,7 +176,7 @@ export function NetWorthVarianceModal({
               {isPositive ? <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <TrendingDown className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
               {isPositive ? "+" : ""}
               {formatVND(netWorthChangeAmount)} ({netWorthChangePercent >= 0 ? "+" : ""}
-              {netWorthChangePercent.toFixed(1)}%)
+              {netWorthChangePercent.toFixed(2)}%)
             </span>
           </DialogTitle>
           <DialogDescription className="text-xs text-slate-400">
