@@ -6,11 +6,13 @@ import {
   Table as TableIcon,
   RefreshCw,
   PieChart as PieIcon,
+  History,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OverviewBalanceSheet } from "@/components/wealth/overview-balance-sheet";
 import { InvestmentPortfolioView } from "@/components/wealth/investment-portfolio-view";
 import { AssetManagementTable } from "@/components/wealth/asset-management-table";
+import { TransactionsManagementTable } from "@/components/wealth/transactions-management-table";
 import { AssetCreationModal } from "@/components/wealth/asset-creation-modal";
 import { AssetCategoryType } from "@/lib/asset-category-types";
 
@@ -21,7 +23,7 @@ export default function WealthManagementPage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Tab State
-  const [activeView, setActiveView] = useState<"OVERVIEW" | "PORTFOLIO" | "HOLDINGS">("OVERVIEW");
+  const [activeView, setActiveView] = useState<"OVERVIEW" | "PORTFOLIO" | "HOLDINGS" | "TRANSACTIONS">("OVERVIEW");
 
   // Modals
   const [creationModalOpen, setCreationModalOpen] = useState(false);
@@ -128,10 +130,10 @@ export default function WealthManagementPage() {
         }`}
       >
         {/* Main View Tabs Bar */}
-        <div className="grid grid-cols-3 gap-1 bg-muted/80 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 w-full">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-1 bg-muted/80 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 w-full">
           <button
             onClick={() => setActiveView("OVERVIEW")}
-            className={`flex items-center justify-center gap-2 px-2 sm:px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+            className={`flex items-center justify-center gap-2 px-2 sm:px-3 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
               activeView === "OVERVIEW"
                 ? "bg-background text-foreground shadow-sm ring-1 ring-slate-200 dark:ring-slate-700"
                 : "text-muted-foreground hover:text-foreground"
@@ -144,7 +146,7 @@ export default function WealthManagementPage() {
 
           <button
             onClick={() => setActiveView("PORTFOLIO")}
-            className={`flex items-center justify-center gap-2 px-2 sm:px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+            className={`flex items-center justify-center gap-2 px-2 sm:px-3 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
               activeView === "PORTFOLIO"
                 ? "bg-background text-foreground shadow-sm ring-1 ring-slate-200 dark:ring-slate-700"
                 : "text-muted-foreground hover:text-foreground"
@@ -157,7 +159,7 @@ export default function WealthManagementPage() {
 
           <button
             onClick={() => setActiveView("HOLDINGS")}
-            className={`flex items-center justify-center gap-2 px-2 sm:px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+            className={`flex items-center justify-center gap-2 px-2 sm:px-3 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
               activeView === "HOLDINGS"
                 ? "bg-background text-foreground shadow-sm ring-1 ring-slate-200 dark:ring-slate-700"
                 : "text-muted-foreground hover:text-foreground"
@@ -165,7 +167,20 @@ export default function WealthManagementPage() {
             title="Bảng Số Dư & Quản Lý Tài Sản"
           >
             <TableIcon className="h-4.5 w-4.5 text-amber-500 shrink-0" />
-            <span className="hidden sm:inline truncate">Bảng Số Dư & Quản Lý Tài Sản</span>
+            <span className="hidden sm:inline truncate">Quản Lý Tài Sản</span>
+          </button>
+
+          <button
+            onClick={() => setActiveView("TRANSACTIONS")}
+            className={`flex items-center justify-center gap-2 px-2 sm:px-3 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+              activeView === "TRANSACTIONS"
+                ? "bg-background text-foreground shadow-sm ring-1 ring-slate-200 dark:ring-slate-700"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+            title="Lịch Sử & Nhật Ký Giao Dịch"
+          >
+            <History className="h-4.5 w-4.5 text-purple-500 shrink-0" />
+            <span className="hidden sm:inline truncate">Sổ Giao Dịch Mua Bán</span>
           </button>
         </div>
 
@@ -197,6 +212,15 @@ export default function WealthManagementPage() {
             transactions={data?.transactions || []}
             isLoading={loading || isRefetching}
             onOpenCreationModal={(catType) => handleOpenCreation(catType)}
+            onRefreshData={() => setRefreshKey((k) => k + 1)}
+          />
+        )}
+
+        {activeView === "TRANSACTIONS" && (
+          <TransactionsManagementTable
+            transactions={data?.transactions || []}
+            holdings={holdings}
+            isLoading={loading || isRefetching}
             onRefreshData={() => setRefreshKey((k) => k + 1)}
           />
         )}

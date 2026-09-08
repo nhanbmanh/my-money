@@ -71,6 +71,7 @@ export function AssetManagementTable({
   const [editHolding, setEditHolding] = useState<any>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [newValuationPrice, setNewValuationPrice] = useState("");
+  const [newValuationQty, setNewValuationQty] = useState("");
   const [tradeType, setTradeType] = useState<"REVALUATION" | "BUY" | "SELL">("REVALUATION");
   const [tradeQty, setTradeQty] = useState("");
   const [liquidAdjustMode, setLiquidAdjustMode] = useState<"SET" | "ADD" | "SUB">("SET");
@@ -139,6 +140,7 @@ export function AssetManagementTable({
       ? (holding.currentMarketPrice || holding.averageCostBasis)
       : holding.averageCostBasis;
     setNewValuationPrice(formatNumberWithDots(initialPrice));
+    setNewValuationQty(holding.quantity.toString());
     setTradeQty(holding.quantity.toString());
     setTradeType("REVALUATION");
     setLiquidAdjustMode("SET");
@@ -157,7 +159,8 @@ export function AssetManagementTable({
     if (!editHolding) return;
 
     if (newType === "REVALUATION") {
-      setNewValuationPrice(formatNumberWithDots(editHolding.averageCostBasis));
+      setNewValuationPrice(formatNumberWithDots(editHolding.currentMarketPrice || editHolding.averageCostBasis));
+      setNewValuationQty(editHolding.quantity.toString());
     } else if (newType === "BUY") {
       setNewValuationPrice(formatNumberWithDots(editHolding.currentMarketPrice || editHolding.averageCostBasis));
     } else if (newType === "SELL") {
@@ -193,6 +196,9 @@ export function AssetManagementTable({
       }
 
       const parsedQty = isCustomSingleUnit ? 1 : parseFloat(tradeQty.replace(",", ".")) || 0;
+      const parsedValuationQty = editHolding.categoryType === 1
+        ? (parseFloat(newValuationQty.replace(",", ".")) || 0)
+        : (isLiquid ? 1 : editHolding.quantity);
 
       const payload =
         tradeType === "REVALUATION"
@@ -200,7 +206,7 @@ export function AssetManagementTable({
               holdingId: editHolding.id,
               actionType: "REVALUATION",
               newPrice: parsedPrice,
-              newQuantity: isLiquid ? 1 : editHolding.quantity,
+              newQuantity: parsedValuationQty,
               valuationMethod: editHolding.categoryType === 2 ? valuationMethod : undefined,
               appreciationRate: editHolding.categoryType === 2 ? Number(appreciationRate) : undefined,
               interestRate: (editHolding.categoryType === 3 || editHolding.categoryType === 4) ? Number(interestRate) : undefined,
@@ -1062,6 +1068,22 @@ export function AssetManagementTable({
                     </div>
                   )}
 
+                  {editHolding.categoryType === 1 && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold">
+                        Số Lượng Nắm Giữ Cập Nhật (Đơn vị)
+                      </label>
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        value={newValuationQty}
+                        onChange={(e) => setNewValuationQty(e.target.value)}
+                        className="h-10 text-xs rounded-xl font-bold"
+                        required
+                      />
+                    </div>
+                  )}
+
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold">
                       {editHolding.categoryType === 1
@@ -1083,7 +1105,7 @@ export function AssetManagementTable({
                     />
                     {editHolding.categoryType === 1 && (
                       <div className="text-[11px] font-semibold text-sky-600 dark:text-sky-400 mt-1">
-                        💡 Đang sở hữu {editHolding.quantity.toLocaleString("vi-VN", { maximumFractionDigits: 6 })} đơn vị → Tổng giá trị ước tính: {formatVND(editHolding.quantity * parseRawNumber(newValuationPrice))}
+                        💡 Tổng giá trị ước tính sau định giá: {formatVND((parseFloat(newValuationQty.replace(",", ".")) || 0) * parseRawNumber(newValuationPrice))}
                       </div>
                     )}
                   </div>

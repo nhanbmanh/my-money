@@ -39,7 +39,7 @@ export async function GET() {
         where: { userId },
         include: { asset: true },
         orderBy: { date: "desc" },
-        take: 50,
+        take: 500,
       }),
       prisma.cashFlow.findMany({
         where: { userId },

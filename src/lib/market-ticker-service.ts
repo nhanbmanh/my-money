@@ -769,16 +769,29 @@ export async function fetchClosingPriceDetailsForSymbol(
       ? currentHoldingPrice
       : matched?.currentPrice || 10000;
 
-  const yesterdayPrice =
+  let yesterdayPrice =
     liveData?.yesterdayPrice && liveData.yesterdayPrice > 0
       ? liveData.yesterdayPrice
       : price;
 
+  if (liveData?.historyMap) {
+    const yesterdayDate = new Date();
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yyyy = yesterdayDate.getFullYear();
+    const mm = String(yesterdayDate.getMonth() + 1).padStart(2, "0");
+    const dd = String(yesterdayDate.getDate()).padStart(2, "0");
+    const yesterdayKey = `${yyyy}-${mm}-${dd}`;
+
+    if (liveData.historyMap[yesterdayKey] !== undefined && liveData.historyMap[yesterdayKey] > 0) {
+      yesterdayPrice = liveData.historyMap[yesterdayKey];
+    }
+  }
+
   const change24h =
-    liveData?.change24h !== undefined
-      ? liveData.change24h
-      : yesterdayPrice > 0 && price !== yesterdayPrice
+    yesterdayPrice > 0 && price !== yesterdayPrice
       ? Number((((price - yesterdayPrice) / yesterdayPrice) * 100).toFixed(2))
+      : liveData?.change24h !== undefined
+      ? liveData.change24h
       : 0;
 
   return { price, change24h, yesterdayPrice, historyMap: liveData?.historyMap };

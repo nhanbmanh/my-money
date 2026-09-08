@@ -91,14 +91,69 @@ export function NetWorthVarianceModal({
     };
   }, [cashFlows, startOfToday]);
 
+  // 3. Filter Wealth Transactions logged TODAY (Asset Purchases / Sales / Investments)
+  const { todayTradeNet, timeframeTrades } = useMemo(() => {
+    let tradeNet = 0;
+    const list: any[] = [];
+
+    (transactions || []).forEach((tx: any) => {
+      const txDate = new Date(tx.date || tx.createdAt);
+      if (txDate >= startOfToday) {
+        const qty = Number(tx.quantity || 0);
+        const price = Number(tx.price || 0);
+        const totalVal = qty > 0 && price > 0 ? qty * price : price;
+        const type = (tx.transactionType || "").toUpperCase();
+
+        if (type === "BUY" || type === "DEPOSIT" || type === "TRANSFER_IN") {
+          tradeNet += totalVal;
+          list.push({ ...tx, totalVal, isAdd: true });
+        } else if (type === "SELL" || type === "WITHDRAW" || type === "TRANSFER_OUT") {
+          tradeNet -= totalVal;
+          list.push({ ...tx, totalVal, isAdd: false });
+        }
+      }
+    });
+
+    return {
+      todayTradeNet: tradeNet,
+      timeframeTrades: list,
+    };
+  }, [transactions, startOfToday]);
+
   const currentNetWorth = Number(summary?.netWorth || 0);
 
   // Map holdings and calculate actual 24h market price variance (Day T vs Day T-1 closing price)
   const allHoldingItems = useMemo(() => {
+    const yesterdayDate = new Date(startOfToday);
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yyyy = yesterdayDate.getFullYear();
+    const mm = String(yesterdayDate.getMonth() + 1).padStart(2, "0");
+    const dd = String(yesterdayDate.getDate()).padStart(2, "0");
+    const yesterdayKey = `${yyyy}-${mm}-${dd}`;
+
     return (holdings || []).map((h) => {
       const quantity = Number(h.quantity || 0);
       const currentUnitPrice = Number(h.currentMarketPrice || h.averageCostBasis || 0);
-      const yesterdayUnitPrice = Number(h.yesterdayPrice || currentUnitPrice);
+      let yesterdayUnitPrice = Number(h.yesterdayPrice || currentUnitPrice);
+
+      if (h.historyMap && Object.keys(h.historyMap).length > 0) {
+        if (h.historyMap[yesterdayKey] !== undefined && Number(h.historyMap[yesterdayKey]) > 0) {
+          yesterdayUnitPrice = Number(h.historyMap[yesterdayKey]);
+        } else {
+          const sortedHistoryDates = Object.keys(h.historyMap).sort();
+          let foundPrice: number | null = null;
+          for (let k = sortedHistoryDates.length - 1; k >= 0; k--) {
+            if (sortedHistoryDates[k] <= yesterdayKey && Number(h.historyMap[sortedHistoryDates[k]]) > 0) {
+              foundPrice = Number(h.historyMap[sortedHistoryDates[k]]);
+              break;
+            }
+          }
+          if (foundPrice !== null) {
+            yesterdayUnitPrice = foundPrice;
+          }
+        }
+      }
+
       const catCfg = getCategoryConfig(h.categoryType ?? 0);
 
       let oneDayChange = 0;
@@ -123,7 +178,7 @@ export function NetWorthVarianceModal({
         change24hPercent: oneDayChangePercent,
       };
     });
-  }, [holdings]);
+  }, [holdings, startOfToday]);
 
   // Filter ONLY market-driven investment items (categoryType !== 0) to avoid double-counting cashflows
   const portfolioAttribution = useMemo(() => {
@@ -138,7 +193,7 @@ export function NetWorthVarianceModal({
 
   // 5. Absolute Net Worth Reconciliation
   const { previousNetWorth, netWorthChangeAmount, portfolioMarketChange } = useMemo(() => {
-    const totalChange = sumPortfolioAttribution + todayNetCashFlow;
+    const totalChange = sumPortfolioAttribution + todayTradeNet + todayNetCashFlow;
     const prev = currentNetWorth - totalChange;
 
     return {
@@ -146,13 +201,14 @@ export function NetWorthVarianceModal({
       netWorthChangeAmount: totalChange,
       portfolioMarketChange: sumPortfolioAttribution,
     };
-  }, [currentNetWorth, todayNetCashFlow, sumPortfolioAttribution]);
+  }, [currentNetWorth, todayNetCashFlow, todayTradeNet, sumPortfolioAttribution]);
 
   const rawChangePercent = previousNetWorth > 0 ? (netWorthChangeAmount / previousNetWorth) * 100 : 0;
   const netWorthChangePercent = Math.abs(rawChangePercent) < 0.01 ? 0 : rawChangePercent;
 
   const isPositive = netWorthChangeAmount >= 0;
   const isPortfolioPositive = sumPortfolioAttribution >= 0;
+  const isTradePositive = todayTradeNet >= 0;
   const isCashFlowPositive = todayNetCashFlow >= 0;
 
   return (
@@ -310,9 +366,6 @@ export function NetWorthVarianceModal({
               {timeframeCashFlows.length === 0 ? (
                 <div className="text-[11px] text-slate-400 text-center py-2 space-y-0.5">
                   <p>Không có giao dịch Thu/Chi mới phát sinh trong kỳ này.</p>
-                  <p className="text-[10px] text-slate-500">
-                    Toàn bộ biến động gia sản ròng kỳ này do thay đổi định giá thị trường danh mục đầu tư.
-                  </p>
                 </div>
               ) : (
                 <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
@@ -346,7 +399,63 @@ export function NetWorthVarianceModal({
             </div>
           </div>
 
-          {/* Section 3: Summary Reconciliation */}
+          {/* Section 3: Asset Trade & Investment Transactions */}
+          {timeframeTrades.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2 text-xs font-bold text-slate-200">
+                <span className="flex items-center gap-1.5 text-purple-400">
+                  <TrendingUp className="h-4 w-4 shrink-0" />
+                  <span>3. Mua Mới & Tích Lũy Tài Sản Trong Kỳ ({timeframeTrades.length} Giao Dịch)</span>
+                </span>
+                <span
+                  className={cn(
+                    "w-fit text-[11px] sm:text-xs font-extrabold px-2.5 py-0.5 rounded-lg border self-start sm:self-auto",
+                    isTradePositive
+                      ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                      : "bg-rose-500/10 border-rose-500/20 text-rose-400"
+                  )}
+                >
+                  Giá trị gia tăng danh mục: {isTradePositive ? "+" : ""}
+                  {formatVND(todayTradeNet)}
+                </span>
+              </div>
+
+              <div className="p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
+                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                  {timeframeTrades.map((tx: any) => {
+                    const ticker = tx.asset?.symbolOrTicker || "Tài sản";
+                    const name = tx.asset?.assetName || tx.notes || "Mua mới/Tích lũy";
+                    return (
+                      <div
+                        key={tx.id}
+                        className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-xl bg-slate-900/80 border border-slate-800/50 gap-2"
+                      >
+                        <div className="flex items-center gap-2 truncate pr-2 min-w-0 flex-1">
+                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 shrink-0">
+                            {ticker}
+                          </span>
+                          <span className="truncate text-slate-300 font-medium">
+                            {tx.notes || `Mua thêm ${tx.quantity || ""} ${name}`}
+                          </span>
+                        </div>
+                        <span
+                          className={cn(
+                            "font-bold shrink-0 text-xs ml-auto",
+                            tx.isAdd ? "text-emerald-400" : "text-rose-400"
+                          )}
+                        >
+                          {tx.isAdd ? "+" : "-"}
+                          {formatVND(tx.totalVal)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Section 4: Summary Reconciliation */}
           <div className="p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-sky-500/10 border border-sky-500/20 text-xs space-y-2">
             <div className="font-bold text-sky-400 flex items-center gap-1.5 text-xs sm:text-sm">
               <CheckCircle2 className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-emerald-400 shrink-0" />
@@ -359,18 +468,26 @@ export function NetWorthVarianceModal({
                   {isPortfolioPositive ? "+" : ""}{formatVND(sumPortfolioAttribution)}
                 </strong>
               </div>
+              {todayTradeNet !== 0 && (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between py-0.5 border-b border-sky-500/20 gap-0.5">
+                  <span>• Mua mới & tích lũy tài sản đầu tư trong kỳ:</span>
+                  <strong className={isTradePositive ? "text-emerald-400" : "text-rose-400"}>
+                    {isTradePositive ? "+" : ""}{formatVND(todayTradeNet)}
+                  </strong>
+                </div>
+              )}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between py-0.5 border-b border-sky-500/20 gap-0.5">
                 <span>• Dòng tiền Thu/Chi mới phát sinh trong kỳ:</span>
                 <strong className={isCashFlowPositive ? "text-emerald-400" : "text-rose-400"}>
                   {isCashFlowPositive ? "+" : ""}{formatVND(todayNetCashFlow)}
                 </strong>
               </div>
-              {Math.abs(netWorthChangeAmount - (sumPortfolioAttribution + todayNetCashFlow)) > 0 && (
+              {Math.abs(netWorthChangeAmount - (sumPortfolioAttribution + todayTradeNet + todayNetCashFlow)) > 0 && (
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between py-0.5 border-b border-sky-500/20 gap-0.5 text-slate-400">
-                  <span>• Chênh lệch điều chỉnh tài sản / nợ khác (Snapshot kỳ trước):</span>
-                  <strong className={netWorthChangeAmount - (sumPortfolioAttribution + todayNetCashFlow) >= 0 ? "text-emerald-400" : "text-rose-400"}>
-                    {netWorthChangeAmount - (sumPortfolioAttribution + todayNetCashFlow) >= 0 ? "+" : ""}
-                    {formatVND(netWorthChangeAmount - (sumPortfolioAttribution + todayNetCashFlow))}
+                  <span>• Chênh lệch điều chỉnh tài sản / nợ khác:</span>
+                  <strong className={netWorthChangeAmount - (sumPortfolioAttribution + todayTradeNet + todayNetCashFlow) >= 0 ? "text-emerald-400" : "text-rose-400"}>
+                    {netWorthChangeAmount - (sumPortfolioAttribution + todayTradeNet + todayNetCashFlow) >= 0 ? "+" : ""}
+                    {formatVND(netWorthChangeAmount - (sumPortfolioAttribution + todayTradeNet + todayNetCashFlow))}
                   </strong>
                 </div>
               )}

@@ -88,12 +88,38 @@ export function OverviewBalanceSheet({
   // Precompute 24h market PnL change logged today (Day T vs T-1 closing price)
   const rawMarketChange = useMemo(() => {
     let sum = 0;
+    const startOfToday = getStartOfTodayVN();
+    const yesterdayDate = new Date(startOfToday);
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yyyy = yesterdayDate.getFullYear();
+    const mm = String(yesterdayDate.getMonth() + 1).padStart(2, "0");
+    const dd = String(yesterdayDate.getDate()).padStart(2, "0");
+    const yesterdayKey = `${yyyy}-${mm}-${dd}`;
+
     (holdings || []).forEach((h: any) => {
       if (h.categoryType === 0 || h.asset?.symbolOrTicker === "CASH_VND") return;
 
       const quantity = Number(h.quantity || 0);
       const currentUnitPrice = Number(h.currentMarketPrice || h.averageCostBasis || 0);
-      const yesterdayUnitPrice = Number(h.yesterdayPrice || currentUnitPrice);
+      let yesterdayUnitPrice = Number(h.yesterdayPrice || currentUnitPrice);
+
+      if (h.historyMap && Object.keys(h.historyMap).length > 0) {
+        if (h.historyMap[yesterdayKey] !== undefined && Number(h.historyMap[yesterdayKey]) > 0) {
+          yesterdayUnitPrice = Number(h.historyMap[yesterdayKey]);
+        } else {
+          const sortedHistoryDates = Object.keys(h.historyMap).sort();
+          let foundPrice: number | null = null;
+          for (let k = sortedHistoryDates.length - 1; k >= 0; k--) {
+            if (sortedHistoryDates[k] <= yesterdayKey && Number(h.historyMap[sortedHistoryDates[k]]) > 0) {
+              foundPrice = Number(h.historyMap[sortedHistoryDates[k]]);
+              break;
+            }
+          }
+          if (foundPrice !== null) {
+            yesterdayUnitPrice = foundPrice;
+          }
+        }
+      }
 
       if (yesterdayUnitPrice > 0 && currentUnitPrice > 0) {
         const priceDelta = currentUnitPrice - yesterdayUnitPrice;
@@ -103,6 +129,28 @@ export function OverviewBalanceSheet({
 
     return sum;
   }, [holdings]);
+
+  // Precompute 24h asset acquisition / sales trade net value logged today
+  const todayTradeNet = useMemo(() => {
+    const startOfToday = getStartOfTodayVN();
+    let tradeNet = 0;
+    (transactions || []).forEach((tx: any) => {
+      const txDate = new Date(tx.date || tx.createdAt);
+      if (txDate >= startOfToday) {
+        const qty = Number(tx.quantity || 0);
+        const price = Number(tx.price || 0);
+        const totalVal = qty > 0 && price > 0 ? qty * price : price;
+        const type = (tx.transactionType || "").toUpperCase();
+
+        if (type === "BUY" || type === "DEPOSIT" || type === "TRANSFER_IN") {
+          tradeNet += totalVal;
+        } else if (type === "SELL" || type === "WITHDRAW" || type === "TRANSFER_OUT") {
+          tradeNet -= totalVal;
+        }
+      }
+    });
+    return tradeNet;
+  }, [transactions]);
 
   // Dynamic timeframe chart data computed strictly via user formula: Net Worth Date X = A + B + C
   // A = Liquid Cash Today - CashFlows logged strictly after Date X
@@ -389,7 +437,7 @@ export function OverviewBalanceSheet({
       }
     });
 
-    const totalChangeAmount = rawMarketChange + todayNetCashFlow;
+    const totalChangeAmount = rawMarketChange + todayTradeNet + todayNetCashFlow;
     const prevNetWorth = currentNetWorth - totalChangeAmount;
 
     const rawPercent = prevNetWorth > 0 ? (totalChangeAmount / prevNetWorth) * 100 : 0;
@@ -401,7 +449,7 @@ export function OverviewBalanceSheet({
       netWorthChangePercent: changePercent,
       isPositive: totalChangeAmount >= 0,
     };
-  }, [summary, cashFlows, rawMarketChange]);
+  }, [summary, cashFlows, rawMarketChange, todayTradeNet]);
 
   const compareLabel = useMemo(() => {
     return language === "vi" ? "so với hôm qua" : "vs yesterday";

@@ -81,18 +81,51 @@ export async function PUT(req: Request) {
         });
       }
 
-      await prisma.wealthTransaction.create({
-        data: {
-          userId,
-          transactionType: "REVALUATION",
-          assetId: holding.assetId,
-          quantity: updatedQty,
-          price: updatedVal,
-          costBasis: updatedVal,
-          currency: "VND",
-          notes: `Cập nhật lại định giá/giá vốn TB tài sản ${holding.asset.assetName}`,
-        },
-      });
+      const qtyDelta = updatedQty - holding.quantity;
+
+      if (qtyDelta > 0) {
+        await prisma.wealthTransaction.create({
+          data: {
+            userId,
+            transactionType: "BUY",
+            assetId: holding.assetId,
+            quantity: qtyDelta,
+            price: updatedVal,
+            costBasis: updatedVal,
+            currency: "VND",
+            notes: `Cập nhật tăng số lượng tài sản ${holding.asset.assetName} (+${qtyDelta})`,
+            date: new Date(),
+          },
+        });
+      } else if (qtyDelta < 0) {
+        await prisma.wealthTransaction.create({
+          data: {
+            userId,
+            transactionType: "SELL",
+            assetId: holding.assetId,
+            quantity: Math.abs(qtyDelta),
+            price: updatedVal,
+            costBasis: updatedVal,
+            currency: "VND",
+            notes: `Cập nhật giảm số lượng tài sản ${holding.asset.assetName} (-${Math.abs(qtyDelta)})`,
+            date: new Date(),
+          },
+        });
+      } else {
+        await prisma.wealthTransaction.create({
+          data: {
+            userId,
+            transactionType: "REVALUATION",
+            assetId: holding.assetId,
+            quantity: updatedQty,
+            price: updatedVal,
+            costBasis: updatedVal,
+            currency: "VND",
+            notes: `Cập nhật lại định giá/giá vốn TB tài sản ${holding.asset.assetName}`,
+            date: new Date(),
+          },
+        });
+      }
 
       return NextResponse.json({ success: true, holding: updatedHolding });
     } else if (actionType === "TRADE") {

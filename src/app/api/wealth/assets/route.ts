@@ -156,6 +156,20 @@ export async function POST(req: Request) {
 
       const transactionValue = Number(quantity) * latestPrice;
 
+      await prisma.wealthTransaction.create({
+        data: {
+          userId,
+          transactionType: "BUY",
+          assetId: asset.id,
+          quantity: Number(quantity),
+          price: latestPrice,
+          costBasis: latestPrice,
+          currency,
+          notes: `Mua/Thêm tài sản ${asset.assetName}`,
+          date: new Date(),
+        },
+      });
+
       return NextResponse.json({
         success: true,
         holding,
@@ -213,6 +227,20 @@ export async function POST(req: Request) {
           investableFlag: Boolean(isInvestable),
         },
         include: { asset: true },
+      });
+
+      await prisma.wealthTransaction.create({
+        data: {
+          userId,
+          transactionType: "BUY",
+          assetId: asset.id,
+          quantity: 1,
+          price: Number(estimatedCurrentValue),
+          costBasis: Number(estimatedCurrentValue),
+          currency: "VND",
+          notes: `Tạo tài sản vật chất ${assetName}`,
+          date: new Date(),
+        },
       });
 
       return NextResponse.json({
@@ -276,6 +304,20 @@ export async function POST(req: Request) {
         include: { asset: true, linkedLiability: true },
       });
 
+      await prisma.wealthTransaction.create({
+        data: {
+          userId,
+          transactionType: "BORROW",
+          assetId: asset.id,
+          quantity: 1,
+          price: Number(debtAmount),
+          costBasis: Number(debtAmount),
+          currency: "VND",
+          notes: `Tạo khoản nợ ${assetName}`,
+          date: new Date(),
+        },
+      });
+
       return NextResponse.json({
         success: true,
         holding,
@@ -326,6 +368,20 @@ export async function POST(req: Request) {
           investableFlag: true,
         },
         include: { asset: true },
+      });
+
+      await prisma.wealthTransaction.create({
+        data: {
+          userId,
+          transactionType: "LEND",
+          assetId: asset.id,
+          quantity: 1,
+          price: Number(estimatedCurrentValue),
+          costBasis: Number(estimatedCurrentValue),
+          currency: "VND",
+          notes: `Tạo khoản cho vay ${assetName}`,
+          date: new Date(),
+        },
       });
 
       return NextResponse.json({
