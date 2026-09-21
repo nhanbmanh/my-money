@@ -44,6 +44,12 @@ export function AppSidebar() {
 
   const NAV_ITEMS = [
     {
+      href: "/profile",
+      label: t("nav.profile"),
+      icon: UserRound,
+      iconColor: "text-blue-500",
+    },
+    {
       href: "/financial-management",
       label: t("nav.financialManagement"),
       icon: Wallet,
@@ -268,8 +274,12 @@ export function AppSidebar() {
 
       <SidebarFooter className="border-t border-sidebar-border px-3 py-3 group-data-[collapsible=icon]:px-0">
         <div className="flex items-center justify-between gap-2 group-data-[collapsible=icon]:justify-center">
-          <div className="flex min-w-0 items-center gap-2 group-data-[collapsible=icon]:hidden">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
+          <Link
+            href="/profile"
+            className="flex min-w-0 items-center gap-2 group-data-[collapsible=icon]:hidden hover:opacity-80 transition-opacity cursor-pointer"
+            title="Xem hồ sơ cá nhân"
+          >
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400 font-bold border border-sky-500/20">
               <UserRound className="h-4 w-4" />
             </div>
             <div className="min-w-0">
@@ -279,16 +289,20 @@ export function AppSidebar() {
               <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-medium">
                 <span className="truncate">{t("common.account")}</span>
                 <span className="opacity-40">•</span>
-                <span className="font-mono text-[10px] font-extrabold text-sky-500/90 dark:text-sky-400/90">v1.0.0</span>
+                <span className="font-mono text-[10px] font-extrabold text-sky-500/90 dark:text-sky-400/90">v1.0.1</span>
               </div>
             </div>
-          </div>
+          </Link>
 
-          <div className="hidden group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
+          <Link
+            href="/profile"
+            className="hidden group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center cursor-pointer"
+            title="Xem hồ sơ cá nhân"
+          >
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400 font-bold border border-sky-500/20">
               <UserRound className="h-4 w-4" />
             </div>
-          </div>
+          </Link>
 
           <Button
             variant="ghost"

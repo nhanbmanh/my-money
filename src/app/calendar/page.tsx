@@ -132,7 +132,7 @@ export default function CalendarPage() {
     fetchPlans();
   }, [fetchPlans]);
 
-  // Listen for open-calendar-modal event from Header button
+  // Listen for open-calendar-modal and refresh-calendar events
   useEffect(() => {
     const handleOpenModal = () => {
       setSelectedPlanForEdit(null);
@@ -141,10 +141,12 @@ export default function CalendarPage() {
     };
 
     window.addEventListener("open-calendar-modal", handleOpenModal);
+    window.addEventListener("refresh-calendar", fetchPlans);
     return () => {
       window.removeEventListener("open-calendar-modal", handleOpenModal);
+      window.removeEventListener("refresh-calendar", fetchPlans);
     };
-  }, []);
+  }, [fetchPlans]);
 
   // Compute Month Days for Desktop
   const monthDays = useMemo(() => {

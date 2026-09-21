@@ -54,6 +54,8 @@
     "calendarDesc": "Plans & schedules",
     "weather": "Weather Forecast",
     "weatherDesc": "Weather & Air Quality",
+    "profile": "Profile",
+    "profileDesc": "Account details & security",
     "themeMode": "Theme Mode",
     "themeLight": "Light",
     "themeDark": "Dark",

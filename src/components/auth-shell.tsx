@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import {
@@ -16,6 +16,7 @@ import {
   Building2,
   Landmark,
   HandCoins,
+  Send,
 } from "lucide-react";
 import { AppSidebar } from "@/components/ui/app-sidebar";
 import {
@@ -27,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { HeaderStatus } from "@/components/header-status";
 import { NotificationsPopover } from "@/components/notifications-popover";
 import { BudgetWarningModal } from "@/components/budget-warning-modal";
+import { ChatAssistantWidget } from "@/components/chat-assistant-widget";
 import {
   Popover,
   PopoverContent,
@@ -383,8 +385,9 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
           </div>
         </SidebarInset>
 
-        {/* Top-level mounted ImportExcelModal for global event triggering */}
+        {/* Top-level mounted Modals & Chat Assistant Widget for global triggering */}
         <ImportExcelModal />
+        <ChatAssistantWidget />
       </div>
     </SidebarProvider>
   );

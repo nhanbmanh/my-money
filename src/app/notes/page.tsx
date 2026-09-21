@@ -71,7 +71,7 @@ export default function NotesPage() {
     fetchNotes();
   }, [fetchNotes]);
 
-  // Listen for open-note-modal event from Header button
+  // Listen for open-note-modal and refresh-notes events
   useEffect(() => {
     const handleOpenModal = () => {
       setSelectedNote(null);
@@ -79,10 +79,12 @@ export default function NotesPage() {
     };
 
     window.addEventListener("open-note-modal", handleOpenModal);
+    window.addEventListener("refresh-notes", fetchNotes);
     return () => {
       window.removeEventListener("open-note-modal", handleOpenModal);
+      window.removeEventListener("refresh-notes", fetchNotes);
     };
-  }, []);
+  }, [fetchNotes]);
 
   const handleEdit = (note: NoteItem) => {
     setSelectedNote(note);

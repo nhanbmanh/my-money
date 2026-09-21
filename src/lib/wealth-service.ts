@@ -206,12 +206,11 @@ export async function getWealthTimeSeriesAndSnapshots(
     const startDate = new Date(today);
     startDate.setDate(startDate.getDate() - daysBack);
 
-    // Fetch all cashFlows and wealthTransactions after startDate
+    // Fetch all cashFlows and wealthTransactions (full history, no date limit)
     const [cashFlows, wealthTransactions] = await Promise.all([
       prisma.cashFlow.findMany({
         where: {
           userId,
-          datetime: { gte: startDate },
         },
         select: {
           datetime: true,
@@ -223,7 +222,6 @@ export async function getWealthTimeSeriesAndSnapshots(
       prisma.wealthTransaction.findMany({
         where: {
           userId,
-          date: { gte: startDate },
         },
         select: {
           date: true,

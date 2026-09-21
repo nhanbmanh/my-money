@@ -1,7 +1,11 @@
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+
+class UnverifiedEmailError extends CredentialsSignin {
+  code = "EMAIL_NOT_VERIFIED";
+}
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -26,7 +30,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!isValid) return null;
 
         if (!user.emailVerified) {
-          throw new Error("EMAIL_NOT_VERIFIED");
+          throw new UnverifiedEmailError();
         }
 
         return { id: user.id, email: user.email, name: user.username };
@@ -38,12 +42,29 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     signIn: "/login",
   },
   callbacks: {
-    jwt({ token, user }) {
-      if (user) token.id = user.id;
+    async jwt({ token, user, trigger, session }) {
+      if (user) {
+        token.id = user.id;
+        token.name = user.name;
+      }
+      if (trigger === "update" && session) {
+        if (session.name) token.name = session.name;
+        if (session.user?.name) token.name = session.user.name;
+      }
+      if (token.id) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { username: true },
+        });
+        if (dbUser?.username) {
+          token.name = dbUser.username;
+        }
+      }
       return token;
     },
     session({ session, token }) {
-      session.user.id = token.id as string;
+      if (token.id) session.user.id = token.id as string;
+      if (token.name) session.user.name = token.name as string;
       return session;
     },
   },

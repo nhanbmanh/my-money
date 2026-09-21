@@ -45,7 +45,6 @@ export async function GET() {
         where: { userId },
         include: { primaryCategory: true, source: true },
         orderBy: { datetime: "desc" },
-        take: 50,
       }),
     ]);
 

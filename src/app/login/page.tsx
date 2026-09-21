@@ -51,10 +51,33 @@ export default function LoginPage() {
     setLoading(false);
 
     if (res?.error) {
-      if (res?.error === "EMAIL_NOT_VERIFIED") {
-        setError(language === "vi" ? "Email chưa được xác thực. Vui lòng kiểm tra hộp thư để nhận mã OTP." : "Email not verified. Please check your inbox for OTP.");
+      if (res?.error.includes("EMAIL_NOT_VERIFIED") || res?.code === "EMAIL_NOT_VERIFIED") {
+        setError(
+          language === "vi"
+            ? "Tài khoản chưa xác thực Email OTP! Vui lòng bấm sang trang xác thực OTP bên dưới."
+            : "Email not verified! Please go to the OTP verification page."
+        );
       } else {
-        setError(language === "vi" ? "Email hoặc mật khẩu không đúng. Vui lòng thử lại." : "Invalid email or password. Please try again.");
+        // Double-check if the email exists but is unverified
+        try {
+          const checkRes = await fetch("/api/auth/resend-otp", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: emailTrimmed }),
+          });
+          const checkData = await checkRes.json();
+          if (checkRes.ok || checkData?.error?.includes("xác thực") || checkData?.error?.includes("verified")) {
+            // User exists but unverified! Redirect to verify-email page
+            router.push(`/verify-email?email=${encodeURIComponent(emailTrimmed)}`);
+            return;
+          }
+        } catch (_) {}
+
+        setError(
+          language === "vi"
+            ? "Email hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại."
+            : "Invalid email or password. Please try again."
+        );
       }
       return;
     }

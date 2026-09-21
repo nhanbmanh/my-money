@@ -25,8 +25,9 @@ export async function POST(req: Request) {
     }
 
     const { email, password, username, bod, gender } = parsed.data;
+    const cleanEmail = email.trim().toLowerCase();
 
-    const existingEmail = await prisma.user.findUnique({ where: { email } });
+    const existingEmail = await prisma.user.findUnique({ where: { email: cleanEmail } });
     if (existingEmail) {
       return NextResponse.json(
         { error: "Email đã được sử dụng" },
@@ -48,7 +49,7 @@ export async function POST(req: Request) {
 
     const user = await prisma.user.create({
       data: {
-        email,
+        email: cleanEmail,
         password: hashedPassword,
         username,
         bod: bod ? new Date(bod) : null,

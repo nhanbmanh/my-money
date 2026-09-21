@@ -36,6 +36,7 @@ export default function FinancialManagementPage() {
     };
 
     const handleOpenSettingsModal = () => setSettingsModalOpen(true);
+    const handleRefreshCashflows = () => setRefreshKey((k) => k + 1);
 
     window.addEventListener("open-cashflow-modal", handleOpenCashFlowModal);
     window.addEventListener(
@@ -47,6 +48,7 @@ export default function FinancialManagementPage() {
       handleOpenCopyCashFlowModal as EventListener
     );
     window.addEventListener("open-settings-modal", handleOpenSettingsModal);
+    window.addEventListener("refresh-cashflows", handleRefreshCashflows);
 
     return () => {
       window.removeEventListener(
@@ -65,6 +67,7 @@ export default function FinancialManagementPage() {
         "open-settings-modal",
         handleOpenSettingsModal
       );
+      window.removeEventListener("refresh-cashflows", handleRefreshCashflows);
     };
   }, []);
 

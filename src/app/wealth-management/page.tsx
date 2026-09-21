@@ -65,9 +65,13 @@ export default function WealthManagementPage() {
       const catType = e.detail?.categoryType !== undefined ? e.detail.categoryType : 0;
       handleOpenCreation(catType);
     };
+    const handleRefresh = () => setRefreshKey((k) => k + 1);
+
     window.addEventListener("open-wealth-creation-modal", handleOpenCreationEvent);
+    window.addEventListener("refresh-cashflows", handleRefresh);
     return () => {
       window.removeEventListener("open-wealth-creation-modal", handleOpenCreationEvent);
+      window.removeEventListener("refresh-cashflows", handleRefresh);
     };
   }, []);
 
