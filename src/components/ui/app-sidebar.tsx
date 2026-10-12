@@ -89,7 +89,9 @@ export function AppSidebar() {
   ];
 
   // Pinned Default Home Route State
-  const [pinnedRoute, setPinnedRoute] = useState<string>("/financial-management");
+  const [pinnedRoute, setPinnedRoute] = useState<string>(
+    "/financial-management",
+  );
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -137,7 +139,8 @@ export function AppSidebar() {
             {NAV_ITEMS.map((item) => {
               const isPinned = pinnedRoute === item.href;
               const isActive =
-                pathname === item.href || (item.href === "/financial-management" && pathname === "/");
+                pathname === item.href ||
+                (item.href === "/financial-management" && pathname === "/");
 
               return (
                 <SidebarMenuItem
@@ -154,7 +157,9 @@ export function AppSidebar() {
                       className="flex items-center justify-between gap-2.5 w-full group/link group-data-[collapsible=icon]:justify-center"
                     >
                       <div className="flex items-center gap-2.5 min-w-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
-                        <item.icon className={cn("h-4 w-4 shrink-0", item.iconColor)} />
+                        <item.icon
+                          className={cn("h-4 w-4 shrink-0", item.iconColor)}
+                        />
                         <span className="group-data-[collapsible=icon]:hidden truncate">
                           {item.label}
                         </span>
@@ -172,18 +177,24 @@ export function AppSidebar() {
                           "p-1 rounded-md transition-all cursor-pointer shrink-0 group-data-[collapsible=icon]:hidden",
                           isPinned
                             ? "text-amber-500 opacity-100"
-                            : "text-slate-400/40 opacity-0 group-hover/link:opacity-100 hover:text-amber-500"
+                            : "text-slate-400/40 opacity-0 group-hover/link:opacity-100 hover:text-amber-500",
                         )}
                         title={
                           isPinned
-                            ? (language === "vi" ? "Trang mặc định (Đã ghim)" : "Default Page (Pinned)")
-                            : (language === "vi" ? "Ghim làm trang mặc định khi truy cập" : "Pin as default landing page")
+                            ? language === "vi"
+                              ? "Trang mặc định (Đã ghim)"
+                              : "Default Page (Pinned)"
+                            : language === "vi"
+                              ? "Ghim làm trang mặc định khi truy cập"
+                              : "Pin as default landing page"
                         }
                       >
                         <Pin
                           className={cn(
                             "h-3.5 w-3.5 transition-transform",
-                            isPinned ? "fill-amber-500 rotate-45" : "-rotate-45"
+                            isPinned
+                              ? "fill-amber-500 rotate-45"
+                              : "-rotate-45",
                           )}
                         />
                       </button>
@@ -210,7 +221,7 @@ export function AppSidebar() {
                   "flex flex-col items-center justify-center py-1.5 px-1 rounded-lg text-[11px] font-bold transition-all gap-1 cursor-pointer",
                   mode === "light"
                     ? "bg-background text-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
                 title={t("nav.themeLight")}
               >
@@ -225,7 +236,7 @@ export function AppSidebar() {
                   "flex flex-col items-center justify-center py-1.5 px-1 rounded-lg text-[11px] font-bold transition-all gap-1 cursor-pointer",
                   mode === "dark"
                     ? "bg-background text-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
                 title={t("nav.themeDark")}
               >
@@ -240,7 +251,7 @@ export function AppSidebar() {
                   "flex flex-col items-center justify-center py-1.5 px-1 rounded-lg text-[11px] font-bold transition-all gap-1 cursor-pointer",
                   mode === "auto"
                     ? "bg-background text-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
                 title={t("nav.themeAuto")}
               >
@@ -290,7 +301,9 @@ export function AppSidebar() {
               <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-medium">
                 <span className="truncate">{t("common.account")}</span>
                 <span className="opacity-40">•</span>
-                <span className="font-mono text-[10px] font-extrabold text-sky-500/90 dark:text-sky-400/90">v1.0.1</span>
+                <span className="font-mono text-[10px] font-extrabold text-sky-500/90 dark:text-sky-400/90">
+                  v1.0.2
+                </span>
               </div>
             </div>
           </Link>
