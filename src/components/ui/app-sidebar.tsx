@@ -31,6 +31,7 @@ import {
   NotebookPen,
   CalendarDays,
   CheckSquare,
+  Database,
 } from "lucide-react";
 import { useTheme, ThemeMode } from "@/components/theme-provider";
 import { useLanguage } from "@/components/language-provider";

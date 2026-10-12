@@ -18,6 +18,9 @@ export default async function RootPage() {
   const session = await auth();
 
   if (session?.user) {
+    if (session.user.role === "admin") {
+      redirect("/database");
+    }
     const cookieStore = await cookies();
     const defaultRoute = cookieStore.get("default_app_route")?.value || "/financial-management";
     const targetRoute = VALID_ROUTES.includes(defaultRoute)

@@ -25,13 +25,14 @@ export default function LoginPage() {
 
     const emailTrimmed = form.email.trim();
     if (!emailTrimmed) {
-      setError(language === "vi" ? "Vui lòng nhập địa chỉ email." : "Please enter your email address.");
+      setError(language === "vi" ? "Vui lòng nhập địa chỉ email hoặc tài khoản admin." : "Please enter your email address or admin account.");
       return;
     }
 
+    const isAdminAccount = emailTrimmed.toLowerCase() === "admin";
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(emailTrimmed)) {
-      setError(language === "vi" ? "Địa chỉ email không hợp lệ (ví dụ: name@example.com)." : "Invalid email format (e.g. name@example.com).");
+    if (!isAdminAccount && !emailRegex.test(emailTrimmed)) {
+      setError(language === "vi" ? "Địa chỉ email không hợp lệ (ví dụ: name@example.com hoặc admin)." : "Invalid email format (e.g. name@example.com or admin).");
       return;
     }
 
@@ -58,27 +59,35 @@ export default function LoginPage() {
             : "Email not verified! Please go to the OTP verification page."
         );
       } else {
-        // Double-check if the email exists but is unverified
-        try {
-          const checkRes = await fetch("/api/auth/resend-otp", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email: emailTrimmed }),
-          });
-          const checkData = await checkRes.json();
-          if (checkRes.ok || checkData?.error?.includes("xác thực") || checkData?.error?.includes("verified")) {
-            // User exists but unverified! Redirect to verify-email page
-            router.push(`/verify-email?email=${encodeURIComponent(emailTrimmed)}`);
-            return;
-          }
-        } catch (_) {}
+        if (!isAdminAccount) {
+          // Double-check if the email exists but is unverified
+          try {
+            const checkRes = await fetch("/api/auth/resend-otp", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: emailTrimmed }),
+            });
+            const checkData = await checkRes.json();
+            if (checkRes.ok || checkData?.error?.includes("xác thực") || checkData?.error?.includes("verified")) {
+              // User exists but unverified! Redirect to verify-email page
+              router.push(`/verify-email?email=${encodeURIComponent(emailTrimmed)}`);
+              return;
+            }
+          } catch (_) {}
+        }
 
         setError(
           language === "vi"
-            ? "Email hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại."
-            : "Invalid email or password. Please try again."
+            ? "Tài khoản hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại."
+            : "Invalid account or password. Please try again."
         );
       }
+      return;
+    }
+
+    if (isAdminAccount) {
+      router.push("/database");
+      router.refresh();
       return;
     }
 

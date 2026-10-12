@@ -34,20 +34,7 @@ export async function register() {
           },
         });
 
-        // 2. Revert future plans (date > endOfToday) back to Todo (0)
-        await prisma.calendarPlan.updateMany({
-          where: {
-            status: 1,
-            date: {
-              gt: endOfToday,
-            },
-          },
-          data: {
-            status: 0,
-          },
-        });
-
-        // 3. Record Daily Asset Snapshots & send daily email report for all users in Vietnam Time
+        // 2. Record Daily Asset Snapshots & send daily email report for all users in Vietnam Time
         const { buildAndSendDailySnapshotEmail } = await import("@/lib/daily-snapshot-email");
         const users = await prisma.user.findMany({ select: { id: true, email: true } });
         const { fetchClosingPriceDetailsForSymbol } = await import("@/lib/market-ticker-service");

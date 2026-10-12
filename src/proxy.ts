@@ -5,6 +5,7 @@ const publicRoutes = ["/login", "/register", "/verify-email"];
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth;
+  const isAdmin = req.auth?.user?.role === "admin";
   const isPublicRoute = publicRoutes.includes(req.nextUrl.pathname);
 
   if (!isLoggedIn && !isPublicRoute) {
@@ -12,11 +13,18 @@ export default auth((req) => {
   }
 
   if (isLoggedIn && isPublicRoute) {
+    if (isAdmin) {
+      return NextResponse.redirect(new URL("/database", req.nextUrl));
+    }
     const defaultRoute = req.cookies.get("default_app_route")?.value || "/financial-management";
     const targetRoute = ["/financial-management", "/weather"].includes(defaultRoute)
       ? defaultRoute
       : "/financial-management";
     return NextResponse.redirect(new URL(targetRoute, req.nextUrl));
+  }
+
+  if (isLoggedIn && req.nextUrl.pathname.startsWith("/database") && !isAdmin) {
+    return NextResponse.redirect(new URL("/financial-management", req.nextUrl));
   }
 
   return NextResponse.next();

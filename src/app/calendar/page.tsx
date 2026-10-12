@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -28,6 +28,8 @@ import {
   ListFilter,
   CheckCircle2,
   Star,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import {
   format,
@@ -55,17 +57,26 @@ export default function CalendarPage() {
   // Selected Reference Date for Calendar Navigation
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   
-  // Track screen size for responsive navigation (mobile week vs desktop month)
-  const [isMobile, setIsMobile] = useState(false);
+  // View layout mode: "month" (Desktop layout) or "week" (Mobile layout)
+  const [layoutMode, setLayoutMode] = useState<"month" | "week">("month");
+  const hasUserToggledRef = useRef(false);
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
+      const mobile = window.innerWidth < 768;
+      if (!hasUserToggledRef.current) {
+        setLayoutMode(mobile ? "week" : "month");
+      }
     };
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  const toggleLayout = () => {
+    hasUserToggledRef.current = true;
+    setLayoutMode((prev) => (prev === "month" ? "week" : "month"));
+  };
 
   const [plans, setPlans] = useState<CalendarPlanItem[]>([]);
   const [userBod, setUserBod] = useState<Date | null>(null);
@@ -168,7 +179,7 @@ export default function CalendarPage() {
 
   // Navigation handlers
   const handlePrev = () => {
-    if (isMobile) {
+    if (layoutMode === "week") {
       setCurrentDate((prev) => subWeeks(prev, 1));
     } else {
       setCurrentDate((prev) => subMonths(prev, 1));
@@ -176,7 +187,7 @@ export default function CalendarPage() {
   };
 
   const handleNext = () => {
-    if (isMobile) {
+    if (layoutMode === "week") {
       setCurrentDate((prev) => addWeeks(prev, 1));
     } else {
       setCurrentDate((prev) => addMonths(prev, 1));
@@ -208,16 +219,21 @@ export default function CalendarPage() {
 
   return (
     <div className="w-full px-4 py-4 lg:px-6 space-y-6">
-      {/* Mobile Navigation Header Bar */}
-      <div className="md:hidden flex items-center justify-between gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2.5 rounded-2xl shadow-xs">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl shrink-0">
+      {/* Responsive Navigation Header Bar */}
+      <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5 sm:gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2.5 sm:p-4 rounded-2xl sm:rounded-3xl shadow-xs">
+        {/* Left: Display Title & Quick Navigation */}
+        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
+          <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 sm:p-1 rounded-xl sm:rounded-2xl shrink-0">
             <Button
               variant="ghost"
               size="icon"
               onClick={handlePrev}
-              className="h-7 w-7 rounded-lg text-slate-600 dark:text-slate-300"
-              title={language === "vi" ? "Tuần trước" : "Previous Week"}
+              className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg sm:rounded-xl text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 shadow-2xs cursor-pointer"
+              title={
+                layoutMode === "week"
+                  ? (language === "vi" ? "Tuần trước" : "Previous Week")
+                  : (language === "vi" ? "Tháng trước" : "Previous Month")
+              }
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -225,35 +241,67 @@ export default function CalendarPage() {
               variant="ghost"
               size="icon"
               onClick={handleNext}
-              className="h-7 w-7 rounded-lg text-slate-600 dark:text-slate-300"
-              title={language === "vi" ? "Tuần sau" : "Next Week"}
+              className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg sm:rounded-xl text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 shadow-2xs cursor-pointer"
+              title={
+                layoutMode === "week"
+                  ? (language === "vi" ? "Tuần sau" : "Next Week")
+                  : (language === "vi" ? "Tháng sau" : "Next Month")
+              }
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
 
-          <h2 className="text-xs font-extrabold text-slate-800 dark:text-slate-100 truncate">
-            {format(currentDate, "'Tuần' w - MM/yyyy", { locale: dateLocale })}
+          <h2 className="text-xs sm:text-lg font-extrabold text-slate-800 dark:text-slate-100 capitalize truncate">
+            {layoutMode === "week"
+              ? format(currentDate, "'Tuần' w - MM/yyyy", { locale: dateLocale })
+              : format(currentDate, "MMMM yyyy", { locale: dateLocale })}
           </h2>
-        </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
           <Button
             variant="outline"
             size="sm"
             onClick={() => setCurrentDate(new Date())}
-            className="h-7 px-2 text-[11px] font-bold rounded-xl border-slate-200 dark:border-slate-700 text-indigo-600 dark:text-indigo-400"
+            className="h-7 sm:h-8 px-2 sm:px-2.5 text-[11px] sm:text-xs font-bold rounded-xl border-slate-200 dark:border-slate-700 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-800 cursor-pointer ml-0.5 sm:ml-1 shrink-0"
           >
             {language === "vi" ? "Hôm nay" : "Today"}
+          </Button>
+        </div>
+
+        {/* Right: Layout Toggle Button & DatePicker Selector */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={toggleLayout}
+            className="h-7 sm:h-8 px-2 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 gap-1.5 transition-all cursor-pointer shadow-2xs"
+            title={
+              layoutMode === "month"
+                ? (language === "vi" ? "Chuyển sang giao diện tuần (Mobile)" : "Switch to week layout (Mobile)")
+                : (language === "vi" ? "Chuyển sang giao diện tháng (Desktop)" : "Switch to month layout (Desktop)")
+            }
+          >
+            {layoutMode === "month" ? (
+              <>
+                <List className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-indigo-500 shrink-0" />
+                <span>{language === "vi" ? "Dạng tuần" : "Week view"}</span>
+              </>
+            ) : (
+              <>
+                <LayoutGrid className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-indigo-500 shrink-0" />
+                <span>{language === "vi" ? "Dạng tháng" : "Month view"}</span>
+              </>
+            )}
           </Button>
 
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
-                className="h-7 px-2 text-[11px] font-bold rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 gap-1"
+                className="h-7 sm:h-8 px-2 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 gap-1 sm:gap-2 cursor-pointer"
+                title={language === "vi" ? "Chọn ngày để mở lịch" : "Select date to jump"}
               >
-                <CalendarIcon className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+                <CalendarIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-indigo-500 shrink-0" />
                 <span>{format(currentDate, "dd/MM/yyyy")}</span>
               </Button>
             </PopoverTrigger>
@@ -269,70 +317,6 @@ export default function CalendarPage() {
             </PopoverContent>
           </Popover>
         </div>
-      </div>
-
-      {/* Desktop Navigation Header Bar */}
-      <div className="hidden md:flex items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-3xl shadow-xs">
-        {/* Left: Month Display Title & Quick Navigation */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handlePrev}
-              className="h-8 w-8 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 shadow-2xs cursor-pointer"
-              title={language === "vi" ? "Tháng trước" : "Previous Month"}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleNext}
-              className="h-8 w-8 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 shadow-2xs cursor-pointer"
-              title={language === "vi" ? "Tháng sau" : "Next Month"}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-
-          <h2 className="text-lg font-extrabold text-slate-800 dark:text-slate-100 capitalize">
-            {format(currentDate, "MMMM yyyy", { locale: dateLocale })}
-          </h2>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentDate(new Date())}
-            className="h-8 px-2.5 text-xs font-bold rounded-xl border-slate-200 dark:border-slate-700 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-800 cursor-pointer ml-1"
-          >
-            {language === "vi" ? "Hôm nay" : "Today"}
-          </Button>
-        </div>
-
-        {/* Right: DatePicker Selector */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className="h-8 px-3 text-xs font-bold rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 gap-2 cursor-pointer"
-              title={language === "vi" ? "Chọn ngày để mở lịch" : "Select date to jump"}
-            >
-              <CalendarIcon className="h-4 w-4 text-indigo-500 shrink-0" />
-              <span>{format(currentDate, "dd/MM/yyyy")}</span>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent
-            className="w-auto p-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-[250]"
-            align="end"
-          >
-            <Calendar
-              mode="single"
-              selected={currentDate}
-              onSelect={(d) => d && setCurrentDate(d)}
-            />
-          </PopoverContent>
-        </Popover>
       </div>
 
       {/* Status Legends Bar */}
@@ -358,16 +342,16 @@ export default function CalendarPage() {
             {language === "vi" ? "Đang tải lịch trình..." : "Loading calendar..."}
           </p>
         </div>
-      ) : (
-        <>
-          {/* DESKTOP VIEW: 7-Column Month Grid */}
-          <div className="hidden md:block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm">
+      ) : layoutMode === "month" ? (
+        /* DESKTOP VIEW: 7-Column Month Grid */
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm overflow-x-auto touch-pan-x">
+          <div className="min-w-[630px] md:min-w-0">
             {/* Weekday Headers */}
             <div className="grid grid-cols-7 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
               {weekDayHeaders.map((header, idx) => (
                 <div
                   key={idx}
-                  className="py-3 text-center text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider"
+                  className="py-2.5 sm:py-3 text-center text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider"
                 >
                   {header}
                 </div>
@@ -388,18 +372,50 @@ export default function CalendarPage() {
                   <div
                     key={idx}
                     onClick={() => handleDayClick(day)}
-                    className={`min-h-[64px] sm:min-h-[72px] p-2.5 flex flex-col justify-start transition-all duration-200 group cursor-pointer relative ${
+                    className={`min-h-[64px] sm:min-h-[72px] p-1.5 sm:p-2.5 flex flex-col justify-start transition-all duration-200 group cursor-pointer relative overflow-hidden min-w-0 ${
                       !isCurrentMonthDay
                         ? "bg-slate-50/40 text-slate-400 dark:bg-slate-950/40 dark:text-slate-500 opacity-60 hover:bg-slate-900 hover:text-white dark:hover:bg-slate-100 dark:hover:text-slate-900 hover:opacity-100 hover:shadow-2xl hover:z-20 hover:scale-[1.01]"
                         : "bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100 hover:bg-slate-900 hover:text-white dark:hover:bg-slate-100 dark:hover:text-slate-900 hover:shadow-2xl hover:z-20 hover:scale-[1.01]"
                     }`}
                   >
-                    {/* Day Cell Header */}
-                    <div className="flex items-center justify-between gap-1 mb-1.5">
-                      <div className="flex items-center gap-2 min-w-0">
-                        {/* Day Number */}
+                    {/* Top-Right Absolute Corner Actions: Special Day Star Icon & Plus Action Button */}
+                    <div className="absolute top-1.5 right-1.5 z-10 flex items-center gap-0.5">
+                      {specials.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleStarClick(day, specials, e)}
+                          className="p-1 rounded-md hover:bg-black/10 dark:hover:bg-white/20 transition-all cursor-pointer"
+                          title={specials.map((s) => (language === "vi" ? s.name : s.nameEn)).join(", ")}
+                        >
+                          <Star
+                            className={`h-3.5 w-3.5 ${
+                              specials.some((s) => s.iconType === "blue_star")
+                                ? "text-sky-400 fill-sky-400 drop-shadow-md animate-pulse"
+                                : "text-amber-400 fill-amber-400 drop-shadow-md"
+                            }`}
+                          />
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDayClick(day);
+                        }}
+                        className="hidden md:inline-flex p-1 rounded-lg text-slate-400 opacity-0 group-hover:opacity-100 group-hover:text-white dark:group-hover:text-slate-900 hover:bg-white/20 dark:hover:bg-slate-300 transition-all cursor-pointer"
+                        title={language === "vi" ? "Thêm kế hoạch cho ngày này" : "Add plan for this day"}
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Day Cell Header Content */}
+                    <div className="flex flex-col min-w-0 pr-6 mb-1">
+                      {/* Day Number + Weekday (on wide screens) */}
+                      <div className="flex items-center gap-1.5 min-w-0">
                         <span
-                          className={`inline-flex items-center justify-center px-2 py-0.5 rounded-xl text-base sm:text-lg font-black transition-all ${
+                          className={`inline-flex items-center justify-center px-1.5 sm:px-2 py-0.5 rounded-xl text-sm sm:text-base md:text-lg font-black shrink-0 transition-all ${
                             isCurrentDay
                               ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/30"
                               : isCurrentMonthDay
@@ -410,53 +426,20 @@ export default function CalendarPage() {
                           {format(day, "d")}
                         </span>
 
-                        {/* Full Info: Weekday & Solar/Lunar Date */}
-                        <div className="flex flex-col min-w-0 leading-tight">
-                          <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-300 group-hover:text-slate-100 dark:group-hover:text-slate-900 truncate">
-                            {format(day, "EEEE", { locale: dateLocale })}
-                          </span>
-                          <div className="flex items-center gap-1 text-[10px] font-semibold text-slate-400 dark:text-slate-500 group-hover:text-slate-300 dark:group-hover:text-slate-700">
-                            <span>{format(day, "dd/MM")}</span>
-                            <span>({formatLunarDate(day)})</span>
-                          </div>
-                        </div>
+                        <span className="hidden xl:inline text-[11px] font-extrabold text-slate-700 dark:text-slate-300 group-hover:text-slate-100 dark:group-hover:text-slate-900 truncate">
+                          {format(day, "EEEE", { locale: dateLocale })}
+                        </span>
                       </div>
 
-                      {/* Right Header Actions: Special Star Icon & Plus Action Button */}
-                      <div className="flex items-center gap-0.5 shrink-0">
-                        {specials.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={(e) => handleStarClick(day, specials, e)}
-                            className="p-1 rounded-lg hover:bg-white/20 dark:hover:bg-slate-300 transition-all cursor-pointer"
-                            title={specials.map((s) => (language === "vi" ? s.name : s.nameEn)).join(", ")}
-                          >
-                            <Star
-                              className={`h-4 w-4 ${
-                                specials.some((s) => s.iconType === "blue_star")
-                                  ? "text-sky-400 fill-sky-400 drop-shadow-md animate-pulse"
-                                  : "text-amber-400 fill-amber-400 drop-shadow-md"
-                              }`}
-                            />
-                          </button>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDayClick(day);
-                          }}
-                          className="p-1 rounded-lg text-slate-400 opacity-0 group-hover:opacity-100 group-hover:text-white dark:group-hover:text-slate-900 hover:bg-white/20 dark:hover:bg-slate-300 transition-all cursor-pointer"
-                          title={language === "vi" ? "Thêm kế hoạch cho ngày này" : "Add plan for this day"}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </button>
+                      {/* Lunar Date (on separate line with full width) */}
+                      <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-slate-400 dark:text-slate-500 group-hover:text-slate-300 dark:group-hover:text-slate-700 mt-0.5">
+                        <span className="hidden xl:inline">{format(day, "dd/MM")}</span>
+                        <span className="whitespace-nowrap">{formatLunarDate(day)}</span>
                       </div>
                     </div>
 
                     {/* List of Plan Items */}
-                    <div className="mt-1 space-y-1">
+                    <div className="mt-1 space-y-1 min-w-0 overflow-hidden">
                       {dayPlans.map((plan) => {
                         const cfg =
                           PLAN_STATUS_CONFIG[plan.status] || PLAN_STATUS_CONFIG[0];
@@ -465,12 +448,12 @@ export default function CalendarPage() {
                           <div
                             key={plan.id}
                             onClick={(e) => handlePlanClick(plan, e)}
-                            className={`p-1.5 rounded-xl text-[11px] font-bold border transition-all truncate hover:scale-[1.02] shadow-2xs ${cfg.colorClass}`}
+                            className={`p-1 sm:p-1.5 rounded-lg sm:rounded-xl text-[10px] sm:text-[11px] font-bold border transition-all truncate hover:scale-[1.02] shadow-2xs ${cfg.colorClass}`}
                             title={`${plan.title} (${
                               language === "vi" ? cfg.labelVi : cfg.labelEn
                             })`}
                           >
-                            <div className="flex items-center gap-1 truncate">
+                            <div className="flex items-center gap-1 min-w-0 overflow-hidden">
                               <span
                                 className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.badgeClass}`}
                               />
@@ -485,9 +468,10 @@ export default function CalendarPage() {
               })}
             </div>
           </div>
-
-          {/* MOBILE VIEW: Vertical 1-Column Week List */}
-          <div className="md:hidden space-y-3">
+        </div>
+      ) : (
+        /* MOBILE VIEW: Vertical 1-Column Week List */
+        <div className="space-y-3">
             {weekDays.map((day, idx) => {
               const isCurrentDay = isToday(day);
               const dayPlans = plans.filter((plan) =>
@@ -601,7 +585,6 @@ export default function CalendarPage() {
               );
             })}
           </div>
-        </>
       )}
 
       {/* Plan Form Modal (Create / Edit) */}
@@ -623,6 +606,12 @@ export default function CalendarPage() {
           setCreateModalOpen(true);
         }}
         onDeleted={fetchPlans}
+        onUpdated={(updated) => {
+          fetchPlans();
+          if (updated) {
+            setSelectedPlanForDetail(updated);
+          }
+        }}
       />
 
       {/* Special Day Information Modal */}

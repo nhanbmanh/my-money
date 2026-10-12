@@ -39,14 +39,14 @@ import { useLanguage } from "@/components/language-provider";
 import { ASSET_CATEGORY_TYPES } from "@/lib/asset-category-types";
 
 export function AuthShell({ children }: { children: React.ReactNode }) {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const pathname = usePathname();
   const { t, language } = useLanguage();
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [wealthMenuOpen, setWealthMenuOpen] = useState(false);
 
-  if (status !== "authenticated") {
+  if (status !== "authenticated" || session?.user?.role === "admin" || pathname === "/database") {
     return <div className="min-h-screen bg-background">{children}</div>;
   }
 

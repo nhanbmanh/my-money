@@ -42,7 +42,7 @@ export async function GET(req: Request) {
 
     const endOfToday = getEndOfTodayVN();
 
-    // 1. Auto-update plans that have reached their execution date (date <= endOfToday) and still have status === 0 (Todo) to status === 1 (In Progress)
+    // Auto-update plans that have reached their execution date (date <= endOfToday) and still have status === 0 (Todo) to status === 1 (In Progress)
     await prisma.calendarPlan.updateMany({
       where: {
         userId,
@@ -53,20 +53,6 @@ export async function GET(req: Request) {
       },
       data: {
         status: 1,
-      },
-    });
-
-    // 2. Revert any future plans (date > endOfToday) that were incorrectly set to status 1 back to status 0 (Todo)
-    await prisma.calendarPlan.updateMany({
-      where: {
-        userId,
-        status: 1,
-        date: {
-          gt: endOfToday,
-        },
-      },
-      data: {
-        status: 0,
       },
     });
 

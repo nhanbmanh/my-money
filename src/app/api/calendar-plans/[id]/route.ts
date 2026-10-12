@@ -79,6 +79,86 @@ export async function PUT(
   }
 }
 
+const patchPlanSchema = z.object({
+  title: z.string().min(1, "Tiêu đề không được để trống").optional(),
+  content: z.string().optional().nullable(),
+  date: z
+    .string()
+    .refine((val) => !isNaN(Date.parse(val)), {
+      message: "Ngày không hợp lệ",
+    })
+    .optional(),
+  status: z.number().int().min(0).max(3).optional(),
+});
+
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await auth();
+    let userId = session?.user?.id;
+
+    if (!userId) {
+      const firstUser = await prisma.user.findFirst();
+      if (firstUser) userId = firstUser.id;
+    }
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const body = await req.json();
+    const validatedData = patchPlanSchema.parse(body);
+
+    const existingPlan = await prisma.calendarPlan.findFirst({
+      where: { id, userId },
+    });
+
+    if (!existingPlan) {
+      return NextResponse.json(
+        { error: "Không tìm thấy kế hoạch" },
+        { status: 404 }
+      );
+    }
+
+    const dataToUpdate: any = {};
+    if (validatedData.title !== undefined) dataToUpdate.title = validatedData.title;
+    if (validatedData.content !== undefined) dataToUpdate.content = validatedData.content || null;
+    if (validatedData.date !== undefined) dataToUpdate.date = new Date(validatedData.date);
+
+    if (validatedData.status !== undefined) {
+      let finalStatus = validatedData.status;
+      const targetDate = dataToUpdate.date || existingPlan.date;
+      const endOfToday = getEndOfTodayVN();
+      if (finalStatus === 0 && targetDate <= endOfToday) {
+        finalStatus = 1;
+      }
+      dataToUpdate.status = finalStatus;
+    }
+
+    const updatedPlan = await prisma.calendarPlan.update({
+      where: { id },
+      data: dataToUpdate,
+    });
+
+    return NextResponse.json(updatedPlan);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: error.issues[0]?.message || "Dữ liệu không hợp lệ" },
+        { status: 400 }
+      );
+    }
+    console.error("PATCH /api/calendar-plans/[id] error:", error);
+    return NextResponse.json(
+      { error: "Lỗi server khi cập nhật kế hoạch" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> }

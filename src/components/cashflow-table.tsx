@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   RefreshCw,
   Bookmark,
+  History,
 } from "lucide-react";
 import { checkIsIncomplete, getMissingFields } from "@/lib/incomplete-checker";
 import { Button } from "@/components/ui/button";
@@ -133,6 +134,8 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
   const [secondaryCategories, setSecondaryCategories] = useState<Category[]>(
     [],
   );
+  const [loadingEarliest, setLoadingEarliest] = useState(false);
+  const [earliestDate, setEarliestDate] = useState<Date | null>(null);
 
   // Selection
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -270,6 +273,49 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
     );
   };
 
+  const handleSetAllTime = async () => {
+    try {
+      setLoadingEarliest(true);
+      let targetDate = earliestDate;
+      if (!targetDate) {
+        const res = await fetch("/api/cashflow/earliest-date");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.earliestDate) {
+            targetDate = new Date(data.earliestDate);
+            setEarliestDate(targetDate);
+          }
+        }
+      }
+
+      if (targetDate) {
+        setDateFrom(startOfDay(targetDate));
+        setDateTo(endOfDay(new Date()));
+        setPage(1);
+      } else {
+        alert(t("financial.noTransactionsFound"));
+      }
+    } catch (e) {
+      console.error("Failed to fetch earliest date", e);
+    } finally {
+      setLoadingEarliest(false);
+    }
+  };
+
+  const handleSetLastMonth = () => {
+    setDateFrom(DEFAULT_DATE_FROM);
+    setDateTo(DEFAULT_DATE_TO);
+    setPage(1);
+  };
+
+  const isLastMonthActive =
+    format(dateFrom, "yyyy-MM-dd") === format(DEFAULT_DATE_FROM, "yyyy-MM-dd") &&
+    format(dateTo, "yyyy-MM-dd") === format(DEFAULT_DATE_TO, "yyyy-MM-dd");
+
+  const isAllTimeActive =
+    earliestDate !== null &&
+    format(dateFrom, "yyyy-MM-dd") === format(startOfDay(earliestDate), "yyyy-MM-dd");
+
   const resetFilters = () => {
     setSearch("");
     setDateFrom(DEFAULT_DATE_FROM);
@@ -278,6 +324,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
     setCategoryId("all");
     setSecondaryCategoryIds([]);
     setCashType("all");
+    setPage(1);
   };
 
   // Checkbox handlers
@@ -297,6 +344,7 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
 
   const handleMutationSuccess = useCallback(() => {
     fetchData();
+    setEarliestDate(null);
     setLocalRefreshKey((k) => k + 1);
     setBudgetsUpdatedKey((k) => k + 1);
     window.dispatchEvent(
@@ -399,9 +447,9 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
           <PopoverTrigger asChild>
             <Button
               variant="outline"
-              className="justify-start text-left font-normal bg-white"
+              className="justify-start text-left font-normal bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100"
             >
-              <CalendarIcon className="mr-2 h-4 w-4" />
+              <CalendarIcon className="mr-2 h-4 w-4 text-sky-600 dark:text-sky-400" />
               {t("financial.filterDateFrom")}: {format(dateFrom, "dd/MM/yyyy")}
             </Button>
           </PopoverTrigger>
@@ -431,6 +479,40 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
             />
           </PopoverContent>
         </Popover>
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleSetLastMonth}
+            className={cn(
+              "text-xs font-medium h-8 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all",
+              isLastMonthActive &&
+                "border-sky-500 text-sky-600 dark:text-sky-400 font-bold bg-sky-50/70 dark:bg-sky-950/40"
+            )}
+          >
+            {t("financial.filterLastMonth")}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleSetAllTime}
+            disabled={loadingEarliest}
+            className={cn(
+              "text-xs font-medium h-8 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center gap-1.5",
+              isAllTimeActive &&
+                "border-sky-500 text-sky-600 dark:text-sky-400 font-bold bg-sky-50/70 dark:bg-sky-950/40"
+            )}
+          >
+            {loadingEarliest ? (
+              <Spinner className="h-3.5 w-3.5" />
+            ) : (
+              <History className="h-3.5 w-3.5 text-sky-500" />
+            )}
+            {t("financial.filterAllTime")}
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3">
