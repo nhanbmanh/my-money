@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { format, subMonths, startOfDay, endOfDay } from "date-fns";
+import { format, subMonths, startOfDay, endOfDay, startOfMonth } from "date-fns";
 import {
   CalendarIcon,
   ChevronUp,
@@ -101,7 +101,8 @@ type CashFlowItem = {
   primaryCategoryId: string | null;
 };
 
-const DEFAULT_DATE_FROM = startOfDay(subMonths(new Date(), 1));
+const DEFAULT_DATE_FROM = startOfMonth(new Date());
+const LAST_MONTH_DATE_FROM = startOfDay(subMonths(new Date(), 1));
 const DEFAULT_DATE_TO = endOfDay(new Date());
 
 export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
@@ -303,13 +304,13 @@ export function CashFlowTable({ refreshKey }: { refreshKey: number }) {
   };
 
   const handleSetLastMonth = () => {
-    setDateFrom(DEFAULT_DATE_FROM);
+    setDateFrom(LAST_MONTH_DATE_FROM);
     setDateTo(DEFAULT_DATE_TO);
     setPage(1);
   };
 
   const isLastMonthActive =
-    format(dateFrom, "yyyy-MM-dd") === format(DEFAULT_DATE_FROM, "yyyy-MM-dd") &&
+    format(dateFrom, "yyyy-MM-dd") === format(LAST_MONTH_DATE_FROM, "yyyy-MM-dd") &&
     format(dateTo, "yyyy-MM-dd") === format(DEFAULT_DATE_TO, "yyyy-MM-dd");
 
   const isAllTimeActive =
